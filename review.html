@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tenant Dashboard — Rentura Preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;overflow-x:hidden}
+
+  .shell{display:flex;min-height:100vh}
+
+  /* ── Sidebar ── */
+  .sidebar{width:260px;background:#0F172A;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;transition:transform .25s}
+  .sb-logo{display:flex;align-items:center;gap:12px;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.07)}
+  .sb-logo-icon{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#3B82F6,#6366F1);display:flex;align-items:center;justify-content:center;font-size:18px}
+  .sb-logo-name{font-family:'Fraunces',serif;font-size:19px;font-weight:700;color:#F8FAFC}
+  .sb-nav{flex:1;padding:14px 12px;overflow-y:auto}
+  .sb-nav::-webkit-scrollbar{width:0}
+  .sb-section{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#4B6587;padding:16px 10px 7px;display:block}
+  .sb-item{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;color:#94A3B8;font-size:13.5px;font-weight:500;cursor:pointer;transition:all .15s;margin-bottom:2px;text-decoration:none}
+  .sb-item:hover{background:rgba(255,255,255,.07);color:#CBD5E1}
+  .sb-item.active{background:rgba(59,130,246,.16);color:#93C5FD;font-weight:700;border:1px solid rgba(59,130,246,.22)}
+  .sb-ico{font-size:16px;width:20px;text-align:center}
+  .sb-footer{border-top:1px solid rgba(255,255,255,.07);padding:14px 18px;display:flex;align-items:center;gap:10px}
+  .sb-av{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#10B981,#34D399);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0}
+  .sb-uname{font-size:13px;font-weight:700;color:#E2E8F0}
+  .sb-badge{display:inline-block;font-size:9.5px;font-weight:700;color:#34D399;background:rgba(16,185,129,.14);border:1px solid rgba(16,185,129,.25);border-radius:4px;padding:1px 6px;margin-top:2px}
+
+  /* ── Main ── */
+  .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0}
+  .topbar{height:56px;background:#fff;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(15,23,42,.04)}
+  .breadcrumb{font-size:13px;color:#94A3B8;font-weight:500}
+  .breadcrumb b{color:#0F172A}
+  .topbar-right{display:flex;align-items:center;gap:10px}
+  .notif-btn{width:34px;height:34px;border-radius:9px;background:#F1F5F9;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;font-size:15px}
+  .notif-dot{width:8px;height:8px;background:#DC2626;border-radius:50%;position:absolute;top:5px;right:5px;border:1.5px solid #fff}
+  .content{padding:28px;flex:1}
+
+  /* ── Hero ── */
+  .hero{background:linear-gradient(135deg,#0F172A 0%,#1E293B 55%,#1a3354 100%);border-radius:20px;padding:28px 32px;margin-bottom:22px;display:flex;align-items:center;justify-content:space-between;position:relative;overflow:hidden}
+  .hero::before{content:'';position:absolute;top:-60px;right:-60px;width:260px;height:260px;background:radial-gradient(circle,rgba(99,102,241,.2) 0%,transparent 65%);pointer-events:none}
+  .hero::after{content:'';position:absolute;bottom:-40px;left:30%;width:180px;height:180px;background:radial-gradient(circle,rgba(59,130,246,.12) 0%,transparent 65%);pointer-events:none}
+  .hero-greeting{font-size:13px;color:#64748B;margin-bottom:4px}
+  .hero-name{font-family:'Fraunces',serif;font-size:28px;font-weight:700;color:#fff;margin-bottom:10px}
+  .hero-chips{display:flex;gap:10px;flex-wrap:wrap}
+  .hero-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#CBD5E1;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:5px 11px}
+  .hero-right{text-align:right;flex-shrink:0}
+  .hero-rent-label{font-size:12px;color:#64748B;margin-bottom:4px}
+  .hero-rent{font-family:'Fraunces',serif;font-size:36px;font-weight:700;color:#fff;line-height:1}
+  .hero-rent-sub{font-size:12px;color:#64748B;margin-top:4px}
+  .hero-status-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:4px 11px;border-radius:99px;margin-top:8px;background:rgba(251,191,36,.15);color:#FCD34D;border:1px solid rgba(251,191,36,.25)}
+
+  /* ── Quick actions ── */
+  .quick-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}
+  .qa-card{background:#fff;border:1.5px solid #E2E8F0;border-radius:14px;padding:18px 14px;text-align:center;cursor:pointer;transition:all .18s;box-shadow:0 1px 4px rgba(15,23,42,.04)}
+  .qa-card:hover{border-color:#BFDBFE;box-shadow:0 6px 20px rgba(37,99,235,.1);transform:translateY(-2px)}
+  .qa-icon{font-size:24px;margin-bottom:7px}
+  .qa-label{font-size:12.5px;font-weight:700;color:#475569}
+
+  /* ── Stats ── */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}
+  .stat-card{background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:18px;box-shadow:0 1px 4px rgba(15,23,42,.04)}
+  .stat-icon{font-size:20px;margin-bottom:8px}
+  .stat-val{font-family:'Fraunces',serif;font-size:26px;font-weight:700;color:#0F172A;line-height:1;margin-bottom:3px}
+  .stat-label{font-size:11px;color:#94A3B8;font-weight:500}
+  .stat-sub{font-size:11.5px;font-weight:600;margin-top:5px}
+
+  /* ── Grid ── */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .card{background:#fff;border:1px solid #E2E8F0;border-radius:16px;padding:20px;box-shadow:0 1px 4px rgba(15,23,42,.04)}
+  .card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8}
+  .card-action{font-size:12px;font-weight:600;color:#2563EB;cursor:pointer;text-decoration:none}
+
+  /* Rent card */
+  .rent-amount{font-family:'Fraunces',serif;font-size:38px;font-weight:700;color:#0F172A;margin-bottom:4px}
+  .rent-meta{font-size:13px;color:#64748B;margin-bottom:18px}
+  .pay-btn{width:100%;padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 4px 14px rgba(37,99,235,.3);transition:opacity .15s}
+  .pay-btn:hover{opacity:.9}
+
+  /* Lease */
+  .lease-dates{display:flex;justify-content:space-between;font-size:12px;color:#64748B;margin-bottom:8px}
+  .lease-bar-bg{height:8px;background:#E2E8F0;border-radius:99px;overflow:hidden;margin-bottom:7px}
+  .lease-bar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#2563EB,#6366F1)}
+  .lease-pct-row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:14px}
+  .lease-status{padding:10px 14px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:#16A34A}
+
+  /* Payment timeline */
+  .tl{display:flex;flex-direction:column;gap:8px}
+  .tl-row{display:flex;align-items:center;gap:10px;padding:11px 12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:11px}
+  .tl-dot{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+  .tl-month{font-size:13px;font-weight:600;color:#0F172A;flex:1}
+  .tl-amount{font-size:13px;font-weight:700;color:#0F172A;margin-right:8px}
+  .tl-badge{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:99px}
+
+  /* Maintenance */
+  .maint-row{display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid #E2E8F0;border-radius:11px;margin-bottom:8px;cursor:pointer;transition:border-color .15s}
+  .maint-row:hover{border-color:#BFDBFE}
+  .maint-priority{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .maint-title{font-size:13px;font-weight:600;color:#0F172A;flex:1}
+  .maint-date{font-size:11px;color:#94A3B8;margin-right:8px}
+  .maint-badge{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:99px}
+
+  /* Messages */
+  .msg-row{display:flex;gap:10px;padding:12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px}
+  .msg-av{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#2563EB,#6366F1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0}
+  .msg-from{font-size:13px;font-weight:700;color:#0F172A}
+  .msg-text{font-size:12px;color:#64748B;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
+  .msg-time{font-size:11px;color:#94A3B8}
+  .msg-unread{width:8px;height:8px;background:#2563EB;border-radius:50%;margin-top:5px}
+
+  .right-col{display:flex;flex-direction:column;gap:16px}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sb-logo">
+      <div class="sb-logo-icon">🏘️</div>
+      <span class="sb-logo-name">Rentura</span>
+    </div>
+    <nav class="sb-nav">
+      <span class="sb-section">My Home</span>
+      <a class="sb-item active"><span class="sb-ico">⊞</span> Dashboard</a>
+      <a class="sb-item"><span class="sb-ico">💰</span> Rent & Payments</a>
+      <a class="sb-item"><span class="sb-ico">📋</span> My Lease</a>
+      <a class="sb-item"><span class="sb-ico">🔧</span> Maintenance</a>
+      <a class="sb-item"><span class="sb-ico">📁</span> Documents</a>
+      <a class="sb-item"><span class="sb-ico">💬</span> Messages <span style="margin-left:auto;background:#DC2626;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px">1</span></a>
+      <span class="sb-section">Account</span>
+      <a class="sb-item"><span class="sb-ico">⚙️</span> Settings</a>
+    </nav>
+    <div class="sb-footer">
+      <div class="sb-av">AF</div>
+      <div>
+        <div class="sb-uname">Aisha Fernandez</div>
+        <span class="sb-badge">TENANT</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <div class="breadcrumb">Rentura &nbsp;/&nbsp; <b>Dashboard</b></div>
+      <div class="topbar-right">
+        <button class="notif-btn">🔔<div class="notif-dot"></div></button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- Hero -->
+      <div class="hero">
+        <div>
+          <div class="hero-greeting">Good morning,</div>
+          <div class="hero-name">Aisha Fernandez 👋</div>
+          <div class="hero-chips">
+            <span class="hero-chip">🏠 Rush Towers</span>
+            <span class="hero-chip">🚪 Unit 4B</span>
+            <span class="hero-chip">👤 Landlord: Nahji Nuzaf</span>
+          </div>
+        </div>
+        <div class="hero-right">
+          <div class="hero-rent-label">Monthly Rent</div>
+          <div class="hero-rent">$1,250</div>
+          <div class="hero-rent-sub">Due on the 5th each month</div>
+          <div class="hero-status-pill">⏳ Due in 6 days</div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <div class="qa-card"><div class="qa-icon">💳</div><div class="qa-label">Pay Rent</div></div>
+        <div class="qa-card"><div class="qa-icon">🔧</div><div class="qa-label">Request Repair</div></div>
+        <div class="qa-card"><div class="qa-icon">💬</div><div class="qa-label">Message Landlord</div></div>
+        <div class="qa-card"><div class="qa-icon">📄</div><div class="qa-label">View Documents</div></div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats">
+        <div class="stat-card">
+          <div class="stat-icon">📅</div>
+          <div class="stat-val" style="color:#D97706">6d</div>
+          <div class="stat-label">Until Rent Due</div>
+          <div class="stat-sub" style="color:#64748B">Due Mar 5</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">💳</div>
+          <div class="stat-val" style="color:#D97706">Pending</div>
+          <div class="stat-label">March Payment</div>
+          <div class="stat-sub" style="color:#64748B">$1,250 due</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📋</div>
+          <div class="stat-val">58%</div>
+          <div class="stat-label">Lease Complete</div>
+          <div class="stat-sub" style="color:#2563EB">296 days left</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🔧</div>
+          <div class="stat-val" style="color:#D97706">2</div>
+          <div class="stat-label">Open Requests</div>
+          <div class="stat-sub" style="color:#64748B">1 in progress</div>
+        </div>
+      </div>
+
+      <!-- Grid -->
+      <div class="grid2">
+
+        <!-- Left col -->
+        <div style="display:flex;flex-direction:column;gap:16px">
+
+          <!-- Rent card -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Current Month Rent</div>
+              <a class="card-action">View All →</a>
+            </div>
+            <div class="rent-amount">$1,250</div>
+            <div class="rent-meta">Due March 5, 2025 · 6 days away</div>
+            <button class="pay-btn">💳 Pay Rent Now</button>
+          </div>
+
+          <!-- Lease progress -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Lease Progress</div>
+              <a class="card-action">View Lease →</a>
+            </div>
+            <div class="lease-dates"><span>Jan 1, 2024</span><span>Dec 31, 2025</span></div>
+            <div class="lease-bar-bg"><div class="lease-bar-fill" style="width:58%"></div></div>
+            <div class="lease-pct-row">
+              <span style="color:#64748B">58% elapsed</span>
+              <span style="color:#2563EB;font-weight:700">296 days left</span>
+            </div>
+            <div class="lease-status">✅ Lease is active and in good standing</div>
+          </div>
+
+        </div>
+
+        <!-- Right col -->
+        <div class="right-col">
+
+          <!-- Payment history -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Recent Payments</div>
+              <a class="card-action">View All →</a>
+            </div>
+            <div class="tl">
+              <div class="tl-row">
+                <div class="tl-dot" style="background:#FEF9C3;color:#CA8A04">○</div>
+                <div class="tl-month">Mar 2025</div>
+                <div class="tl-amount">$1,250</div>
+                <span class="tl-badge" style="background:#FEF9C3;color:#CA8A04">Pending</span>
+              </div>
+              <div class="tl-row">
+                <div class="tl-dot" style="background:#DCFCE7;color:#16A34A">✓</div>
+                <div class="tl-month">Feb 2025</div>
+                <div class="tl-amount">$1,250</div>
+                <span class="tl-badge" style="background:#DCFCE7;color:#16A34A">Paid</span>
+              </div>
+              <div class="tl-row">
+                <div class="tl-dot" style="background:#DCFCE7;color:#16A34A">✓</div>
+                <div class="tl-month">Jan 2025</div>
+                <div class="tl-amount">$1,250</div>
+                <span class="tl-badge" style="background:#DCFCE7;color:#16A34A">Paid</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Maintenance -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Maintenance</div>
+              <a class="card-action">+ New Request</a>
+            </div>
+            <div class="maint-row">
+              <div class="maint-priority" style="background:#DC2626"></div>
+              <div class="maint-title">AC not cooling properly</div>
+              <div class="maint-date">Mar 1</div>
+              <span class="maint-badge" style="background:#FEF9C3;color:#CA8A04">In Progress</span>
+            </div>
+            <div class="maint-row">
+              <div class="maint-priority" style="background:#D97706"></div>
+              <div class="maint-title">Leaking tap in kitchen</div>
+              <div class="maint-date">Feb 28</div>
+              <span class="maint-badge" style="background:#FEE2E2;color:#DC2626">Open</span>
+            </div>
+          </div>
+
+          <!-- Messages -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Messages</div>
+              <a class="card-action">View All →</a>
+            </div>
+            <div class="msg-row">
+              <div class="msg-av">NN</div>
+              <div style="flex:1;min-width:0">
+                <div class="msg-from">Nahji Nuzaf</div>
+                <div class="msg-text">Hi Aisha, the plumber is scheduled for Thursday.</div>
+                <div class="msg-time">2h ago</div>
+              </div>
+              <div class="msg-unread"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
