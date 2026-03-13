@@ -20,8 +20,8 @@ type Property = {
 }
 
 const STATUS_CFG: Record<string, { label: string; bg: string; color: string; banner: string }> = {
-  active:   { label: 'Active',   bg: '#DCFCE7', color: '#16A34A', banner: 'linear-gradient(135deg,#EFF6FF,#EEF2FF)' },
-  listed:   { label: 'Listed',   bg: '#FEF3C7', color: '#D97706', banner: 'linear-gradient(135deg,#FFFBEB,#FEF3C7)' },
+  active: { label: 'Active', bg: '#DCFCE7', color: '#16A34A', banner: 'linear-gradient(135deg,#EFF6FF,#EEF2FF)' },
+  listed: { label: 'Listed', bg: '#FEF3C7', color: '#D97706', banner: 'linear-gradient(135deg,#FFFBEB,#FEF3C7)' },
   inactive: { label: 'Inactive', bg: '#F1F5F9', color: '#64748B', banner: 'linear-gradient(135deg,#F8FAFC,#F1F5F9)' },
 }
 
@@ -35,19 +35,19 @@ export default function PropertiesPage() {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [userId, setUserId]             = useState('')
+  const [userId, setUserId] = useState('')
   const [userInitials, setUserInitials] = useState('NN')
-  const [fullName, setFullName]         = useState('User')
-  const [sidebarOpen, setSidebarOpen]   = useState(false)
-  const [properties, setProperties]     = useState<Property[]>([])
-  const [loading, setLoading]           = useState(true)
-  const [filter, setFilter]             = useState<'all'|'active'|'listed'|'inactive'>('all')
+  const [fullName, setFullName] = useState('User')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [properties, setProperties] = useState<Property[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<'all' | 'active' | 'listed' | 'inactive'>('all')
 
   // Drawer
-  const [drawer, setDrawer]       = useState<'add'|'edit'|null>(null)
-  const [editing, setEditing]     = useState<Property|null>(null)
-  const [saving, setSaving]       = useState(false)
-  const [saveError, setSaveError] = useState<string|null>(null)
+  const [drawer, setDrawer] = useState<'add' | 'edit' | null>(null)
+  const [editing, setEditing] = useState<Property | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [form, setForm] = useState({
     name: '', address: '', city: '', country: 'Sri Lanka',
     type: 'apartment', status: 'active',
@@ -55,7 +55,7 @@ export default function PropertiesPage() {
   })
 
   // Photo upload state
-  const [photoFiles, setPhotoFiles]     = useState<File[]>([])
+  const [photoFiles, setPhotoFiles] = useState<File[]>([])
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
   const [uploadingPhotos, setUploadingPhotos] = useState(false)
 
@@ -63,8 +63,8 @@ export default function PropertiesPage() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   // Delete
-  const [deleteConfirm, setDeleteConfirm] = useState<string|null>(null)
-  const [deleting, setDeleting]           = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   // ── LOAD ─────────────────────────────────────────────────
   useEffect(() => {
@@ -77,7 +77,7 @@ export default function PropertiesPage() {
 
         const name = user.user_metadata?.full_name || 'User'
         setFullName(name)
-        setUserInitials(name.split(' ').map((n:string)=>n[0]).join('').toUpperCase().slice(0,2))
+        setUserInitials(name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2))
 
         // Flat query — no nested joins
         const { data: props, error } = await supabase
@@ -88,31 +88,31 @@ export default function PropertiesPage() {
         if (error) throw error
 
         // Flat units query
-        const propIds = (props||[]).map((p:any) => p.id)
-        let unitMap: Record<string, {occupied:number; avg_rent:number}> = {}
+        const propIds = (props || []).map((p: any) => p.id)
+        let unitMap: Record<string, { occupied: number; avg_rent: number }> = {}
         if (propIds.length > 0) {
           const { data: units } = await supabase
             .from('units')
             .select('id, property_id, status, monthly_rent')
             .in('property_id', propIds)
-          ;(units||[]).forEach((u:any) => {
-            if (!unitMap[u.property_id]) unitMap[u.property_id] = { occupied: 0, avg_rent: 0 }
-            if (u.status === 'occupied') unitMap[u.property_id].occupied++
-          })
+            ; (units || []).forEach((u: any) => {
+              if (!unitMap[u.property_id]) unitMap[u.property_id] = { occupied: 0, avg_rent: 0 }
+              if (u.status === 'occupied') unitMap[u.property_id].occupied++
+            })
           // avg rent per property
           const rentTotals: Record<string, number[]> = {}
-          ;(units||[]).forEach((u:any) => {
-            if (!rentTotals[u.property_id]) rentTotals[u.property_id] = []
-            if (u.monthly_rent) rentTotals[u.property_id].push(u.monthly_rent)
-          })
+            ; (units || []).forEach((u: any) => {
+              if (!rentTotals[u.property_id]) rentTotals[u.property_id] = []
+              if (u.monthly_rent) rentTotals[u.property_id].push(u.monthly_rent)
+            })
           Object.keys(rentTotals).forEach(pid => {
             const rents = rentTotals[pid]
             unitMap[pid].avg_rent = rents.length > 0
-              ? Math.round(rents.reduce((a,b)=>a+b,0) / rents.length) : 0
+              ? Math.round(rents.reduce((a, b) => a + b, 0) / rents.length) : 0
           })
         }
 
-        const shaped: Property[] = (props||[]).map((p:any) => ({
+        const shaped: Property[] = (props || []).map((p: any) => ({
           id: p.id, name: p.name, address: p.address || '',
           city: p.city, country: p.country,
           total_units: p.total_units,
@@ -135,9 +135,9 @@ export default function PropertiesPage() {
 
   const filtered = filter === 'all' ? properties : properties.filter(p => p.status === filter)
   const counts = {
-    all:      properties.length,
-    active:   properties.filter(p => p.status === 'active').length,
-    listed:   properties.filter(p => p.status === 'listed').length,
+    all: properties.length,
+    active: properties.filter(p => p.status === 'active').length,
+    listed: properties.filter(p => p.status === 'listed').length,
     inactive: properties.filter(p => p.status === 'inactive').length,
   }
 
@@ -158,8 +158,8 @@ export default function PropertiesPage() {
   }
 
   function removePhoto(idx: number) {
-    setPhotoFiles(prev => prev.filter((_,i)=>i!==idx))
-    setPhotoPreviews(prev => prev.filter((_,i)=>i!==idx))
+    setPhotoFiles(prev => prev.filter((_, i) => i !== idx))
+    setPhotoPreviews(prev => prev.filter((_, i) => i !== idx))
   }
 
   async function uploadPhotos(propertyId: string): Promise<string[]> {
@@ -167,7 +167,7 @@ export default function PropertiesPage() {
     const supabase = createClient()
     const urls: string[] = []
     for (const file of photoFiles) {
-      const ext  = file.name.split('.').pop()
+      const ext = file.name.split('.').pop()
       const path = `properties/${propertyId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
       const { error } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
       if (!error) {
@@ -181,7 +181,7 @@ export default function PropertiesPage() {
   // ── ADD ──────────────────────────────────────────────────
   function openAdd() {
     if (properties.length >= FREE_PLAN_LIMIT) { setShowUpgradeModal(true); return }
-    setForm({ name:'', address:'', city:'', country:'Sri Lanka', type:'apartment', status:'active', total_units:'', default_rent:'' })
+    setForm({ name: '', address: '', city: '', country: 'Sri Lanka', type: 'apartment', status: 'active', total_units: '', default_rent: '' })
     setEditing(null)
     setSaveError(null)
     setPhotoFiles([])
@@ -207,8 +207,8 @@ export default function PropertiesPage() {
 
   // ── SAVE ─────────────────────────────────────────────────
   async function handleSave() {
-    if (!form.name.trim())  { setSaveError('Property name is required.'); return }
-    if (!form.city.trim())  { setSaveError('City is required.'); return }
+    if (!form.name.trim()) { setSaveError('Property name is required.'); return }
+    if (!form.city.trim()) { setSaveError('City is required.'); return }
     if (drawer === 'add' && (!form.total_units || parseInt(form.total_units) < 1)) {
       setSaveError('Total units must be at least 1.'); return
     }
@@ -223,12 +223,12 @@ export default function PropertiesPage() {
         // 1. Insert property first (need id for photo upload)
         const { data: newProp, error: propErr } = await supabase
           .from('properties').insert({
-            name:        form.name.trim(),
-            address:     form.address.trim(),
-            city:        form.city.trim(),
-            country:     form.country.trim(),
-            type:        form.type,
-            status:      form.status,
+            name: form.name.trim(),
+            address: form.address.trim(),
+            city: form.city.trim(),
+            country: form.country.trim(),
+            type: form.type,
+            status: form.status,
             total_units: parseInt(form.total_units) || 1,
             landlord_id: user.id,
           }).select().single()
@@ -244,14 +244,14 @@ export default function PropertiesPage() {
 
         // 3. Create units
         const count = parseInt(form.total_units) || 1
-        const rent  = parseFloat(form.default_rent) || 0
+        const rent = parseFloat(form.default_rent) || 0
         await supabase.from('units').insert(
-          Array.from({ length: count }, (_,i) => ({
-            property_id:  newProp.id,
-            unit_number:  `Unit ${i+1}`,
+          Array.from({ length: count }, (_, i) => ({
+            property_id: newProp.id,
+            unit_number: `Unit ${i + 1}`,
             monthly_rent: rent,
-            currency:     'USD',
-            status:       'vacant',
+            currency: 'USD',
+            status: 'vacant',
           }))
         )
 
@@ -266,21 +266,21 @@ export default function PropertiesPage() {
       } else if (drawer === 'edit' && editing) {
         // For edit: new files get uploaded, existing URLs kept from previews
         setUploadingPhotos(true)
-        const newUrls   = await uploadPhotos(editing.id)
+        const newUrls = await uploadPhotos(editing.id)
         setUploadingPhotos(false)
         // Existing photos = previews that are URLs (not data:// blobs)
-        const keptUrls  = photoPreviews.filter(p => p.startsWith('http'))
+        const keptUrls = photoPreviews.filter(p => p.startsWith('http'))
         const allPhotos = [...keptUrls, ...newUrls].slice(0, 3)
 
         const payload = {
-          name:        form.name.trim(),
-          address:     form.address.trim(),
-          city:        form.city.trim(),
-          country:     form.country.trim(),
-          type:        form.type,
-          status:      form.status,
+          name: form.name.trim(),
+          address: form.address.trim(),
+          city: form.city.trim(),
+          country: form.country.trim(),
+          type: form.type,
+          status: form.status,
           total_units: parseInt(form.total_units) || 1,
-          photos:      allPhotos,
+          photos: allPhotos,
         }
         const { error: updErr } = await supabase.from('properties').update(payload).eq('id', editing.id)
         if (updErr) throw new Error(updErr.message)
@@ -292,8 +292,11 @@ export default function PropertiesPage() {
 
         setProperties(prev => prev.map(p =>
           p.id === editing.id
-            ? { ...p, ...payload, type: payload.type.toLowerCase(), photos: allPhotos,
-                avg_rent: !isNaN(newRent) && newRent > 0 ? newRent : p.avg_rent }
+            ? {
+              ...p, ...payload, type: payload.type.toLowerCase(), photos: allPhotos,
+              status: payload.status as Property['status'],
+              avg_rent: !isNaN(newRent) && newRent > 0 ? newRent : p.avg_rent
+            }
             : p
         ))
       }
@@ -532,47 +535,47 @@ export default function PropertiesPage() {
       `}</style>
 
       {/* Hidden file input */}
-      <input ref={fileInputRef} type="file" accept="image/*" multiple style={{display:'none'}} onChange={handlePhotoSelect} />
+      <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handlePhotoSelect} />
 
-      <div className={`sb-overlay${sidebarOpen?' open':''}`} onClick={()=>setSidebarOpen(false)}/>
-      <div className={`drawer-overlay${drawer?' open':''}`} onClick={()=>setDrawer(null)}/>
+      <div className={`sb-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
+      <div className={`drawer-overlay${drawer ? ' open' : ''}`} onClick={() => setDrawer(null)} />
 
       {/* DELETE MODAL */}
-      <div className={`del-overlay${deleteConfirm?' open':''}`}>
+      <div className={`del-overlay${deleteConfirm ? ' open' : ''}`}>
         <div className="del-box">
           <div className="del-ico">🗑️</div>
           <div className="del-title">Delete Property?</div>
           <div className="del-sub">This will permanently delete the property and all its units. This cannot be undone.</div>
           <div className="del-actions">
-            <button className="del-cancel" onClick={()=>setDeleteConfirm(null)}>Cancel</button>
-            <button className="del-confirm" disabled={deleting} onClick={handleDelete}>{deleting?'Deleting…':'Yes, Delete'}</button>
+            <button className="del-cancel" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+            <button className="del-confirm" disabled={deleting} onClick={handleDelete}>{deleting ? 'Deleting…' : 'Yes, Delete'}</button>
           </div>
         </div>
       </div>
 
       {/* ADD / EDIT DRAWER */}
-      <div className={`drawer${drawer?' open':''}`}>
+      <div className={`drawer${drawer ? ' open' : ''}`}>
         <div className="drawer-head">
-          <span className="drawer-title">{drawer==='add'?'Add Property':'Edit Property'}</span>
-          <button className="drawer-close" onClick={()=>setDrawer(null)}>✕</button>
+          <span className="drawer-title">{drawer === 'add' ? 'Add Property' : 'Edit Property'}</span>
+          <button className="drawer-close" onClick={() => setDrawer(null)}>✕</button>
         </div>
         <div className="drawer-body">
 
           {/* PHOTO UPLOAD */}
           <div>
             <div className="photo-section-label">
-              <span>Photos <span style={{color:'#94A3B8',fontWeight:400}}>(up to 3)</span></span>
+              <span>Photos <span style={{ color: '#94A3B8', fontWeight: 400 }}>(up to 3)</span></span>
               <span className="photo-hint">{photoPreviews.length}/3 added</span>
             </div>
             <div className="photo-grid">
-              {photoPreviews.map((src,i) => (
+              {photoPreviews.map((src, i) => (
                 <div key={i} className="photo-slot">
-                  <img src={src} alt={`Photo ${i+1}`}/>
-                  <button className="photo-remove" onClick={()=>removePhoto(i)}>✕</button>
+                  <img src={src} alt={`Photo ${i + 1}`} />
+                  <button className="photo-remove" onClick={() => removePhoto(i)}>✕</button>
                 </div>
               ))}
               {photoPreviews.length < 3 && (
-                <div className="photo-slot photo-slot-add" onClick={()=>fileInputRef.current?.click()}>
+                <div className="photo-slot photo-slot-add" onClick={() => fileInputRef.current?.click()}>
                   <span>📷</span>Add Photo
                 </div>
               )}
@@ -583,32 +586,32 @@ export default function PropertiesPage() {
           <div className="field">
             <label>Property Name *</label>
             <input placeholder="e.g. Rush Towers, Sunset Villas" value={form.name}
-              onChange={e=>setForm(f=>({...f,name:e.target.value}))}/>
+              onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
           </div>
 
           <div className="field-row">
             <div className="field">
               <label>City *</label>
               <input placeholder="e.g. Colombo 05" value={form.city}
-                onChange={e=>setForm(f=>({...f,city:e.target.value}))}/>
+                onChange={e => setForm(f => ({ ...f, city: e.target.value }))} />
             </div>
             <div className="field">
               <label>Country</label>
               <input placeholder="e.g. Sri Lanka" value={form.country}
-                onChange={e=>setForm(f=>({...f,country:e.target.value}))}/>
+                onChange={e => setForm(f => ({ ...f, country: e.target.value }))} />
             </div>
           </div>
 
           <div className="field">
-            <label>Street Address <span style={{color:'#94A3B8',fontWeight:400}}>(optional)</span></label>
+            <label>Street Address <span style={{ color: '#94A3B8', fontWeight: 400 }}>(optional)</span></label>
             <input placeholder="e.g. 42 Galle Road" value={form.address}
-              onChange={e=>setForm(f=>({...f,address:e.target.value}))}/>
+              onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
           </div>
 
           <div className="field-row">
             <div className="field">
               <label>Property Type</label>
-              <select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}>
+              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
                 <option value="apartment">Apartment Building</option>
                 <option value="house">House / Villa</option>
                 <option value="commercial">Commercial</option>
@@ -617,7 +620,7 @@ export default function PropertiesPage() {
             </div>
             <div className="field">
               <label>Status</label>
-              <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
+              <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
                 <option value="active">Active</option>
                 <option value="listed">Listed (For Rent)</option>
                 <option value="inactive">Inactive</option>
@@ -629,18 +632,18 @@ export default function PropertiesPage() {
             <div className="field">
               <label>Total Units *</label>
               <input type="number" min="1" placeholder="e.g. 20" value={form.total_units}
-                onChange={e=>setForm(f=>({...f,total_units:e.target.value}))}
-                disabled={drawer==='edit'}/>
+                onChange={e => setForm(f => ({ ...f, total_units: e.target.value }))}
+                disabled={drawer === 'edit'} />
             </div>
             <div className="field">
               <label>Default Rent (USD)</label>
               <input type="number" min="0" placeholder="e.g. 500" value={form.default_rent}
-                onChange={e=>setForm(f=>({...f,default_rent:e.target.value}))}/>
+                onChange={e => setForm(f => ({ ...f, default_rent: e.target.value }))} />
             </div>
           </div>
 
           <div className="hint">
-            {drawer==='add'
+            {drawer === 'add'
               ? '💡 All units will be created automatically. Go to Manage Units on the card to set individual rents per unit.'
               : '💡 Changing the default rent will update all units. Use Manage Units to set individual rents.'}
           </div>
@@ -650,15 +653,15 @@ export default function PropertiesPage() {
 
         <div className="drawer-footer">
           <div className="btn-row">
-            <button className="btn-cancel" onClick={()=>setDrawer(null)}>Cancel</button>
-            <button className="btn-save" disabled={saving||uploadingPhotos} onClick={handleSave}>{savingLabel}</button>
+            <button className="btn-cancel" onClick={() => setDrawer(null)}>Cancel</button>
+            <button className="btn-save" disabled={saving || uploadingPhotos} onClick={handleSave}>{savingLabel}</button>
           </div>
         </div>
       </div>
 
       <div className="shell">
         {/* SIDEBAR */}
-        <aside className={`sidebar${sidebarOpen?' open':''}`}>
+        <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="sb-logo"><div className="sb-logo-icon">🏘️</div><span className="sb-logo-name">Rentura</span></div>
           <nav className="sb-nav">
             <span className="sb-section">Overview</span>
@@ -680,7 +683,7 @@ export default function PropertiesPage() {
             <div className="sb-upgrade">
               <div className="sb-up-title">⭐ Upgrade to Pro</div>
               <div className="sb-up-sub">Unlimited properties, reports & priority support.</div>
-              <button className="sb-up-btn" onClick={()=>window.location.href='/landlord/upgrade'}>See Plans →</button>
+              <button className="sb-up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
             </div>
             <div className="sb-user">
               <div className="sb-av">{userInitials}</div>
@@ -693,7 +696,7 @@ export default function PropertiesPage() {
         <div className="main">
           <div className="topbar">
             <div className="tb-left">
-              <button className="hamburger" onClick={()=>setSidebarOpen(true)}>☰</button>
+              <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
               <div className="breadcrumb">Rentura &nbsp;/&nbsp; <b>Properties</b></div>
             </div>
             <button className="btn-primary" onClick={openAdd}>+ Add Property</button>
@@ -712,27 +715,27 @@ export default function PropertiesPage() {
               <div className="plan-bar-left">
                 <div className="plan-bar-label">Free plan · Properties used</div>
                 <div className="plan-bar-track">
-                  <div className="plan-bar-fill" style={{width:`${Math.min((counts.all/FREE_PLAN_LIMIT)*100,100)}%`,background:counts.all>=FREE_PLAN_LIMIT?'#EF4444':'linear-gradient(90deg,#3B82F6,#6366F1)'}}/>
+                  <div className="plan-bar-fill" style={{ width: `${Math.min((counts.all / FREE_PLAN_LIMIT) * 100, 100)}%`, background: counts.all >= FREE_PLAN_LIMIT ? '#EF4444' : 'linear-gradient(90deg,#3B82F6,#6366F1)' }} />
                 </div>
-                <div className="plan-bar-count" style={{color:counts.all>=FREE_PLAN_LIMIT?'#DC2626':'#0F172A'}}>{counts.all} / {FREE_PLAN_LIMIT}</div>
+                <div className="plan-bar-count" style={{ color: counts.all >= FREE_PLAN_LIMIT ? '#DC2626' : '#0F172A' }}>{counts.all} / {FREE_PLAN_LIMIT}</div>
               </div>
-              <button className="plan-bar-upgrade" onClick={()=>window.location.href='/landlord/upgrade'}>⭐ Upgrade for unlimited</button>
+              <button className="plan-bar-upgrade" onClick={() => window.location.href = '/landlord/upgrade'}>⭐ Upgrade for unlimited</button>
             </div>
 
             {/* STAT STRIP */}
             <div className="stat-strip">
-              <div className="sstat"><div className="sstat-ico" style={{background:'#EFF6FF'}}>🏘️</div><div><div className="sstat-num">{counts.all}</div><div className="sstat-lbl">Total</div></div></div>
-              <div className="sstat"><div className="sstat-ico" style={{background:'#DCFCE7'}}>✅</div><div><div className="sstat-num">{counts.active}</div><div className="sstat-lbl">Active</div></div></div>
-              <div className="sstat"><div className="sstat-ico" style={{background:'#FEF3C7'}}>📋</div><div><div className="sstat-num">{counts.listed}</div><div className="sstat-lbl">Listed</div></div></div>
-              <div className="sstat"><div className="sstat-ico" style={{background:'#F1F5F9'}}>🔑</div><div><div className="sstat-num">{counts.inactive}</div><div className="sstat-lbl">Inactive</div></div></div>
+              <div className="sstat"><div className="sstat-ico" style={{ background: '#EFF6FF' }}>🏘️</div><div><div className="sstat-num">{counts.all}</div><div className="sstat-lbl">Total</div></div></div>
+              <div className="sstat"><div className="sstat-ico" style={{ background: '#DCFCE7' }}>✅</div><div><div className="sstat-num">{counts.active}</div><div className="sstat-lbl">Active</div></div></div>
+              <div className="sstat"><div className="sstat-ico" style={{ background: '#FEF3C7' }}>📋</div><div><div className="sstat-num">{counts.listed}</div><div className="sstat-lbl">Listed</div></div></div>
+              <div className="sstat"><div className="sstat-ico" style={{ background: '#F1F5F9' }}>🔑</div><div><div className="sstat-num">{counts.inactive}</div><div className="sstat-lbl">Inactive</div></div></div>
             </div>
 
             {/* FILTER TABS */}
             <div className="filter-row">
               <div className="filter-tabs">
-                {(['all','active','listed','inactive'] as const).map(f=>(
-                  <button key={f} className={`ftab${filter===f?' active':''}`} onClick={()=>setFilter(f)}>
-                    {{all:'All',active:'Active',listed:'Listed',inactive:'Inactive'}[f]}
+                {(['all', 'active', 'listed', 'inactive'] as const).map(f => (
+                  <button key={f} className={`ftab${filter === f ? ' active' : ''}`} onClick={() => setFilter(f)}>
+                    {{ all: 'All', active: 'Active', listed: 'Listed', inactive: 'Inactive' }[f]}
                     <span className="fc">{counts[f]}</span>
                   </button>
                 ))}
@@ -742,13 +745,13 @@ export default function PropertiesPage() {
             {/* CONTENT */}
             {loading ? (
               <div className="prop-grid">
-                {[1,2,3].map(i=>(
+                {[1, 2, 3].map(i => (
                   <div key={i} className="skel-card">
-                    <div className="skeleton skel-banner"/>
+                    <div className="skeleton skel-banner" />
                     <div className="skel-body">
-                      <div className="skeleton skel-line w80"/>
-                      <div className="skeleton skel-line w50"/>
-                      <div className="skeleton skel-line w100"/>
+                      <div className="skeleton skel-line w80" />
+                      <div className="skeleton skel-line w50" />
+                      <div className="skeleton skel-line w100" />
                     </div>
                   </div>
                 ))}
@@ -756,52 +759,52 @@ export default function PropertiesPage() {
             ) : filtered.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-ico">🏘️</div>
-                <div className="empty-title">{filter==='all'?'No properties yet':`No ${filter} properties`}</div>
-                <div className="empty-sub">{filter==='all'?'Add your first property to get started.':'Try a different filter.'}</div>
-                {filter==='all'&&<button className="btn-primary" style={{margin:'0 auto'}} onClick={openAdd}>+ Add Property</button>}
+                <div className="empty-title">{filter === 'all' ? 'No properties yet' : `No ${filter} properties`}</div>
+                <div className="empty-sub">{filter === 'all' ? 'Add your first property to get started.' : 'Try a different filter.'}</div>
+                {filter === 'all' && <button className="btn-primary" style={{ margin: '0 auto' }} onClick={openAdd}>+ Add Property</button>}
               </div>
             ) : (
               <div className="prop-grid">
-                {filtered.map(p=>{
-                  const sc    = STATUS_CFG[p.status] || STATUS_CFG.inactive
-                  const pct   = p.total_units > 0 ? Math.round((p.occupied_count/p.total_units)*100) : 0
+                {filtered.map(p => {
+                  const sc = STATUS_CFG[p.status] || STATUS_CFG.inactive
+                  const pct = p.total_units > 0 ? Math.round((p.occupied_count / p.total_units) * 100) : 0
                   const vacant = p.total_units - p.occupied_count
-                  const addr  = [p.address, p.city, p.country].filter(Boolean).join(', ')
+                  const addr = [p.address, p.city, p.country].filter(Boolean).join(', ')
                   const mainPhoto = p.photos?.[0]
                   return (
                     <div key={p.id} className="prop-card">
-                      <div className="prop-banner" style={{background:sc.banner}}>
+                      <div className="prop-banner" style={{ background: sc.banner }}>
                         {mainPhoto
-                          ? <img className="prop-banner-img" src={mainPhoto} alt={p.name}/>
-                          : <div className="prop-banner-icon">{TYPE_ICON[p.type]||'🏠'}</div>
+                          ? <img className="prop-banner-img" src={mainPhoto} alt={p.name} />
+                          : <div className="prop-banner-icon">{TYPE_ICON[p.type] || '🏠'}</div>
                         }
                         {p.photos?.length > 1 && (
                           <div className="prop-banner-photos">
-                            {p.photos.slice(1).map((ph,i)=>(
-                              <img key={i} className="prop-thumb" src={ph} alt={`Photo ${i+2}`}/>
+                            {p.photos.slice(1).map((ph, i) => (
+                              <img key={i} className="prop-thumb" src={ph} alt={`Photo ${i + 2}`} />
                             ))}
                           </div>
                         )}
-                        <span className="prop-status-pill" style={{background:sc.bg,color:sc.color}}>● {sc.label}</span>
+                        <span className="prop-status-pill" style={{ background: sc.bg, color: sc.color }}>● {sc.label}</span>
                       </div>
                       <div className="prop-body">
                         <div className="prop-name">{p.name}</div>
-                        <div className="prop-loc">📍 {addr||'—'}</div>
+                        <div className="prop-loc">📍 {addr || '—'}</div>
                         {p.avg_rent > 0 && <div className="avg-rent">Avg ${p.avg_rent.toLocaleString()}/mo</div>}
                         <div className="prop-stats">
                           <div className="ps"><div className="ps-val">{p.total_units}</div><div className="ps-lbl">Total Units</div></div>
-                          <div className="ps"><div className="ps-val" style={{color:'#16A34A'}}>{p.occupied_count}</div><div className="ps-lbl">Occupied</div></div>
-                          <div className="ps"><div className="ps-val" style={{color:vacant>0?'#D97706':'#94A3B8'}}>{vacant}</div><div className="ps-lbl">Vacant</div></div>
+                          <div className="ps"><div className="ps-val" style={{ color: '#16A34A' }}>{p.occupied_count}</div><div className="ps-lbl">Occupied</div></div>
+                          <div className="ps"><div className="ps-val" style={{ color: vacant > 0 ? '#D97706' : '#94A3B8' }}>{vacant}</div><div className="ps-lbl">Vacant</div></div>
                         </div>
                         <div className="occ-row">
                           <div className="occ-top"><span className="occ-lbl">Occupancy</span><span className="occ-pct">{pct}%</span></div>
-                          <div className="occ-bar"><div className="occ-fill" style={{width:`${pct}%`}}/></div>
+                          <div className="occ-bar"><div className="occ-fill" style={{ width: `${pct}%` }} /></div>
                         </div>
                       </div>
                       <div className="prop-footer">
-                        <button className="pf-btn" onClick={()=>openEdit(p)}>✏️ Edit</button>
+                        <button className="pf-btn" onClick={() => openEdit(p)}>✏️ Edit</button>
                         <a href={`/landlord/properties/${p.id}/units`} className="pf-btn">🏗️ Units</a>
-                        <button className="pf-btn pf-btn-danger" onClick={()=>setDeleteConfirm(p.id)}>🗑️</button>
+                        <button className="pf-btn pf-btn-danger" onClick={() => setDeleteConfirm(p.id)}>🗑️</button>
                       </div>
                     </div>
                   )
@@ -814,20 +817,20 @@ export default function PropertiesPage() {
 
       {/* UPGRADE MODAL */}
       {showUpgradeModal && (
-        <div className="umodal-overlay" onClick={()=>setShowUpgradeModal(false)}>
-          <div className="umodal" onClick={e=>e.stopPropagation()}>
+        <div className="umodal-overlay" onClick={() => setShowUpgradeModal(false)}>
+          <div className="umodal" onClick={e => e.stopPropagation()}>
             <div className="umodal-icon">🏘️</div>
             <div className="umodal-title">Unlock More Properties</div>
             <div className="umodal-sub">You've reached the Free plan limit. Upgrade to Pro to manage unlimited properties.</div>
             <div className="umodal-limit">⚠️ Free plan: {FREE_PLAN_LIMIT} properties max</div>
             <div className="umodal-features">
-              <div className="umodal-feat"><span style={{color:'#16A34A'}}>✓</span> Unlimited properties</div>
-              <div className="umodal-feat"><span style={{color:'#16A34A'}}>✓</span> Unlimited units</div>
-              <div className="umodal-feat"><span style={{color:'#16A34A'}}>✓</span> Advanced reports & analytics</div>
-              <div className="umodal-feat"><span style={{color:'#16A34A'}}>✓</span> CSV & PDF exports</div>
+              <div className="umodal-feat"><span style={{ color: '#16A34A' }}>✓</span> Unlimited properties</div>
+              <div className="umodal-feat"><span style={{ color: '#16A34A' }}>✓</span> Unlimited units</div>
+              <div className="umodal-feat"><span style={{ color: '#16A34A' }}>✓</span> Advanced reports & analytics</div>
+              <div className="umodal-feat"><span style={{ color: '#16A34A' }}>✓</span> CSV & PDF exports</div>
             </div>
-            <button className="umodal-btn-pro" onClick={()=>{setShowUpgradeModal(false);window.location.href='/landlord/upgrade'}}>⭐ Upgrade to Pro →</button>
-            <button className="umodal-btn-cancel" onClick={()=>setShowUpgradeModal(false)}>Maybe later</button>
+            <button className="umodal-btn-pro" onClick={() => { setShowUpgradeModal(false); window.location.href = '/landlord/upgrade' }}>⭐ Upgrade to Pro →</button>
+            <button className="umodal-btn-cancel" onClick={() => setShowUpgradeModal(false)}>Maybe later</button>
           </div>
         </div>
       )}
