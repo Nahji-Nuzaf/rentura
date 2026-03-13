@@ -294,7 +294,7 @@ export default function PropertiesPage() {
           p.id === editing.id
             ? {
               ...p, ...payload, type: payload.type.toLowerCase(), photos: allPhotos,
-              status: payload.status as Property['status'],
+              status: payload.status as 'active' | 'listed' | 'inactive',
               avg_rent: !isNaN(newRent) && newRent > 0 ? newRent : p.avg_rent
             }
             : p
