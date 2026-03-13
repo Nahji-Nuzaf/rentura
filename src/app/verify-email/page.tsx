@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 
-export default function VerifyEmailPage() {
+function VerifyEmailPage() {
   const params = useSearchParams()
   const email  = params.get('email') || ''
-  const [resent, setResent]   = useState(false)
+  const [resent, setResent]       = useState(false)
   const [resending, setResending] = useState(false)
 
   async function handleResend() {
@@ -31,21 +31,15 @@ export default function VerifyEmailPage() {
         .blob{position:absolute;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(56,189,248,.13) 0%,transparent 65%);top:-150px;right:-100px;pointer-events:none;animation:float 9s ease-in-out infinite}
         .blob2{position:absolute;width:350px;height:350px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.1) 0%,transparent 65%);bottom:-100px;left:-80px;pointer-events:none;animation:float 12s ease-in-out infinite reverse}
         @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-20px)}}
-
         .card{background:#fff;border:1px solid #E2E8F0;border-radius:28px;padding:44px 40px;width:100%;max-width:460px;text-align:center;position:relative;z-index:1;box-shadow:0 20px 60px rgba(15,23,42,.1),0 4px 16px rgba(99,102,241,.06)}
-
         .email-icon{width:72px;height:72px;border-radius:20px;background:linear-gradient(135deg,#EFF6FF,#EEF2FF);border:1px solid #BFDBFE;display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 24px}
-
         .resend-btn{padding:11px 24px;border-radius:12px;border:1.5px solid #E2E8F0;background:#F8FAFC;color:#475569;font-size:14px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .2s;margin-top:8px}
         .resend-btn:hover{border-color:#BFDBFE;color:#2563EB;background:#EFF6FF}
         .resend-btn:disabled{opacity:.5;cursor:not-allowed}
-
         .login-link{display:inline-block;margin-top:28px;font-size:14px;color:#64748B}
         .login-link a{color:#2563EB;font-weight:700;text-decoration:none}
         .login-link a:hover{text-decoration:underline}
-
         .success-banner{background:#DCFCE7;border:1px solid #BBF7D0;border-radius:12px;padding:12px 16px;color:#16A34A;font-size:13px;font-weight:600;margin-top:16px;display:flex;align-items:center;justify-content:center;gap:8px}
-
         .steps{margin-top:28px;text-align:left;display:flex;flex-direction:column;gap:10px}
         .step-row{display:flex;align-items:center;gap:12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:12px 14px}
         .step-num{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#0EA5E9,#6366F1);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
@@ -54,9 +48,7 @@ export default function VerifyEmailPage() {
 
       <div className="page">
         <div className="blob"/><div className="blob2"/>
-
         <div className="card">
-          {/* Logo */}
           <div style={{ display:'flex', alignItems:'center', gap:10, justifyContent:'center', marginBottom:32 }}>
             <div style={{ width:38, height:38, borderRadius:11, background:'linear-gradient(135deg,#38BDF8,#6366F1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>🏘️</div>
             <span style={{ fontFamily:'Fraunces,serif', fontSize:20, fontWeight:700, color:'#0F172A' }}>Rentura</span>
@@ -79,7 +71,6 @@ export default function VerifyEmailPage() {
             Click the link in the email to verify your account and continue to onboarding.
           </p>
 
-          {/* Steps */}
           <div className="steps">
             {[
               ['Open the email from Rentura', '1'],
@@ -93,7 +84,6 @@ export default function VerifyEmailPage() {
             ))}
           </div>
 
-          {/* Resend */}
           {resent && (
             <div className="success-banner">✅ Email resent! Check your inbox.</div>
           )}
@@ -110,5 +100,13 @@ export default function VerifyEmailPage() {
         </div>
       </div>
     </>
+  )
+}
+
+export default function Page() {
+  return (
+    <Suspense>
+      <VerifyEmailPage />
+    </Suspense>
   )
 }
