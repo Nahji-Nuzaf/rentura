@@ -86,33 +86,34 @@ export default function UnitsPage() {
     let tenantMap: Record<string, { name: string; email: string; tenant_id: string }> = {}
 
     if (unitIds.length > 0) {
-      // FIX: Removed .eq('invite_accepted', true) to show tenants even if invite is pending
+      // 1. Fetch tenants for these units. We include 'email' from the tenants table itself
       const { data: tenantsData } = await supabase
         .from('tenants')
-        .select('id,unit_id,profile_id,invite_accepted')
+        .select('id,unit_id,profile_id,email,invite_accepted')
         .in('unit_id', unitIds)
 
       const profileIds = (tenantsData || []).map((t: any) => t.profile_id).filter(Boolean)
 
+      let profileMap: Record<string, any> = {}
       if (profileIds.length > 0) {
         const { data: profilesData } = await supabase
           .from('profiles').select('id,full_name,email').in('id', profileIds)
-
-        const profileMap: Record<string, any> = {}
         ;(profilesData || []).forEach((p: any) => { profileMap[p.id] = p })
-
-        ;(tenantsData || []).forEach((t: any) => {
-          if (t.unit_id && t.profile_id && profileMap[t.profile_id]) {
-            tenantMap[t.unit_id] = {
-              name:      profileMap[t.profile_id].full_name,
-              email:     profileMap[t.profile_id].email,
-              tenant_id: t.id,
-            }
-          }
-        })
       }
 
-      // Keep auto-fix logic restricted to accepted invites only
+      // 2. Build the map. If no profile exists yet (invite pending), fallback to the email in tenants table
+      ;(tenantsData || []).forEach((t: any) => {
+        if (t.unit_id) {
+          const profile = t.profile_id ? profileMap[t.profile_id] : null
+          tenantMap[t.unit_id] = {
+            name:      profile?.full_name || t.email || 'Invited Tenant',
+            email:     profile?.email || t.email || '',
+            tenant_id: t.id,
+          }
+        }
+      })
+
+      // 3. Auto-fix status for accepted tenants (same as before)
       const unitIdsToFix = (tenantsData || [])
         .filter((t: any) => t.invite_accepted && t.profile_id)
         .map((t: any) => t.unit_id)
@@ -136,7 +137,7 @@ export default function UnitsPage() {
       monthly_rent: u.monthly_rent || 0,
       currency:     u.currency || 'USD',
       rent_due_day: u.rent_due_day || 1,
-      // Priority: If a tenant is mapped, it's occupied. Otherwise use DB status.
+      // If a tenant record exists, force status to occupied visually
       status:       tenantMap[u.id] ? 'occupied' : (u.status || 'vacant'),
       lease_start:  u.lease_start,
       lease_end:    u.lease_end,
@@ -165,7 +166,7 @@ export default function UnitsPage() {
         const channel = supabase
           .channel(`units-${propertyId}`)
           .on('postgres_changes', {
-            event: 'UPDATE',
+            event: '*',
             schema: 'public',
             table: 'tenants',
             filter: `property_id=eq.${propertyId}`,
