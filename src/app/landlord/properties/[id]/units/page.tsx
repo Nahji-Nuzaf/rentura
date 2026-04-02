@@ -86,7 +86,7 @@ export default function UnitsPage() {
     let tenantMap: Record<string, { name: string; email: string; tenant_id: string }> = {}
 
     if (unitIds.length > 0) {
-      // 1. Fetch tenants for these units. We include 'email' from the tenants table itself
+      // FIX: Fetch email from tenants table and remove accepted-only filter
       const { data: tenantsData } = await supabase
         .from('tenants')
         .select('id,unit_id,profile_id,email,invite_accepted')
@@ -101,7 +101,7 @@ export default function UnitsPage() {
         ;(profilesData || []).forEach((p: any) => { profileMap[p.id] = p })
       }
 
-      // 2. Build the map. If no profile exists yet (invite pending), fallback to the email in tenants table
+      // FIX: Fallback to invitation email if profile name isn't available
       ;(tenantsData || []).forEach((t: any) => {
         if (t.unit_id) {
           const profile = t.profile_id ? profileMap[t.profile_id] : null
@@ -113,7 +113,6 @@ export default function UnitsPage() {
         }
       })
 
-      // 3. Auto-fix status for accepted tenants (same as before)
       const unitIdsToFix = (tenantsData || [])
         .filter((t: any) => t.invite_accepted && t.profile_id)
         .map((t: any) => t.unit_id)
@@ -137,7 +136,6 @@ export default function UnitsPage() {
       monthly_rent: u.monthly_rent || 0,
       currency:     u.currency || 'USD',
       rent_due_day: u.rent_due_day || 1,
-      // If a tenant record exists, force status to occupied visually
       status:       tenantMap[u.id] ? 'occupied' : (u.status || 'vacant'),
       lease_start:  u.lease_start,
       lease_end:    u.lease_end,
@@ -163,10 +161,11 @@ export default function UnitsPage() {
 
         await loadUnits(supabase, user.id)
 
+        // FIX: Watch for ALL events (*), so new tenants show up immediately
         const channel = supabase
           .channel(`units-${propertyId}`)
           .on('postgres_changes', {
-            event: '*',
+            event: '*', 
             schema: 'public',
             table: 'tenants',
             filter: `property_id=eq.${propertyId}`,
