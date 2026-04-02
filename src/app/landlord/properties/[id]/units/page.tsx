@@ -27,8 +27,8 @@ type Property = {
 }
 
 const UNIT_STATUS: Record<string, { label: string; bg: string; color: string }> = {
-  occupied:    { label: 'Occupied',    bg: '#DCFCE7', color: '#16A34A' },
-  vacant:      { label: 'Vacant',      bg: '#FEF3C7', color: '#D97706' },
+  occupied:     { label: 'Occupied',    bg: '#DCFCE7', color: '#16A34A' },
+  vacant:       { label: 'Vacant',      bg: '#FEF3C7', color: '#D97706' },
   maintenance: { label: 'Maintenance', bg: '#FEE2E2', color: '#DC2626' },
 }
 
@@ -86,12 +86,11 @@ export default function UnitsPage() {
     let tenantMap: Record<string, { name: string; email: string; tenant_id: string }> = {}
 
     if (unitIds.length > 0) {
-      // Load ALL tenants for these units (no status filter — catch any linked tenant)
+      // FIX: Removed .eq('invite_accepted', true) to show tenants even if invite is pending
       const { data: tenantsData } = await supabase
         .from('tenants')
         .select('id,unit_id,profile_id,invite_accepted')
         .in('unit_id', unitIds)
-        .eq('invite_accepted', true)  // only accepted invites
 
       const profileIds = (tenantsData || []).map((t: any) => t.profile_id).filter(Boolean)
 
@@ -113,7 +112,7 @@ export default function UnitsPage() {
         })
       }
 
-      // Fix any units that have an accepted tenant but wrong status
+      // Keep auto-fix logic restricted to accepted invites only
       const unitIdsToFix = (tenantsData || [])
         .filter((t: any) => t.invite_accepted && t.profile_id)
         .map((t: any) => t.unit_id)
@@ -124,7 +123,6 @@ export default function UnitsPage() {
 
       if (unitIdsToFix.length > 0) {
         await supabase.from('units').update({ status: 'occupied' }).in('id', unitIdsToFix)
-        // Update local data too
         unitIdsToFix.forEach((uid: string) => {
           const u = unitsData?.find((u: any) => u.id === uid)
           if (u) u.status = 'occupied'
@@ -138,7 +136,7 @@ export default function UnitsPage() {
       monthly_rent: u.monthly_rent || 0,
       currency:     u.currency || 'USD',
       rent_due_day: u.rent_due_day || 1,
-      // If tenant is linked, force status to occupied regardless of DB value
+      // Priority: If a tenant is mapped, it's occupied. Otherwise use DB status.
       status:       tenantMap[u.id] ? 'occupied' : (u.status || 'vacant'),
       lease_start:  u.lease_start,
       lease_end:    u.lease_end,
@@ -164,7 +162,6 @@ export default function UnitsPage() {
 
         await loadUnits(supabase, user.id)
 
-        // ── Real-time: watch tenants table for new accepted invites ──
         const channel = supabase
           .channel(`units-${propertyId}`)
           .on('postgres_changes', {
@@ -173,7 +170,6 @@ export default function UnitsPage() {
             table: 'tenants',
             filter: `property_id=eq.${propertyId}`,
           }, async () => {
-            // Reload units when any tenant in this property updates
             await loadUnits(supabase, user.id)
           })
           .subscribe()
@@ -234,7 +230,6 @@ export default function UnitsPage() {
         unit_number:  editForm.unit_number.trim(),
         monthly_rent: rent,
         rent_due_day: dueDay,
-        // Only allow status change if unit is NOT occupied
         status: editUnit.tenant_id ? editUnit.status : editForm.status,
       }
       if (editForm.lease_start) payload.lease_start = editForm.lease_start
@@ -265,12 +260,10 @@ export default function UnitsPage() {
     setBulkSaving(true)
     try {
       const supabase = createClient()
-      // Don't change status of occupied units in bulk
       const ids = Array.from(selected)
       const update: any = {}
       if (bulkRent) update.monthly_rent = parseFloat(bulkRent)
       if (bulkStatus) {
-        // Only apply status to vacant/maintenance units
         const safeIds = ids.filter(id => {
           const u = units.find(u => u.id === id)
           return u && !u.tenant_id
