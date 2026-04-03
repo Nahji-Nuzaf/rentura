@@ -114,6 +114,17 @@ export default function TenantsPage() {
   const [inviteLoading, setInviteLoading] = useState(false)
   const [inviteError, setInviteError]   = useState('')
 
+  // ── Lease setup modal (fires when tenant accepts invite) ──────────────────
+  const [leaseModal, setLeaseModal]       = useState(false)
+  const [leaseTenantId, setLeaseTenantId] = useState('')
+  const [leaseUnitId, setLeaseUnitId]     = useState('')
+  const [leaseTenantName, setLeaseTenantName] = useState('')
+  const [leaseStart, setLeaseStart]       = useState('')
+  const [leaseEnd, setLeaseEnd]           = useState('')
+  const [leaseRent, setLeaseRent]         = useState('')
+  const [leaseSaving, setLeaseSaving]     = useState(false)
+  const [leaseError, setLeaseError]       = useState('')
+
   // ── Rent history drawer ────────────────────────────────────────────────────
   const [historyOpen, setHistoryOpen]       = useState(false)
   const [historyTenant, setHistoryTenant]   = useState<Tenant | null>(null)
@@ -181,6 +192,137 @@ export default function TenantsPage() {
       finally { setLoading(false) }
     })()
   }, [router])
+
+  // ── Realtime: detect when tenant accepts invite ──────────────────────────
+  useEffect(() => {
+    const sb = createClient()
+    let landlordId = ''
+
+    sb.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      landlordId = user.id
+
+      const channel = sb
+        .channel('tenant-accepted')
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'tenants',
+        }, async (payload: any) => {
+          const row = payload.new
+          // Only fire if invite just got accepted and has a profile
+          if (!row.invite_accepted || !row.profile_id) return
+
+          // Verify this belongs to our landlord's property
+          const { data: prop } = await sb.from('properties')
+            .select('landlord_id,name')
+            .eq('id', row.property_id)
+            .single()
+          if (!prop || prop.landlord_id !== landlordId) return
+
+          // Get tenant name from profiles
+          const { data: prof } = await sb.from('profiles')
+            .select('full_name')
+            .eq('id', row.profile_id)
+            .single()
+
+          // Get current unit rent for pre-filling
+          const { data: unit } = await sb.from('units')
+            .select('monthly_rent')
+            .eq('id', row.unit_id)
+            .single()
+
+          // Show lease setup modal
+          setLeaseTenantId(row.id)
+          setLeaseUnitId(row.unit_id)
+          setLeaseTenantName(prof?.full_name || 'New Tenant')
+          setLeaseRent(String(unit?.monthly_rent || ''))
+          setLeaseStart('')
+          setLeaseEnd('')
+          setLeaseError('')
+          setLeaseModal(true)
+
+          // Refresh tenant list
+          const { data: rawUpdated } = await sb.from('tenants')
+            .select('id,profile_id,property_id,unit_id,status,invite_token,created_at')
+            .in('property_id', [row.property_id])
+            .order('created_at', { ascending: false })
+
+          if (rawUpdated) {
+            const pids2 = [...new Set(rawUpdated.map((t: any) => t.profile_id).filter(Boolean))]
+            const profMap2: Record<string, any> = {}
+            if (pids2.length) {
+              const { data: pa2 } = await sb.from('profiles').select('id,full_name,email,phone,avatar_url').in('id', pids2 as string[])
+              ;(pa2 || []).forEach((p: any) => { profMap2[p.id] = p })
+            }
+            const uids2 = [...new Set(rawUpdated.map((t: any) => t.unit_id).filter(Boolean))]
+            const unitMap2: Record<string, any> = {}
+            if (uids2.length) {
+              const { data: ua2 } = await sb.from('units').select('id,unit_number,monthly_rent,currency,rent_due_day,lease_start,lease_end').in('id', uids2 as string[])
+              ;(ua2 || []).forEach((u: any) => { unitMap2[u.id] = u })
+            }
+            const { data: props2 } = await sb.from('properties').select('id,name').eq('landlord_id', landlordId)
+            const propMap2: Record<string, string> = {}
+            ;(props2 || []).forEach((p: any) => { propMap2[p.id] = p.name })
+
+            setTenants(rawUpdated.map((row2: any) => {
+              const p2 = profMap2[row2.profile_id] || {}
+              const u2 = unitMap2[row2.unit_id] || {}
+              return {
+                id: row2.id, profile_id: row2.profile_id,
+                property_id: row2.property_id, unit_id: row2.unit_id,
+                full_name:   p2.full_name || 'Pending',
+                email:       p2.email || '—',
+                phone:       p2.phone || '—',
+                avatar_url:  p2.avatar_url || null,
+                property:    propMap2[row2.property_id] || '—',
+                unit:        u2.unit_number || '—',
+                rent_amount: u2.monthly_rent || 0,
+                currency:    u2.currency || 'USD',
+                rent_due_day: u2.rent_due_day || 1,
+                lease_start: u2.lease_start || '—',
+                lease_end:   u2.lease_end || '—',
+                status:      row2.status || deriveStatus(u2.lease_end || null),
+                invite_token: row2.invite_token,
+                created_at:  row2.created_at,
+              }
+            }))
+          }
+        })
+        .subscribe()
+
+      return () => { sb.removeChannel(channel) }
+    })
+  }, [router])
+
+  // ── Save lease dates ──────────────────────────────────────────────────────
+  async function handleSaveLease() {
+    if (!leaseStart) { setLeaseError('Please set a lease start date.'); return }
+    if (!leaseEnd)   { setLeaseError('Please set a lease end date.'); return }
+    if (new Date(leaseEnd) <= new Date(leaseStart)) { setLeaseError('Lease end must be after start.'); return }
+
+    setLeaseSaving(true); setLeaseError('')
+    try {
+      const sb = createClient()
+      const updates: any = { lease_start: leaseStart, lease_end: leaseEnd }
+      if (leaseRent && parseFloat(leaseRent) > 0) updates.monthly_rent = parseFloat(leaseRent)
+
+      await sb.from('units').update(updates).eq('id', leaseUnitId)
+
+      // Update local state
+      setTenants(prev => prev.map(t =>
+        t.id === leaseTenantId
+          ? { ...t, lease_start: leaseStart, lease_end: leaseEnd,
+              rent_amount: leaseRent ? parseFloat(leaseRent) : t.rent_amount }
+          : t
+      ))
+      setLeaseModal(false)
+    } catch (err: any) {
+      setLeaseError(err?.message || 'Failed to save lease.')
+    } finally {
+      setLeaseSaving(false)
+    }
+  }
 
   const filtered = tenants.filter(t => {
     const sm = filter === 'all' || t.status === filter
@@ -632,6 +774,84 @@ export default function TenantsPage() {
 
       {/* Overlays */}
       <div className={`sb-overlay${sidebarOpen?' open':''}`} onClick={() => setSidebarOpen(false)} />
+
+      {/* ── Lease Setup Modal ── */}
+      {leaseModal && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:700,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+          <div style={{background:'#fff',borderRadius:22,padding:32,width:'100%',maxWidth:420,boxShadow:'0 24px 60px rgba(15,23,42,.25)'}}>
+            {/* Header */}
+            <div style={{textAlign:'center',marginBottom:22}}>
+              <div style={{fontSize:40,marginBottom:10}}>🎉</div>
+              <div style={{fontFamily:'Fraunces,serif',fontSize:22,fontWeight:700,color:'#0F172A',marginBottom:6}}>
+                Tenant Joined!
+              </div>
+              <div style={{fontSize:14,color:'#64748B',lineHeight:1.6}}>
+                <strong style={{color:'#0F172A'}}>{leaseTenantName}</strong> has successfully accepted the invite and joined their unit. Set the lease dates to complete the setup.
+              </div>
+            </div>
+
+            {/* Tenant badge */}
+            <div style={{background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:12,padding:'10px 14px',marginBottom:20,display:'flex',alignItems:'center',gap:10}}>
+              <div style={{width:36,height:36,borderRadius:10,background:'linear-gradient(135deg,#10B981,#34D399)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:14,fontWeight:700,flexShrink:0}}>
+                {leaseTenantName.split(' ').map((n:string)=>n[0]).join('').toUpperCase().slice(0,2)}
+              </div>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:'#0F172A'}}>{leaseTenantName}</div>
+                <div style={{fontSize:11,color:'#16A34A',fontWeight:600}}>✓ Successfully linked to unit</div>
+              </div>
+            </div>
+
+            {/* Lease dates */}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14}}>
+              <div>
+                <label style={{display:'block',fontSize:12,fontWeight:700,color:'#374151',marginBottom:6,textTransform:'uppercase',letterSpacing:'.05em'}}>Lease Start *</label>
+                <input type="date" value={leaseStart} onChange={e=>setLeaseStart(e.target.value)}
+                  style={{width:'100%',padding:'10px 12px',borderRadius:10,border:'1.5px solid #E2E8F0',fontSize:14,fontFamily:"'Plus Jakarta Sans',sans-serif",color:'#0F172A',outline:'none'}}
+                  onFocus={e=>{e.target.style.borderColor='#3B82F6'}}
+                  onBlur={e=>{e.target.style.borderColor='#E2E8F0'}}
+                />
+              </div>
+              <div>
+                <label style={{display:'block',fontSize:12,fontWeight:700,color:'#374151',marginBottom:6,textTransform:'uppercase',letterSpacing:'.05em'}}>Lease End *</label>
+                <input type="date" value={leaseEnd} onChange={e=>setLeaseEnd(e.target.value)}
+                  style={{width:'100%',padding:'10px 12px',borderRadius:10,border:'1.5px solid #E2E8F0',fontSize:14,fontFamily:"'Plus Jakarta Sans',sans-serif",color:'#0F172A',outline:'none'}}
+                  onFocus={e=>{e.target.style.borderColor='#3B82F6'}}
+                  onBlur={e=>{e.target.style.borderColor='#E2E8F0'}}
+                />
+              </div>
+            </div>
+
+            {/* Monthly rent */}
+            <div style={{marginBottom:18}}>
+              <label style={{display:'block',fontSize:12,fontWeight:700,color:'#374151',marginBottom:6,textTransform:'uppercase',letterSpacing:'.05em'}}>Monthly Rent (USD)</label>
+              <input type="number" min="0" value={leaseRent} onChange={e=>setLeaseRent(e.target.value)}
+                placeholder="e.g. 500"
+                style={{width:'100%',padding:'10px 12px',borderRadius:10,border:'1.5px solid #E2E8F0',fontSize:14,fontFamily:"'Plus Jakarta Sans',sans-serif",color:'#0F172A',outline:'none'}}
+                onFocus={e=>{e.target.style.borderColor='#3B82F6'}}
+                onBlur={e=>{e.target.style.borderColor='#E2E8F0'}}
+              />
+              <div style={{fontSize:11,color:'#94A3B8',marginTop:4}}>Leave unchanged to keep the current unit rent</div>
+            </div>
+
+            {leaseError && (
+              <div style={{background:'#FEE2E2',border:'1px solid #FECACA',borderRadius:10,padding:'10px 12px',color:'#DC2626',fontSize:13,fontWeight:600,marginBottom:14}}>
+                ⚠️ {leaseError}
+              </div>
+            )}
+
+            <div style={{display:'flex',gap:10}}>
+              <button onClick={()=>setLeaseModal(false)}
+                style={{flex:1,padding:11,borderRadius:10,border:'1.5px solid #E2E8F0',background:'#fff',color:'#475569',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:"'Plus Jakarta Sans',sans-serif"}}>
+                Skip for now
+              </button>
+              <button onClick={handleSaveLease} disabled={leaseSaving}
+                style={{flex:2,padding:11,borderRadius:10,border:'none',background:'linear-gradient(135deg,#2563EB,#6366F1)',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:"'Plus Jakarta Sans',sans-serif",opacity:leaseSaving?0.7:1}}>
+                {leaseSaving ? 'Saving…' : '✓ Save Lease Details'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Invite Modal — 2 step */}
       <div className={`modal-overlay${inviteOpen?' open':''}`} onClick={() => setInviteOpen(false)}>
