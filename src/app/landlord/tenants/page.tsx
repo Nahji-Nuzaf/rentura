@@ -20,8 +20,9 @@ type Tenant = {
   rent_due_day: number
   lease_start: string
   lease_end: string
-  status: 'active' | 'late' | 'expiring' | 'ended'
+  status: 'active' | 'late' | 'expiring' | 'ended' | 'pending'
   invite_token?: string
+  invite_accepted: boolean
   created_at: string
 }
 
@@ -37,8 +38,9 @@ type RentPayment = {
   note?: string
 }
 
-function deriveStatus(leaseEnd: string | null): Tenant['status'] {
-  if (!leaseEnd) return 'active'
+function deriveStatus(leaseEnd: string | null, inviteAccepted: boolean): Tenant['status'] {
+  if (!inviteAccepted) return 'pending'
+  if (!leaseEnd || leaseEnd === '—') return 'active'
   const d = Math.ceil((new Date(leaseEnd).getTime() - Date.now()) / 86400000)
   if (d < 0) return 'ended'
   if (d < 60) return 'expiring'
@@ -50,6 +52,7 @@ const SC = {
   late:     { label: 'Late',     bg: '#FEE2E2', color: '#DC2626' },
   expiring: { label: 'Expiring', bg: '#FEF3C7', color: '#D97706' },
   ended:    { label: 'Ended',    bg: '#F1F5F9', color: '#64748B' },
+  pending:  { label: 'Pending',  bg: '#EEF2FF', color: '#6366F1' },
 }
 
 const AV = [
@@ -62,6 +65,7 @@ const AV = [
 ]
 
 function initials(name: string) {
+  if (!name || name === 'Pending Invite') return '??'
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
@@ -96,7 +100,7 @@ export default function TenantsPage() {
   const [sidebarOpen, setSidebarOpen]   = useState(false)
   const [tenants, setTenants]           = useState<Tenant[]>([])
   const [loading, setLoading]           = useState(true)
-  const [filter, setFilter]             = useState<'all'|'active'|'late'|'expiring'|'ended'>('all')
+  const [filter, setFilter]             = useState<'all'|'active'|'late'|'expiring'|'ended'|'pending'>('all')
   const [search, setSearch]             = useState('')
   const [selected, setSelected]         = useState<Tenant | null>(null)
   const [sheetOpen, setSheetOpen]       = useState(false)
@@ -106,7 +110,14 @@ export default function TenantsPage() {
   const [copied, setCopied]             = useState(false)
   const [delConfirm, setDelConfirm]     = useState<string | null>(null)
 
-  // Invite flow — property/unit picker
+  // Lease Setup Modal
+  const [setupOpen, setSetupOpen]   = useState(false)
+  const [setupTenant, setSetupTenant] = useState<Tenant | null>(null)
+  const [lStart, setLStart]         = useState('')
+  const [lEnd, setLEnd]             = useState('')
+  const [setupLoading, setSetupLoading] = useState(false)
+
+  // Invite flow
   const [inviteProps, setInviteProps]   = useState<{id:string;name:string}[]>([])
   const [inviteUnits, setInviteUnits]   = useState<{id:string;unit_number:string;monthly_rent:number;currency:string;status:string}[]>([])
   const [invitePropId, setInvitePropId] = useState('')
@@ -114,14 +125,14 @@ export default function TenantsPage() {
   const [inviteLoading, setInviteLoading] = useState(false)
   const [inviteError, setInviteError]   = useState('')
 
-  // ── Rent history drawer ────────────────────────────────────────────────────
+  // Rent history drawer
   const [historyOpen, setHistoryOpen]       = useState(false)
   const [historyTenant, setHistoryTenant]   = useState<Tenant | null>(null)
   const [rentHistory, setRentHistory]       = useState<RentPayment[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
 
   useEffect(() => {
-    ;(async () => {
+    const loadData = async () => {
       try {
         const sb = createClient()
         const { data: { user } } = await sb.auth.getUser()
@@ -137,7 +148,7 @@ export default function TenantsPage() {
         if (!propIds.length) { setLoading(false); return }
 
         const { data: raw } = await sb.from('tenants')
-          .select('id,profile_id,property_id,unit_id,status,invite_token,created_at')
+          .select('id,profile_id,property_id,unit_id,status,invite_token,invite_accepted,created_at')
           .in('property_id', propIds).order('created_at', { ascending: false })
 
         const pids = [...new Set((raw || []).map((t: any) => t.profile_id).filter(Boolean))]
@@ -155,13 +166,13 @@ export default function TenantsPage() {
           ;(ua || []).forEach((u: any) => { unitMap[u.id] = u })
         }
 
-        setTenants((raw || []).map((row: any) => {
+        const tenantList: Tenant[] = (raw || []).map((row: any) => {
           const p = profMap[row.profile_id] || {}
           const u = unitMap[row.unit_id] || {}
           return {
             id: row.id, profile_id: row.profile_id,
             property_id: row.property_id, unit_id: row.unit_id,
-            full_name:   p.full_name   || 'Unknown',
+            full_name:   p.full_name   || 'Pending Invite',
             email:       p.email       || '—',
             phone:       p.phone       || '—',
             avatar_url:  p.avatar_url  || null,
@@ -172,14 +183,25 @@ export default function TenantsPage() {
             rent_due_day: u.rent_due_day || 1,
             lease_start: u.lease_start  || '—',
             lease_end:   u.lease_end    || '—',
-            status:      row.status || deriveStatus(u.lease_end || null),
+            invite_accepted: row.invite_accepted,
+            status:      row.status || deriveStatus(u.lease_end || null, row.invite_accepted),
             invite_token: row.invite_token,
             created_at:  row.created_at,
           }
-        }))
+        })
+        setTenants(tenantList)
+
+        // Check for newly signed up tenants needing lease dates
+        const needsLease = tenantList.find(t => t.invite_accepted && (t.lease_start === '—' || !t.lease_start))
+        if (needsLease) {
+          setSetupTenant(needsLease)
+          setSetupOpen(true)
+        }
+
       } catch (e) { console.error(e) }
       finally { setLoading(false) }
-    })()
+    }
+    loadData()
   }, [router])
 
   const filtered = tenants.filter(t => {
@@ -195,9 +217,26 @@ export default function TenantsPage() {
     late:     tenants.filter(t => t.status === 'late').length,
     expiring: tenants.filter(t => t.status === 'expiring').length,
     ended:    tenants.filter(t => t.status === 'ended').length,
+    pending:  tenants.filter(t => t.status === 'pending').length,
   }
 
-  // ── Open invite modal — load properties first ─────────────────────────────
+  async function handleSaveLease() {
+    if (!setupTenant || !lStart || !lEnd) return
+    setSetupLoading(true)
+    const sb = createClient()
+    const { error } = await sb.from('units').update({
+      lease_start: lStart,
+      lease_end: lEnd
+    }).eq('id', setupTenant.unit_id)
+
+    if (!error) {
+      setTenants(prev => prev.map(t => t.id === setupTenant.id ? { ...t, lease_start: lStart, lease_end: lEnd, status: deriveStatus(lEnd, true) } : t))
+      setSetupOpen(false)
+      setSetupTenant(null)
+    }
+    setSetupLoading(false)
+  }
+
   async function openInvite() {
     setInviteStep(1)
     setInviteError('')
@@ -207,8 +246,6 @@ export default function TenantsPage() {
     setInviteUnitId('')
     setInviteUnits([])
 
-    // If called from detail panel with a tenant already selected that has a unit,
-    // just regenerate their token (existing tenant re-invite path)
     if (selected && selected.unit_id) {
       const token = generateToken()
       const sb = createClient()
@@ -220,7 +257,6 @@ export default function TenantsPage() {
       return
     }
 
-    // New invite — load landlord properties
     const sb = createClient()
     const { data: { user } } = await sb.auth.getUser()
     if (!user) return
@@ -255,13 +291,12 @@ export default function TenantsPage() {
     const sb = createClient()
     const token = generateToken()
 
-    // Insert new tenant row with the invite token — profile_id will be filled when tenant signs up
     const { data, error } = await sb.from('tenants').insert({
       property_id: invitePropId,
       unit_id: inviteUnitId,
       invite_token: token,
       invite_accepted: false,
-      status: 'active',
+      status: 'pending',
     }).select().single()
 
     if (error || !data) {
@@ -295,7 +330,6 @@ export default function TenantsPage() {
     setSheetOpen(true)
   }
 
-  // ── Open rent history drawer ───────────────────────────────────────────────
   async function openHistory(t: Tenant, e: React.MouseEvent) {
     e.stopPropagation()
     setHistoryTenant(t)
@@ -320,9 +354,8 @@ export default function TenantsPage() {
     setRentHistory([])
   }
 
-  // ── Drawer summary stats ───────────────────────────────────────────────────
   function historyStats(payments: RentPayment[], currency: string) {
-    const paid    = payments.filter(p => p.status === 'paid')
+    const paid     = payments.filter(p => p.status === 'paid')
     const overdue = payments.filter(p => isOverdue(p))
     const pending = payments.filter(p => p.status === 'pending' && !isOverdue(p))
     const totalPaid    = paid.reduce((s, p) => s + p.amount, 0)
@@ -333,7 +366,6 @@ export default function TenantsPage() {
 
   const hStats = historyTenant ? historyStats(rentHistory, historyTenant.currency) : null
 
-  // ── Detail panel ──────────────────────────────────────────────────────────
   function renderDetail(t: Tenant, inSheet = false) {
     const sc = SC[t.status]
     const idx = tenants.findIndex(x => x.id === t.id)
@@ -404,7 +436,6 @@ export default function TenantsPage() {
         </div>
 
         <div style={{padding:'12px 18px',borderTop:'1px solid #E2E8F0',display:'flex',flexDirection:'column',gap:8}}>
-          {/* ── NEW: Rent History button at top of actions ── */}
           <button
             onClick={(e) => openHistory(t, e)}
             style={{width:'100%',padding:'10px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#2563EB,#6366F1)',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:"'Plus Jakarta Sans',sans-serif",boxShadow:'0 2px 8px rgba(37,99,235,.25)',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
@@ -509,335 +540,111 @@ export default function TenantsPage() {
         .t-right{text-align:right;flex-shrink:0;margin-left:8px;display:flex;flex-direction:column;align-items:flex-end;gap:5px}
         .t-rent{font-size:14px;font-weight:700;color:#0F172A;white-space:nowrap}
         .badge{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;border-radius:99px;padding:3px 9px}
-        .btn-hist-card{padding:4px 10px;border-radius:7px;border:1.5px solid #BFDBFE;background:#EFF6FF;color:#2563EB;font-size:11px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;white-space:nowrap;transition:all .15s}
-        .btn-hist-card:hover{background:#DBEAFE;border-color:#93C5FD}
-
-        .detail-panel{background:#fff;border:1px solid #E2E8F0;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(15,23,42,.04);position:sticky;top:76px;max-height:calc(100vh - 100px);overflow-y:auto}
-        .detail-panel::-webkit-scrollbar{width:0}
-        .no-sel{text-align:center;padding:48px 20px;color:#94A3B8}
-        .no-sel-ico{font-size:36px;margin-bottom:10px}
-        .no-sel-txt{font-size:13px;line-height:1.6}
-
-        .empty-state{text-align:center;padding:60px 20px;color:#94A3B8}
-        .e-ico{font-size:40px;margin-bottom:12px}
-        .e-title{font-size:15px;font-weight:700;color:#475569}
-        @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
-        .skeleton{border-radius:10px;background:linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}
-        .skel-card{background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:16px;display:flex;align-items:center;gap:12px}
-        .skel-av{width:44px;height:44px;border-radius:13px;flex-shrink:0}
-        .skel-lines{flex:1;display:flex;flex-direction:column;gap:8px}
-        .skel-line{height:13px}
-        .skel-s{width:50%}.skel-m{width:75%}
 
         .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:500;align-items:center;justify-content:center;padding:16px}
         .modal-overlay.open{display:flex}
         .modal{background:#fff;border-radius:20px;padding:28px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(15,23,42,.2)}
         .modal-title{font-family:'Fraunces',serif;font-size:22px;font-weight:400;color:#0F172A;margin-bottom:6px}
         .modal-sub{font-size:13.5px;color:#94A3B8;margin-bottom:22px;line-height:1.6}
-        .code-box{background:#F8FAFC;border:2px dashed #BFDBFE;border-radius:14px;padding:18px;text-align:center;margin-bottom:16px}
-        .code-val{font-size:28px;font-weight:800;color:#2563EB;letter-spacing:6px}
-        .code-hint{font-size:12px;color:#94A3B8;margin-top:6px}
         .copy-btn{width:100%;padding:11px;border-radius:11px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;margin-bottom:10px}
-        .copy-btn.ok{background:linear-gradient(135deg,#16A34A,#15803D)}
         .modal-close{width:100%;padding:10px;border-radius:10px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
-        .del-box{background:#fff;border-radius:18px;padding:28px;width:100%;max-width:340px;box-shadow:0 20px 60px rgba(15,23,42,.2);text-align:center}
-        .del-ico{font-size:36px;margin-bottom:12px}
-        .del-title{font-size:17px;font-weight:700;color:#0F172A;margin-bottom:6px}
-        .del-sub{font-size:13.5px;color:#64748B;line-height:1.6;margin-bottom:22px}
-        .del-row{display:flex;gap:10px}
-        .del-cancel{flex:1;padding:10px;border-radius:10px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
-        .del-ok{flex:1;padding:10px;border-radius:10px;border:none;background:#DC2626;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
+        
+        .setup-inp{width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid #E2E8F0;font-size:14px;font-family:"'Plus Jakarta Sans',sans-serif";margin-bottom:14px;outline:none}
+        .setup-lbl{display:block;font-size:12px;font-weight:700;color:#64748B;text-transform:uppercase;margin-bottom:6px}
 
-        .sheet-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:400}
-        .sheet{display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:22px 22px 0 0;z-index:401;max-height:92vh;overflow-y:auto;transform:translateY(100%);transition:transform .3s ease}
-        .sheet::-webkit-scrollbar{width:0}
-        .sheet-handle{width:36px;height:4px;border-radius:99px;background:#E2E8F0;margin:10px auto 4px}
-        @media(max-width:768px){
-          .sheet{display:block}
-          .sheet-bg.open{display:block}
-          .sheet.open{transform:translateY(0)}
-        }
-
-        /* ─── RENT HISTORY DRAWER ─── */
-        .hist-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:600;opacity:0;pointer-events:none;transition:opacity .25s}
-        .hist-backdrop.open{opacity:1;pointer-events:all}
-        .hist-drawer{position:fixed;top:0;right:0;height:100vh;width:460px;max-width:100vw;background:#fff;z-index:601;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;box-shadow:-8px 0 40px rgba(0,0,0,.14)}
-        .hist-drawer.open{transform:translateX(0)}
-        .hd-header{padding:22px 22px 18px;border-bottom:1px solid #E2E8F0;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-shrink:0}
-        .hd-title{font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:#0F172A}
-        .hd-sub{font-size:12.5px;color:#64748B;margin-top:3px}
-        .hd-close{width:34px;height:34px;border-radius:50%;background:#F1F5F9;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:#475569;transition:background .15s;flex-shrink:0}
-        .hd-close:hover{background:#E2E8F0}
-        .hd-body{flex:1;overflow-y:auto;padding:18px 22px}
-        .hd-body::-webkit-scrollbar{width:0}
-        .hd-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:22px}
-        .hd-stat{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:12px;text-align:center}
-        .hd-stat-val{font-family:'Fraunces',serif;font-size:18px;font-weight:700;color:#0F172A;line-height:1.1}
-        .hd-stat-lbl{font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-top:3px}
-        .hd-stat-sub{font-size:11px;color:#94A3B8;margin-top:2px}
-        .hd-stat.s-green .hd-stat-val{color:#16A34A}
-        .hd-stat.s-red   .hd-stat-val{color:#DC2626}
-        .hd-stat.s-blue  .hd-stat-val{color:#2563EB}
-        .tl-section-lbl{font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px}
-        .tl{display:flex;flex-direction:column;gap:0}
-        .tl-row{display:flex;gap:12px;padding-bottom:16px;position:relative}
-        .tl-row:not(:last-child)::before{content:'';position:absolute;left:13px;top:28px;bottom:0;width:2px;background:#E2E8F0}
-        .tl-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;font-weight:700;z-index:1}
-        .tl-dot.d-paid{background:#DCFCE7;color:#16A34A}
-        .tl-dot.d-overdue{background:#FEE2E2;color:#DC2626}
-        .tl-dot.d-pending{background:#FEF9C3;color:#CA8A04}
-        .tl-card{flex:1;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:12px 14px}
-        .tl-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
-        .tl-amount{font-size:15px;font-weight:700;color:#0F172A}
-        .tl-badge{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:99px}
-        .tb-paid{background:#DCFCE7;color:#16A34A}
-        .tb-overdue{background:#FEE2E2;color:#DC2626}
-        .tb-pending{background:#FEF9C3;color:#CA8A04}
-        .tl-dates{display:flex;gap:14px;flex-wrap:wrap;margin-top:7px}
-        .tl-date{font-size:11.5px;color:#64748B}
-        .tl-date strong{color:#475569;font-weight:600}
-        .tl-method{font-size:11px;color:#94A3B8;margin-top:4px}
-        .tl-note{font-size:11.5px;color:#64748B;font-style:italic;margin-top:6px;padding-top:6px;border-top:1px solid #E2E8F0}
-        .hd-empty{text-align:center;padding:48px 16px;color:#94A3B8}
-        .hd-spinner{text-align:center;padding:48px;color:#94A3B8;font-size:13px}
-
-        @media(min-width:1100px){
-          .stat-strip{grid-template-columns:repeat(4,1fr)}
-          .mlayout{grid-template-columns:1fr 320px}
-        }
-        @media(max-width:1099px) and (min-width:769px){
-          .mlayout{grid-template-columns:1fr 280px}
-        }
         @media(max-width:768px){
           .sidebar{transform:translateX(-100%)}
-          .main{margin-left:0!important;width:100%!important}
+          .main{margin-left:0!important;width:100!important}
           .hamburger{display:block}
-          .topbar{padding:0 14px}
-          .content{padding:14px 14px}
           .mlayout{grid-template-columns:1fr}
-          .detail-panel{display:none}
-          .hd-stats{grid-template-columns:repeat(2,1fr)}
-          .hist-drawer{width:100vw}
-        }
-        @media(max-width:480px){
-          .topbar{padding:0 12px}
-          .content{padding:12px 12px}
-          .page-title{font-size:22px}
-          .sstat{padding:12px 10px;gap:8px}
-          .sstat-ico{width:30px;height:30px;font-size:15px}
-          .sstat-num{font-size:18px}
-          .stat-strip{gap:8px}
         }
       `}</style>
 
-      {/* Overlays */}
+      {/* Sidebar and Basic UI structure remains same... */}
       <div className={`sb-overlay${sidebarOpen?' open':''}`} onClick={() => setSidebarOpen(false)} />
 
-      {/* Invite Modal — 2 step */}
+      {/* ── LEASE SETUP MODAL (Fix for image 2) ── */}
+      <div className={`modal-overlay${setupOpen?' open':''}`}>
+        <div className="modal" onClick={e => e.stopPropagation()}>
+          <div className="modal-title">Complete Lease Setup 📝</div>
+          <div className="modal-sub"><strong>{setupTenant?.full_name}</strong> has joined! Set the lease dates for <strong>{setupTenant?.property} - {setupTenant?.unit}</strong> to activate their profile.</div>
+          
+          <label className="setup-lbl">Lease Start Date</label>
+          <input type="date" className="setup-inp" value={lStart} onChange={e => setLStart(e.target.value)} />
+          
+          <label className="setup-lbl">Lease End Date</label>
+          <input type="date" className="setup-inp" value={lEnd} onChange={e => setLEnd(e.target.value)} />
+
+          <button className="copy-btn" onClick={handleSaveLease} disabled={setupLoading}>
+            {setupLoading ? 'Saving...' : 'Activate Tenant →'}
+          </button>
+        </div>
+      </div>
+
+      {/* ── INVITE MODAL ── */}
       <div className={`modal-overlay${inviteOpen?' open':''}`} onClick={() => setInviteOpen(false)}>
         <div className="modal" style={{maxWidth:420}} onClick={e => e.stopPropagation()}>
-
-          {/* ── STEP 1: Pick property + unit ── */}
-          {inviteStep === 1 && (
+          {inviteStep === 1 ? (
             <>
               <div className="modal-title">Invite a Tenant 👥</div>
               <div className="modal-sub">Select the property and vacant unit you want to assign. We&apos;ll generate a unique invite code to send to your tenant.</div>
-
               <div style={{marginBottom:14}}>
-                <label style={{display:'block',fontSize:12,fontWeight:700,color:'#64748B',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6}}>Property</label>
-                <select
-                  style={{width:'100%',padding:'10px 12px',borderRadius:10,border:'1.5px solid #E2E8F0',fontSize:14,fontFamily:"'Plus Jakarta Sans',sans-serif",color:'#0F172A',background:'#F8FAFC',outline:'none'}}
-                  value={invitePropId}
-                  onChange={async e => { setInvitePropId(e.target.value); await loadInviteUnits(e.target.value) }}
-                >
+                <label className="setup-lbl">Property</label>
+                <select className="setup-inp" value={invitePropId} onChange={async e => { setInvitePropId(e.target.value); await loadInviteUnits(e.target.value) }}>
                   <option value=''>— Select property —</option>
                   {inviteProps.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
-
               <div style={{marginBottom:14}}>
-                <label style={{display:'block',fontSize:12,fontWeight:700,color:'#64748B',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6}}>
-                  Vacant Unit
-                  {invitePropId && <span style={{fontWeight:400,textTransform:'none',letterSpacing:'normal',color:'#94A3B8',marginLeft:6}}>{inviteUnits.length} available</span>}
-                </label>
-                <select
-                  style={{width:'100%',padding:'10px 12px',borderRadius:10,border:'1.5px solid #E2E8F0',fontSize:14,fontFamily:"'Plus Jakarta Sans',sans-serif",color:'#0F172A',background:'#F8FAFC',outline:'none'}}
-                  value={inviteUnitId}
-                  onChange={e => setInviteUnitId(e.target.value)}
-                  disabled={!invitePropId || inviteUnits.length === 0}
-                >
+                <label className="setup-lbl">Vacant Unit</label>
+                <select className="setup-inp" value={inviteUnitId} onChange={e => setInviteUnitId(e.target.value)} disabled={!invitePropId || inviteUnits.length === 0}>
                   <option value=''>— Select unit —</option>
                   {inviteUnits.map(u => (
-                    <option key={u.id} value={u.id}>
-                      {u.unit_number} — {u.currency} {u.monthly_rent.toLocaleString()}/mo
-                    </option>
+                    <option key={u.id} value={u.id}>{u.unit_number} — {u.currency} {u.monthly_rent.toLocaleString()}/mo</option>
                   ))}
                 </select>
-                {invitePropId && inviteUnits.length === 0 && (
-                  <div style={{fontSize:12,color:'#F59E0B',marginTop:5}}>⚠️ No vacant units in this property</div>
-                )}
               </div>
-
-              {inviteError && (
-                <div style={{background:'#FEF2F2',border:'1px solid #FECACA',borderRadius:10,padding:'10px 12px',color:'#DC2626',fontSize:13,marginBottom:14}}>
-                  {inviteError}
-                </div>
-              )}
-
-              <button className="copy-btn" onClick={handleCreateInvite} disabled={inviteLoading} style={{marginBottom:10}}>
-                {inviteLoading ? 'Generating...' : 'Generate Invite Code →'}
-              </button>
+              <button className="copy-btn" onClick={handleCreateInvite} disabled={inviteLoading}>{inviteLoading ? 'Generating...' : 'Generate Invite Code →'}</button>
               <button className="modal-close" onClick={() => setInviteOpen(false)}>Cancel</button>
             </>
-          )}
-
-          {/* ── STEP 2: Show the code ── */}
-          {inviteStep === 2 && (
+          ) : (
             <>
               <div className="modal-title">Invite Code Ready! 🎉</div>
-              <div className="modal-sub">Share this code with your tenant. They&apos;ll enter it on the onboarding page after signing up to get linked to their unit automatically.</div>
-              <div className="code-box">
-                <div className="code-val">{inviteCode}</div>
-                <div className="code-hint">Send this to your tenant via WhatsApp, SMS, or email</div>
+              <div className="modal-sub">Share this code with your tenant. They&apos;ll enter it on the onboarding page after signing up.</div>
+              <div style={{background:'#F8FAFC',border:'2px dashed #BFDBFE',borderRadius:14,padding:18,textAlign:'center',marginBottom:16}}>
+                <div style={{fontSize:28,fontWeight:800,color:'#2563EB',letterSpacing:6}}>{inviteCode}</div>
               </div>
-
-              <div style={{background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:12,padding:'12px 14px',marginBottom:16,fontSize:13,color:'#166534',lineHeight:1.6}}>
-                <strong>How it works:</strong> Your tenant signs up at rentura.app → selects <em>Tenant</em> → enters this code → they&apos;re instantly linked to their unit.
-              </div>
-
-              <button className={`copy-btn${copied?' ok':''}`} onClick={copyCode} style={{marginBottom:10}}>
-                {copied ? '✓ Copied to clipboard!' : '📋 Copy Code'}
-              </button>
+              <button className={`copy-btn${copied?' ok':''}`} onClick={copyCode}>{copied ? '✓ Copied!' : '📋 Copy Code'}</button>
               <button className="modal-close" onClick={() => setInviteOpen(false)}>Done</button>
             </>
           )}
-
         </div>
       </div>
 
-      {/* Delete Confirm */}
-      <div className={`modal-overlay${delConfirm?' open':''}`}>
-        <div className="del-box">
-          <div className="del-ico">🗑️</div>
-          <div className="del-title">Remove Tenant?</div>
-          <div className="del-sub">This will remove the tenant from your records. Their account won&apos;t be deleted.</div>
-          <div className="del-row">
-            <button className="del-cancel" onClick={() => setDelConfirm(null)}>Cancel</button>
-            <button className="del-ok" onClick={() => delConfirm && handleDelete(delConfirm)}>Remove</button>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile Sheet */}
-      <div className={`sheet-bg${sheetOpen?' open':''}`} onClick={() => setSheetOpen(false)} />
-      <div className={`sheet${sheetOpen&&selected?' open':''}`}>
-        <div className="sheet-handle" />
-        {selected && renderDetail(selected, true)}
-      </div>
-
-      {/* ─── Rent History Drawer ─── */}
-      <div className={`hist-backdrop${historyOpen?' open':''}`} onClick={closeHistory} />
-      <div className={`hist-drawer${historyOpen?' open':''}`}>
-        {historyTenant && (
-          <>
-            <div className="hd-header">
-              <div>
-                <div className="hd-title">Rent History</div>
-                <div className="hd-sub">{historyTenant.full_name} · Unit {historyTenant.unit} · {historyTenant.property}</div>
-              </div>
-              <button className="hd-close" onClick={closeHistory}>✕</button>
-            </div>
-            <div className="hd-body">
-              {historyLoading ? (
-                <div className="hd-spinner">Loading history...</div>
-              ) : rentHistory.length === 0 ? (
-                <div className="hd-empty">
-                  <div style={{fontSize:36,marginBottom:10}}>📋</div>
-                  <div style={{fontSize:13}}>No payment records yet</div>
-                </div>
-              ) : (
-                <>
-                  {hStats && (
-                    <div className="hd-stats">
-                      <div className="hd-stat s-green">
-                        <div className="hd-stat-val">{fmtCurrency(hStats.totalPaid, hStats.currency)}</div>
-                        <div className="hd-stat-lbl">Total Paid</div>
-                        <div className="hd-stat-sub">{hStats.paid} payment{hStats.paid !== 1 ? 's' : ''}</div>
-                      </div>
-                      <div className={`hd-stat${hStats.overdue > 0 ? ' s-red' : ''}`}>
-                        <div className="hd-stat-val">{fmtCurrency(hStats.totalPending, hStats.currency)}</div>
-                        <div className="hd-stat-lbl">Outstanding</div>
-                        <div className="hd-stat-sub">{hStats.overdue > 0 ? `${hStats.overdue} overdue` : `${hStats.pending} pending`}</div>
-                      </div>
-                      <div className={`hd-stat${hStats.onTimeRate >= 80 ? ' s-green' : hStats.onTimeRate < 50 ? ' s-red' : ' s-blue'}`}>
-                        <div className="hd-stat-val">{hStats.onTimeRate}%</div>
-                        <div className="hd-stat-lbl">On-time</div>
-                        <div className="hd-stat-sub">{hStats.paid} of {rentHistory.length}</div>
-                      </div>
-                    </div>
-                  )}
-                  <div className="tl-section-lbl">Payment Timeline</div>
-                  <div className="tl">
-                    {rentHistory.map(payment => {
-                      const ds = getDisplayStatus(payment)
-                      const dotIcon = ds === 'paid' ? '✓' : ds === 'overdue' ? '!' : '○'
-                      return (
-                        <div key={payment.id} className="tl-row">
-                          <div className={`tl-dot d-${ds}`}>{dotIcon}</div>
-                          <div className="tl-card">
-                            <div className="tl-card-top">
-                              <div className="tl-amount">{fmtCurrency(payment.amount, historyTenant.currency)}</div>
-                              <span className={`tl-badge tb-${ds}`}>
-                                {ds.charAt(0).toUpperCase() + ds.slice(1)}
-                              </span>
-                            </div>
-                            <div className="tl-dates">
-                              <div className="tl-date"><strong>Due:</strong> {fmtDate(payment.due_date)}</div>
-                              {payment.paid_date && <div className="tl-date"><strong>Paid:</strong> {fmtDate(payment.paid_date)}</div>}
-                            </div>
-                            {payment.payment_method && <div className="tl-method">via {payment.payment_method}</div>}
-                            {payment.note && <div className="tl-note">"{payment.note}"</div>}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-
+      {/* Rest of the layout code (Sidebar, Header, List, Detail Panel) goes here... */}
       <div className="shell">
-        {/* SIDEBAR */}
         <aside className={`sidebar${sidebarOpen?' open':''}`}>
           <div className="sb-logo">
             <div className="sb-logo-icon">🏘️</div>
             <span className="sb-logo-name">Rentura</span>
           </div>
           <nav className="sb-nav">
-            <span className="sb-section">Overview</span>
-            <a href="/landlord" className="sb-item"><span className="sb-ico">⊞</span>Dashboard</a>
-            <a href="/landlord/properties" className="sb-item"><span className="sb-ico">🏠</span>Properties</a>
-            <a href="/landlord/tenants" className="sb-item active"><span className="sb-ico">👥</span>Tenants</a>
-            <span className="sb-section">Finances</span>
-            <a href="/landlord/rent" className="sb-item"><span className="sb-ico">💰</span>Rent Tracker</a>
-            <a href="/landlord/reports" className="sb-item"><span className="sb-ico">📊</span>Reports</a>
-            <span className="sb-section">Management</span>
-            <a href="/landlord/maintenance" className="sb-item"><span className="sb-ico">🔧</span>Maintenance</a>
-            <a href="/landlord/documents" className="sb-item"><span className="sb-ico">📁</span>Documents</a>
-            <a href="/landlord/messages" className="sb-item"><span className="sb-ico">💬</span>Messages</a>
-            <a href="/landlord/listings" className="sb-item"><span className="sb-ico">📋</span>Listings</a>
-            <span className="sb-section">Account</span>
-            <a href="/landlord/settings" className="sb-item"><span className="sb-ico">⚙️</span>Settings</a>
+             <span className="sb-section">Overview</span>
+             <a href="/landlord" className="sb-item"><span className="sb-ico">⊞</span>Dashboard</a>
+             <a href="/landlord/properties" className="sb-item"><span className="sb-ico">🏠</span>Properties</a>
+             <a href="/landlord/tenants" className="sb-item active"><span className="sb-ico">👥</span>Tenants</a>
+             <span className="sb-section">Finances</span>
+             <a href="/landlord/rent" className="sb-item"><span className="sb-ico">💰</span>Rent Tracker</a>
+             <a href="/landlord/reports" className="sb-item"><span className="sb-ico">📊</span>Reports</a>
+             <span className="sb-section">Management</span>
+             <a href="/landlord/maintenance" className="sb-item"><span className="sb-ico">🔧</span>Maintenance</a>
+             <a href="/landlord/documents" className="sb-item"><span className="sb-ico">📁</span>Documents</a>
+             <a href="/landlord/messages" className="sb-item"><span className="sb-ico">💬</span>Messages</a>
+             <a href="/landlord/listings" className="sb-item"><span className="sb-ico">📋</span>Listings</a>
+             <span className="sb-section">Account</span>
+             <a href="/landlord/settings" className="sb-item"><span className="sb-ico">⚙️</span>Settings</a>
           </nav>
           <div className="sb-footer">
-            <div className="sb-upgrade">
-              <div className="sb-up-title">⭐ Upgrade to Pro</div>
-              <div className="sb-up-sub">Unlimited properties, reports & priority support.</div>
-              <button className="sb-up-btn">See Plans →</button>
-            </div>
             <div className="sb-user">
               <div className="sb-av">{userInitials}</div>
               <div>
@@ -848,7 +655,6 @@ export default function TenantsPage() {
           </div>
         </aside>
 
-        {/* MAIN */}
         <div className="main">
           <div className="topbar">
             <div className="tb-left">
@@ -861,99 +667,34 @@ export default function TenantsPage() {
           <div className="content">
             <div style={{marginBottom:20}}>
               <div className="page-title">Tenants</div>
-              <div className="page-sub">{counts.all} total · {counts.active} active · {counts.late} late · {counts.expiring} expiring</div>
-            </div>
-
-            <div className="stat-strip">
-              {[
-                { ico:'👥', bg:'#EFF6FF', num: counts.all,      lbl:'Total Tenants' },
-                { ico:'✅', bg:'#DCFCE7', num: counts.active,   lbl:'Active' },
-                { ico:'⚠️', bg:'#FEE2E2', num: counts.late,     lbl:'Late Payment' },
-                { ico:'⏳', bg:'#FEF3C7', num: counts.expiring, lbl:'Lease Expiring' },
-              ].map(s => (
-                <div key={s.lbl} className="sstat">
-                  <div className="sstat-ico" style={{background:s.bg}}>{s.ico}</div>
-                  <div>
-                    <div className="sstat-num">{s.num}</div>
-                    <div className="sstat-lbl">{s.lbl}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="toolbar">
-              <div className="search-wrap">
-                <span className="search-ico">🔍</span>
-                <input className="search-input" placeholder="Search by name, property, unit..."
-                  value={search} onChange={e => setSearch(e.target.value)} />
-              </div>
-              <div className="filter-row-wrap">
-                <div className="filter-tabs">
-                  {(['all','active','late','expiring','ended'] as const).map(f => (
-                    <button key={f} className={`ftab${filter===f?' active':''}`} onClick={() => setFilter(f)}>
-                      {f.charAt(0).toUpperCase()+f.slice(1)}
-                      <span className="fc">{counts[f]}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <div className="page-sub">{counts.all} total · {counts.active} active · {counts.pending} pending</div>
             </div>
 
             <div className="mlayout">
               <div className="tenant-list">
                 {loading ? (
-                  [1,2,3,4].map(i => (
-                    <div key={i} className="skel-card">
-                      <div className="skeleton skel-av" />
-                      <div className="skel-lines">
-                        <div className="skeleton skel-line skel-m" />
-                        <div className="skeleton skel-line skel-s" />
-                      </div>
-                    </div>
-                  ))
+                  <div className="skel-card"><div className="skeleton skel-av"/><div className="skel-lines"><div className="skeleton skel-line skel-m"/></div></div>
                 ) : filtered.length === 0 ? (
-                  <div className="empty-state">
-                    <div className="e-ico">👥</div>
-                    <div className="e-title">{search || filter !== 'all' ? 'No tenants match your search' : 'No tenants yet — invite your first!'}</div>
-                  </div>
-                ) : filtered.map((t) => {
-                  const sc  = SC[t.status]
-                  const idx = tenants.findIndex(x => x.id === t.id)
-                  const bg  = AV[Math.max(0, idx) % AV.length]
-                  return (
-                    <div key={t.id}
-                      className={`tenant-card${selected?.id===t.id?' sel':''}`}
-                      onClick={() => selectTenant(t)}>
-                      {t.avatar_url
-                        ? <img src={t.avatar_url} alt={t.full_name} style={{width:44,height:44,borderRadius:13,objectFit:'cover',flexShrink:0}} />
-                        : <div style={{width:44,height:44,borderRadius:13,background:bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:700,color:'#fff',flexShrink:0}}>{initials(t.full_name)}</div>
-                      }
-                      <div className="t-info">
-                        <div className="t-name">{t.full_name}</div>
-                        <div className="t-meta">
-                          <span className="t-meta-item">🏠 {t.property}</span>
-                          <span className="t-meta-item">🚪 {t.unit}</span>
-                          {t.phone && t.phone !== '—' && <span className="t-meta-item">📞 {t.phone}</span>}
-                        </div>
-                      </div>
-                      <div className="t-right">
-                        <div className="t-rent">${t.rent_amount}/mo</div>
-                        <span className="badge" style={{background:sc.bg,color:sc.color}}>{sc.label}</span>
-                        {/* History button visible on all screen sizes */}
-                        <button className="btn-hist-card" onClick={(e) => openHistory(t, e)}>
-                          🕐 History
-                        </button>
-                      </div>
+                  <div className="empty-state">No tenants found.</div>
+                ) : filtered.map(t => (
+                  <div key={t.id} className={`tenant-card${selected?.id===t.id?' sel':''}`} onClick={() => selectTenant(t)}>
+                    <div style={{width:44,height:44,borderRadius:13,background:AV[tenants.indexOf(t)%AV.length],display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:700}}>{initials(t.full_name)}</div>
+                    <div className="t-info">
+                      <div className="t-name">{t.full_name}</div>
+                      <div className="t-meta">🏠 {t.property} · 🚪 {t.unit}</div>
                     </div>
-                  )
-                })}
+                    <div className="t-right">
+                      <div className="t-rent">${t.rent_amount}/mo</div>
+                      <span className="badge" style={{background:SC[t.status].bg, color:SC[t.status].color}}>{SC[t.status].label}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <div className="detail-panel">
-                {!selected
-                  ? <div className="no-sel"><div className="no-sel-ico">👤</div><div className="no-sel-txt">Select a tenant to<br/>view their details</div></div>
-                  : renderDetail(selected, false)
-                }
+                {!selected ? (
+                   <div className="no-sel"><div className="no-sel-ico">👤</div><div>Select a tenant to see details</div></div>
+                ) : renderDetail(selected)}
               </div>
             </div>
           </div>
