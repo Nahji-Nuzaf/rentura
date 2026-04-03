@@ -375,7 +375,7 @@ export default function LandlordDashboard() {
         .sb-upgrade { margin:12px; padding:16px; border-radius:14px; background:linear-gradient(135deg,rgba(59,130,246,0.16),rgba(99,102,241,0.2)); border:1px solid rgba(59,130,246,0.22); }
         .sb-up-title { font-size:13.5px; font-weight:700; color:#F1F5F9; margin-bottom:4px; }
         .sb-up-sub { font-size:12px; color:#64748B; line-height:1.55; margin-bottom:12px; }
-        .sb-up-btn { width:100%; padding:9px; border-radius:9px; border:none; background:linear-gradient(135deg,#3B82F6,#6366F1); color:#fff; font-size:12.5px; font-weight:700; cursor:pointer; font-family:'Plus Jakarta Sans',sans-serif; }
+        .sb-up-btn { width:100%; padding:9px; border-radius:99px; border:none; background:linear-gradient(135deg,#3B82F6,#6366F1); color:#fff; font-size:12.5px; font-weight:700; cursor:pointer; font-family:'Plus Jakarta Sans',sans-serif; }
         .sb-user { padding:14px 18px; border-top:1px solid rgba(255,255,255,0.07); display:flex; align-items:center; gap:11px; }
         .sb-av { width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,#3B82F6,#6366F1); display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:700; flex-shrink:0; }
         .sb-uname { font-size:13px; font-weight:700; color:#E2E8F0; }
@@ -524,7 +524,7 @@ export default function LandlordDashboard() {
         }
         @media(max-width:768px){
           .sidebar{transform:translateX(-100%)}
-          .main{margin-left:0!important;width:100%!important}
+          .main{margin-left:0!important;width:100!important}
           .hamburger{display:block}
           .topbar{padding:0 14px}
           .content{padding:14px 14px}
@@ -685,7 +685,6 @@ export default function LandlordDashboard() {
                           <th>Units</th>
                           <th>Occupancy</th>
                           <th>Status</th>
-                          <th>Avg Rent</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -696,11 +695,10 @@ export default function LandlordDashboard() {
                               <td><div className="skeleton" style={{height:13,width:30}} /></td>
                               <td><div className="skeleton" style={{height:8,width:100}} /></td>
                               <td><div className="skeleton" style={{height:20,width:60,borderRadius:99}} /></td>
-                              <td><div className="skeleton" style={{height:13,width:50}} /></td>
                             </tr>
                           ))
                         ) : properties.length === 0 ? (
-                          <tr><td colSpan={5}>
+                          <tr><td colSpan={4}>
                             <div className="empty">No properties yet. <a href="/landlord/properties">Add your first →</a></div>
                           </td></tr>
                         ) : properties.map(p => {
@@ -725,11 +723,6 @@ export default function LandlordDashboard() {
                               <td>
                                 <span className={`pill ${pillClass}`}>
                                   <span className="pdot" />{statusLabel}
-                                </span>
-                              </td>
-                              <td>
-                                <span className="p-rent">
-                                  {p.avg_rent > 0 ? `$${p.avg_rent.toLocaleString()}` : '—'}
                                 </span>
                               </td>
                             </tr>
@@ -888,7 +881,7 @@ export default function LandlordDashboard() {
                     <span className="card-title">Quick Actions</span>
                   </div>
                   <div className="qa">
-                    <a href="/landlord/tenants"   className="qa-item"><div className="qa-ico" style={{background:'#EEF2FF'}}>👥</div><span className="qa-lbl">Invite Tenant</span></a>
+                    <a href="/landlord/tenants"    className="qa-item"><div className="qa-ico" style={{background:'#EEF2FF'}}>👥</div><span className="qa-lbl">Invite Tenant</span></a>
                     <a href="/landlord/rent"       className="qa-item"><div className="qa-ico" style={{background:'#EFF6FF'}}>💰</div><span className="qa-lbl">Rent Tracker</span></a>
                     <a href="/landlord/documents"  className="qa-item"><div className="qa-ico" style={{background:'#FFFBEB'}}>📁</div><span className="qa-lbl">Upload Doc</span></a>
                     <a href="/landlord/listings"   className="qa-item"><div className="qa-ico" style={{background:'#F0FDF4'}}>📋</div><span className="qa-lbl">Post Listing</span></a>
