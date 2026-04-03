@@ -41,6 +41,7 @@ export default function OnboardingPage() {
   const [step, setStep]           = useState(1)
   const [loading, setLoading]     = useState(false)
   const [errors, setErrors]       = useState<Record<string, string>>({})
+  const [skippedProperty, setSkippedProperty] = useState(false)
 
   // Landlord
   const [phone, setPhone]               = useState('')
@@ -50,7 +51,7 @@ export default function OnboardingPage() {
   const [country, setCountry]           = useState('')
   const [propType, setPropType]         = useState('apartment')
   const [units, setUnits]               = useState('1')
-  const [rent, setRent]                 = useState('')
+  const [rent, setRent]                 = useState('0')
   const [currency, setCurrency]         = useState('USD')
 
   // Tenant
@@ -93,8 +94,6 @@ export default function OnboardingPage() {
     if (!address.trim())      e.address      = 'Address is required'
     if (!city.trim())         e.city         = 'City is required'
     if (!country.trim())      e.country      = 'Country is required'
-    if (!rent)                e.rent         = 'Monthly rent is required'
-    else if (parseFloat(rent) <= 0) e.rent   = 'Rent must be greater than 0'
     setErrors(e); return Object.keys(e).length === 0
   }
 
@@ -161,6 +160,7 @@ export default function OnboardingPage() {
     }))
     await sb.from('units').insert(unitRows)
     setLoading(false)
+    setSkippedProperty(false)
     setStep(3)
   }
 
@@ -382,41 +382,10 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
-              {/* Currency + Rent row */}
-              <div style={{ marginBottom:16 }}>
-                <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#374151', marginBottom:7 }}>Monthly Rent per Unit</label>
-                <div style={{ display:'flex', gap:8 }}>
-                  <select
-                    className="ob-inp"
-                    value={currency}
-                    onChange={e => setCurrency(e.target.value)}
-                    style={{ width:110, flexShrink:0 }}
-                  >
-                    {['USD','LKR','EUR','GBP','AED','SGD','AUD','CAD','INR','MYR'].map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                  <input
-                    className={`ob-inp${errors.rent ? ' ob-inp-err' : ''}`}
-                    type="number" min="1" step="any"
-                    value={rent}
-                    onChange={e => { const v = parseFloat(e.target.value); setRent(v < 0 ? '0' : e.target.value) }}
-                    placeholder="e.g. 1500"
-                    style={{ flex:1 }}
-                  />
-                </div>
-                {errors.rent && (
-                  <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:6 }}>
-                    <span style={{ fontSize:12 }}>⚠️</span>
-                    <span style={{ fontSize:12, color:'#EF4444', fontWeight:500 }}>{errors.rent}</span>
-                  </div>
-                )}
-              </div>
-
               <button className="ob-btn" onClick={handleLandlordProperty} disabled={loading} style={{ marginTop:8 }}>
                 {loading ? 'Saving...' : 'Save & Continue →'}
               </button>
-              <button className="ob-skip" onClick={() => setStep(3)}>Skip for now</button>
+              <button className="ob-skip" onClick={() => { setSkippedProperty(true); setStep(3); }}>Skip for now</button>
             </div>
           )}
 
@@ -428,13 +397,17 @@ export default function OnboardingPage() {
                 You're all set!
               </h2>
               <p style={{ color:'#64748B', fontSize:15, lineHeight:1.7, maxWidth:320, margin:'0 auto 32px' }}>
-                Your property has been added. Your dashboard is ready to go.
+                Your account is ready. Your dashboard is ready to go.
               </p>
               <div style={{ marginBottom:32, textAlign:'left' }}>
-                {[['✅','Account created'],['✅','First property added'],['⏳','Invite your first tenant']].map(([icon,text]) => (
+                {[
+                  ['✅', 'Account created'],
+                  skippedProperty ? ['⏳', 'Property setup skipped'] : ['✅', 'First property added'],
+                  ['⏳', 'Invite your first tenant']
+                ].map(([icon, text]) => (
                   <div className="check-item" key={text}>
                     <span style={{ fontSize:16 }}>{icon}</span>
-                    <span style={{ fontSize:14, color: icon==='✅' ? '#475569' : '#94A3B8' }}>{text}</span>
+                    <span style={{ fontSize:14, color: icon === '✅' ? '#475569' : '#94A3B8' }}>{text}</span>
                   </div>
                 ))}
               </div>
