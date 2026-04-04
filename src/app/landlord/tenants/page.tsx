@@ -202,15 +202,64 @@ export default function TenantsPage() {
     setLeaseSaving(true); setLeaseError('')
     try {
       const sb = createClient()
+
+      // 1. Update unit with lease dates + optional new rent
+      const rent = leaseRent && parseFloat(leaseRent) > 0 ? parseFloat(leaseRent) : null
       const updates: any = { lease_start: leaseStart, lease_end: leaseEnd }
-      if (leaseRent && parseFloat(leaseRent) > 0) updates.monthly_rent = parseFloat(leaseRent)
+      if (rent) updates.monthly_rent = rent
 
-      await sb.from('units').update(updates).eq('id', leaseUnitId)
+      const { data: unitData } = await sb.from('units')
+        .update(updates)
+        .eq('id', leaseUnitId)
+        .select('monthly_rent, rent_due_day, currency')
+        .single()
 
+      // 2. Get the final rent amount and currency from unit
+      const finalRent     = rent || unitData?.monthly_rent || 0
+      const finalCurrency = unitData?.currency || 'USD'
+      const dueDay        = unitData?.rent_due_day || 1
+
+      // 3. Delete any existing pending payments for this tenant (clean slate)
+      await sb.from('rent_payments')
+        .delete()
+        .eq('tenant_id', leaseTenantId)
+        .eq('status', 'pending')
+
+      // 4. Generate 3 upcoming monthly payment rows
+      // Start from the lease start date, find the first due date on or after it
+      const leaseStartDate = new Date(leaseStart)
+      const leaseEndDate   = new Date(leaseEnd)
+      const payments: any[] = []
+
+      // Find first due date: same month as lease start, on due day
+      let dueDate = new Date(leaseStartDate.getFullYear(), leaseStartDate.getMonth(), dueDay)
+      // If due day already passed this month, move to next month
+      if (dueDate < leaseStartDate) {
+        dueDate = new Date(leaseStartDate.getFullYear(), leaseStartDate.getMonth() + 1, dueDay)
+      }
+
+      for (let i = 0; i < 3; i++) {
+        if (dueDate > leaseEndDate) break
+        payments.push({
+          tenant_id:  leaseTenantId,
+          unit_id:    leaseUnitId,
+          amount:     finalRent,
+          due_date:   dueDate.toISOString().split('T')[0],
+          status:     'pending',
+        })
+        // Move to next month
+        dueDate = new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, dueDay)
+      }
+
+      if (payments.length > 0) {
+        await sb.from('rent_payments').insert(payments)
+      }
+
+      // 5. Update local state
       setTenants(prev => prev.map(t =>
         t.id === leaseTenantId
           ? { ...t, lease_start: leaseStart, lease_end: leaseEnd,
-              rent_amount: leaseRent ? parseFloat(leaseRent) : t.rent_amount }
+              rent_amount: finalRent, currency: finalCurrency }
           : t
       ))
       setLeaseModal(false)
