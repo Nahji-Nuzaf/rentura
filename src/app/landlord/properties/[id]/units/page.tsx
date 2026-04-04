@@ -27,8 +27,8 @@ type Property = {
 }
 
 const UNIT_STATUS: Record<string, { label: string; bg: string; color: string }> = {
-  occupied:     { label: 'Occupied',    bg: '#DCFCE7', color: '#16A34A' },
-  vacant:       { label: 'Vacant',      bg: '#FEF3C7', color: '#D97706' },
+  occupied:    { label: 'Occupied',    bg: '#DCFCE7', color: '#16A34A' },
+  vacant:      { label: 'Vacant',      bg: '#FEF3C7', color: '#D97706' },
   maintenance: { label: 'Maintenance', bg: '#FEE2E2', color: '#DC2626' },
 }
 
@@ -42,8 +42,8 @@ const BEDROOM_PRESETS = [
 ]
 
 export default function UnitsPage() {
-  const router = useRouter()
-  const params = useParams()
+  const router   = useRouter()
+  const params   = useParams()
   const propertyId = params?.id as string
 
   const [userInitials, setUserInitials] = useState('NN')
@@ -70,7 +70,7 @@ export default function UnitsPage() {
   const [bulkSaving, setBulkSaving] = useState(false)
 
   // ── LOAD ─────────────────────────────────────────────────
-  async function loadUnits(supabase: any, userId: string) {
+  async function loadUnits(supabase: any) {
     const { data: prop } = await supabase
       .from('properties').select('id,name,city,type').eq('id', propertyId).single()
     setProperty(prop)
@@ -86,41 +86,45 @@ export default function UnitsPage() {
     let tenantMap: Record<string, { name: string; email: string; tenant_id: string }> = {}
 
     if (unitIds.length > 0) {
-      // FIX: Fetch email from tenants table and remove accepted-only filter
+      // Load all tenants for these units
       const { data: tenantsData } = await supabase
         .from('tenants')
-        .select('id,unit_id,profile_id,email,invite_accepted')
+        .select('id,unit_id,profile_id,invite_accepted')
         .in('unit_id', unitIds)
 
-      const profileIds = (tenantsData || []).map((t: any) => t.profile_id).filter(Boolean)
+      // Get profiles for tenants that have a profile_id
+      const profileIds = (tenantsData || [])
+        .map((t: any) => t.profile_id)
+        .filter(Boolean)
 
       let profileMap: Record<string, any> = {}
       if (profileIds.length > 0) {
         const { data: profilesData } = await supabase
-          .from('profiles').select('id,full_name,email').in('id', profileIds)
+          .from('profiles')
+          .select('id,full_name,email')
+          .in('id', profileIds)
         ;(profilesData || []).forEach((p: any) => { profileMap[p.id] = p })
       }
 
-      // FIX: Fallback to invitation email if profile name isn't available
+      // Build tenant map — include any tenant linked to a unit
       ;(tenantsData || []).forEach((t: any) => {
-        if (t.unit_id) {
-          const profile = t.profile_id ? profileMap[t.profile_id] : null
-          tenantMap[t.unit_id] = {
-            name:      profile?.full_name || t.email || 'Invited Tenant',
-            email:     profile?.email || t.email || '',
-            tenant_id: t.id,
+        if (t.unit_id && t.profile_id) {
+          const profile = profileMap[t.profile_id]
+          if (profile) {
+            tenantMap[t.unit_id] = {
+              name:      profile.full_name || 'Tenant',
+              email:     profile.email || '',
+              tenant_id: t.id,
+            }
           }
         }
       })
 
-      const unitIdsToFix = (tenantsData || [])
-        .filter((t: any) => t.invite_accepted && t.profile_id)
-        .map((t: any) => t.unit_id)
-        .filter((uid: string) => {
-          const u = (unitsData || []).find((u: any) => u.id === uid)
-          return u && u.status !== 'occupied'
-        })
-
+      // Auto-fix units that have a linked tenant but wrong status
+      const unitIdsToFix = Object.keys(tenantMap).filter(uid => {
+        const u = (unitsData || []).find((u: any) => u.id === uid)
+        return u && u.status !== 'occupied'
+      })
       if (unitIdsToFix.length > 0) {
         await supabase.from('units').update({ status: 'occupied' }).in('id', unitIdsToFix)
         unitIdsToFix.forEach((uid: string) => {
@@ -149,39 +153,18 @@ export default function UnitsPage() {
 
   useEffect(() => {
     if (!propertyId) return
-    const init = async () => {
+    ;(async () => {
       try {
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) { router.push('/login'); return }
-
         const name = user.user_metadata?.full_name || 'User'
         setFullName(name)
         setUserInitials(name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2))
-
-        await loadUnits(supabase, user.id)
-
-        // FIX: Watch for ALL events (*), so new tenants show up immediately
-        const channel = supabase
-          .channel(`units-${propertyId}`)
-          .on('postgres_changes', {
-            event: '*', 
-            schema: 'public',
-            table: 'tenants',
-            filter: `property_id=eq.${propertyId}`,
-          }, async () => {
-            await loadUnits(supabase, user.id)
-          })
-          .subscribe()
-
-        return () => { supabase.removeChannel(channel) }
-      } catch (err) {
-        console.error('Load error:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    init()
+        await loadUnits(supabase)
+      } catch (err) { console.error('Load error:', err) }
+      finally { setLoading(false) }
+    })()
   }, [propertyId, router])
 
   const filtered = units.filter(u => {
@@ -234,17 +217,13 @@ export default function UnitsPage() {
       }
       if (editForm.lease_start) payload.lease_start = editForm.lease_start
       if (editForm.lease_end)   payload.lease_end   = editForm.lease_end
-
       const { error } = await supabase.from('units').update(payload).eq('id', editUnit.id)
       if (error) throw new Error(error.message)
-
       setUnits(prev => prev.map(u => u.id === editUnit.id ? { ...u, ...payload } : u))
       setEditUnit(null)
     } catch (err: any) {
       setSaveError(err?.message || 'Failed to save.')
-    } finally {
-      setSaving(false)
-    }
+    } finally { setSaving(false) }
   }
 
   // ── BULK ─────────────────────────────────────────────────
@@ -254,37 +233,24 @@ export default function UnitsPage() {
   function toggleSelectAll() {
     setSelected(selected.size === filtered.length ? new Set() : new Set(filtered.map(u => u.id)))
   }
-
   async function applyBulk() {
     if (selected.size === 0 || (!bulkRent && !bulkStatus)) return
     setBulkSaving(true)
     try {
       const supabase = createClient()
       const ids = Array.from(selected)
-      const update: any = {}
-      if (bulkRent) update.monthly_rent = parseFloat(bulkRent)
+      if (bulkRent) await supabase.from('units').update({ monthly_rent: parseFloat(bulkRent) }).in('id', ids)
       if (bulkStatus) {
-        const safeIds = ids.filter(id => {
-          const u = units.find(u => u.id === id)
-          return u && !u.tenant_id
-        })
-        if (safeIds.length > 0) {
-          await supabase.from('units').update({ status: bulkStatus }).in('id', safeIds)
-        }
-        if (bulkRent && ids.length > 0) {
-          await supabase.from('units').update({ monthly_rent: parseFloat(bulkRent) }).in('id', ids)
-        }
-        setUnits(prev => prev.map(u => {
-          if (!ids.includes(u.id)) return u
-          const updated: any = { ...u }
-          if (bulkRent) updated.monthly_rent = parseFloat(bulkRent)
-          if (bulkStatus && !u.tenant_id) updated.status = bulkStatus
-          return updated
-        }))
-      } else {
-        await supabase.from('units').update(update).in('id', ids)
-        setUnits(prev => prev.map(u => ids.includes(u.id) ? { ...u, ...update } : u))
+        const safeIds = ids.filter(id => !units.find(u => u.id === id)?.tenant_id)
+        if (safeIds.length > 0) await supabase.from('units').update({ status: bulkStatus }).in('id', safeIds)
       }
+      setUnits(prev => prev.map(u => {
+        if (!ids.includes(u.id)) return u
+        const updated = { ...u }
+        if (bulkRent) updated.monthly_rent = parseFloat(bulkRent)
+        if (bulkStatus && !u.tenant_id) updated.status = bulkStatus as any
+        return updated
+      }))
       setSelected(new Set()); setBulkRent(''); setBulkStatus(''); setBulkMode(false)
     } catch (err) { console.error(err) }
     finally { setBulkSaving(false) }
@@ -471,23 +437,16 @@ export default function UnitsPage() {
           <button className="drawer-close" onClick={()=>setEditUnit(null)}>✕</button>
         </div>
         <div className="drawer-body">
-
-          {/* Occupied notice */}
           {editUnit && isOccupied(editUnit) && (
-            <div className="info-box">
-              🔒 This unit has an active tenant. Status is locked and cannot be changed.
-            </div>
+            <div className="info-box">🔒 This unit has an active tenant. Status is locked.</div>
           )}
-
           <div className="field">
             <label>Unit Number / Name *</label>
             <input placeholder="e.g. Unit 5A" value={editForm.unit_number}
               onChange={e=>setEditForm(f=>({...f,unit_number:e.target.value}))}/>
           </div>
-
           <div className="divider"/>
           <div className="section-label">Rent & Payment</div>
-
           <div className="field-row">
             <div className="field">
               <label>Monthly Rent (USD)</label>
@@ -500,7 +459,6 @@ export default function UnitsPage() {
                 onChange={e=>setEditForm(f=>({...f,rent_due_day:e.target.value}))}/>
             </div>
           </div>
-
           <div style={{fontSize:'12px',color:'#94A3B8'}}>💡 Quick rent presets:</div>
           <div className="preset-grid">
             {BEDROOM_PRESETS.map(p=>(
@@ -517,23 +475,19 @@ export default function UnitsPage() {
               </button>
             ))}
           </div>
-
           <div className="divider"/>
           <div className="section-label">Status & Lease</div>
-
           <div className="field">
             <label>Unit Status {editUnit && isOccupied(editUnit) && <span style={{color:'#16A34A',fontWeight:400}}>(locked — tenant active)</span>}</label>
-            {editUnit && isOccupied(editUnit) ? (
-              <div className="locked-badge">🔒 Occupied — tenant is active</div>
-            ) : (
-              <select value={editForm.status} onChange={e=>setEditForm(f=>({...f,status:e.target.value}))}>
-                <option value="vacant">Vacant (available)</option>
-                <option value="occupied">Occupied (has tenant)</option>
-                <option value="maintenance">Maintenance (unavailable)</option>
-              </select>
-            )}
+            {editUnit && isOccupied(editUnit)
+              ? <div className="locked-badge">🔒 Occupied — tenant is active</div>
+              : <select value={editForm.status} onChange={e=>setEditForm(f=>({...f,status:e.target.value}))}>
+                  <option value="vacant">Vacant (available)</option>
+                  <option value="occupied">Occupied (has tenant)</option>
+                  <option value="maintenance">Maintenance (unavailable)</option>
+                </select>
+            }
           </div>
-
           <div className="field-row">
             <div className="field">
               <label>Lease Start</label>
@@ -546,15 +500,12 @@ export default function UnitsPage() {
                 onChange={e=>setEditForm(f=>({...f,lease_end:e.target.value}))}/>
             </div>
           </div>
-
           {saveError && <div className="err-box">⚠️ {saveError}</div>}
         </div>
         <div className="drawer-footer">
           <div className="btn-row">
             <button className="btn-cancel" onClick={()=>setEditUnit(null)}>Cancel</button>
-            <button className="btn-save" disabled={saving} onClick={handleSaveUnit}>
-              {saving?'Saving…':'Save Unit'}
-            </button>
+            <button className="btn-save" disabled={saving} onClick={handleSaveUnit}>{saving?'Saving…':'Save Unit'}</button>
           </div>
         </div>
       </div>
@@ -706,12 +657,13 @@ export default function UnitsPage() {
                             {bulkMode && <td className="check-col"><input type="checkbox" checked={selected.has(u.id)} onChange={()=>toggleSelect(u.id)}/></td>}
                             <td><span className="unit-num">{u.unit_number}</span></td>
                             <td>
-                              {u.tenant_name ? (
-                                <div className="unit-tenant">
-                                  <span className="tenant-name">👤 {u.tenant_name}</span>
-                                  <span className="tenant-email">{u.tenant_email}</span>
-                                </div>
-                              ) : <span className="no-tenant">No tenant</span>}
+                              {u.tenant_name
+                                ? <div className="unit-tenant">
+                                    <span className="tenant-name">👤 {u.tenant_name}</span>
+                                    <span className="tenant-email">{u.tenant_email}</span>
+                                  </div>
+                                : <span className="no-tenant">No tenant</span>
+                              }
                             </td>
                             <td>
                               <div className="rent-cell">${u.monthly_rent.toLocaleString()}</div>
@@ -719,14 +671,15 @@ export default function UnitsPage() {
                             </td>
                             <td><span className="badge" style={{background:sc.bg,color:sc.color}}>● {sc.label}</span></td>
                             <td>
-                              {u.lease_start && u.lease_end ? (
-                                <div>
-                                  <div className="lease-dates">
-                                    {new Date(u.lease_start).toLocaleDateString('en-US',{month:'short',year:'numeric'})} → {new Date(u.lease_end).toLocaleDateString('en-US',{month:'short',year:'numeric'})}
+                              {u.lease_start && u.lease_end
+                                ? <div>
+                                    <div className="lease-dates">
+                                      {new Date(u.lease_start).toLocaleDateString('en-US',{month:'short',year:'numeric'})} → {new Date(u.lease_end).toLocaleDateString('en-US',{month:'short',year:'numeric'})}
+                                    </div>
+                                    <div className="lease-bar"><div className="lease-fill" style={{width:`${leasePct}%`}}/></div>
                                   </div>
-                                  <div className="lease-bar"><div className="lease-fill" style={{width:`${leasePct}%`}}/></div>
-                                </div>
-                              ) : <span style={{fontSize:12,color:'#94A3B8'}}>—</span>}
+                                : <span style={{fontSize:12,color:'#94A3B8'}}>—</span>
+                              }
                             </td>
                             <td><button className="edit-btn" onClick={()=>openEdit(u)}>Edit</button></td>
                           </tr>
@@ -759,24 +712,26 @@ export default function UnitsPage() {
                           </div>
                           <div className="uc-field">
                             <div className="uc-label">Lease</div>
-                            {u.lease_start&&u.lease_end ? (
-                              <>
-                                <div className="uc-sub" style={{marginTop:2}}>{new Date(u.lease_start).toLocaleDateString('en-US',{month:'short',year:'numeric'})}</div>
-                                <div className="uc-sub">→ {new Date(u.lease_end).toLocaleDateString('en-US',{month:'short',year:'numeric'})}</div>
-                                <div style={{height:4,background:'#E2E8F0',borderRadius:99,overflow:'hidden',marginTop:5}}>
-                                  <div style={{height:'100%',width:`${leasePct}%`,background:'#3B82F6',borderRadius:99}}/>
-                                </div>
-                              </>
-                            ) : <div className="uc-sub" style={{marginTop:2}}>No lease set</div>}
+                            {u.lease_start&&u.lease_end
+                              ? <>
+                                  <div className="uc-sub" style={{marginTop:2}}>{new Date(u.lease_start).toLocaleDateString('en-US',{month:'short',year:'numeric'})}</div>
+                                  <div className="uc-sub">→ {new Date(u.lease_end).toLocaleDateString('en-US',{month:'short',year:'numeric'})}</div>
+                                  <div style={{height:4,background:'#E2E8F0',borderRadius:99,overflow:'hidden',marginTop:5}}>
+                                    <div style={{height:'100%',width:`${leasePct}%`,background:'#3B82F6',borderRadius:99}}/>
+                                  </div>
+                                </>
+                              : <div className="uc-sub" style={{marginTop:2}}>No lease set</div>
+                            }
                           </div>
                         </div>
                         <div className="uc-footer">
-                          {u.tenant_name ? (
-                            <div className="uc-tenant">
-                              <div className="uc-tname">👤 {u.tenant_name}</div>
-                              {u.tenant_email&&<div className="uc-temail">{u.tenant_email}</div>}
-                            </div>
-                          ) : <span className="uc-no-tenant">No tenant assigned</span>}
+                          {u.tenant_name
+                            ? <div className="uc-tenant">
+                                <div className="uc-tname">👤 {u.tenant_name}</div>
+                                {u.tenant_email&&<div className="uc-temail">{u.tenant_email}</div>}
+                              </div>
+                            : <span className="uc-no-tenant">No tenant assigned</span>
+                          }
                           <button className="edit-btn" onClick={()=>openEdit(u)}>Edit</button>
                         </div>
                       </div>
