@@ -405,7 +405,7 @@ export default function TenantDashboard() {
       <div className="shell">
         <aside className={`sidebar${sidebarOpen?' open':''}`}>
           <div className="sb-logo">
-            <div className="sb-logo-icon">🏘️</div>
+            {/* <div className="sb-logo-icon">🏘️</div> */}
             <span className="sb-logo-name">Rentura</span>
           </div>
           <nav className="sb-nav">

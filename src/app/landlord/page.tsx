@@ -554,7 +554,7 @@ export default function LandlordDashboard() {
         {/* SIDEBAR */}
         <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="sb-logo">
-            <div className="sb-logo-icon">🏘️</div>
+            {/* <div className="sb-logo-icon">🏘️</div> */}
             <span className="sb-logo-name">Rentura</span>
           </div>
           <nav className="sb-nav">
