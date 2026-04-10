@@ -125,7 +125,7 @@ export default function SettingsPage() {
     if (!userRoles.includes(role)) {
       setRolePopoverOpen(false);
       // Redirect to a setup/onboarding page for that specific role
-      window.location.href = `/onboarding/${role}`;
+      router.push(`/onboarding/${role}`);
       return;
     }
 
