@@ -120,21 +120,40 @@ export default function SettingsPage() {
   //   else window.location.href = '/landlord'
   // }
 
+  // async function handleRoleSwitch(role: string) {
+  //   // 1. Guard Clause: If they don't have the role, send them to setup
+  //   if (!userRoles.includes(role)) {
+  //     setRolePopoverOpen(false);
+  //     // Redirect to a setup/onboarding page for that specific role
+  //     router.push(`/onboarding/${role}`);
+  //     return;
+  //   }
+
+  //   // 2. Optimistic Update: Change the UI state immediately for speed
+  //   setActiveRole(role);
+  //   setRolePopoverOpen(false);
+
+  //   // 3. Database Sync: Update the 'active_role' in Supabase
+  //   const supabase = createClient();
+  //   const { error } = await supabase
+  //     .from('profiles')
+  //     .update({ active_role: role })
+  //     .eq('id', userId);
+
+  //   if (error) {
+  //     console.error("Role sync failed:", error.message);
+  //     // Optional: Add a toast notification here
+  //     return;
+  //   }
+
+  //   // 4. Clean Redirect
+  //   window.location.href = `/${role}`;
+  // }
+
   async function handleRoleSwitch(role: string) {
-    // 1. Guard Clause: If they don't have the role, send them to setup
-    if (!userRoles.includes(role)) {
-      setRolePopoverOpen(false);
-      // Redirect to a setup/onboarding page for that specific role
-      router.push(`/onboarding/${role}`);
-      return;
-    }
-
-    // 2. Optimistic Update: Change the UI state immediately for speed
-    setActiveRole(role);
-    setRolePopoverOpen(false);
-
-    // 3. Database Sync: Update the 'active_role' in Supabase
     const supabase = createClient();
+
+    // 1. Database Sync: Update the 'active_role' in Supabase
     const { error } = await supabase
       .from('profiles')
       .update({ active_role: role })
@@ -142,12 +161,14 @@ export default function SettingsPage() {
 
     if (error) {
       console.error("Role sync failed:", error.message);
-      // Optional: Add a toast notification here
       return;
     }
 
-    // 4. Clean Redirect
-    window.location.href = `/${role}`;
+    // 2. Redirect to the MAIN onboarding page
+    // Since your main logic is in src/app/onboarding/page.tsx,
+    // we just go to /onboarding. The code there will read the new 
+    // 'active_role' from the DB and show the right form.
+    window.location.href = `/onboarding`;
   }
 
 
@@ -453,8 +474,8 @@ export default function SettingsPage() {
                         You have access to {userRoles.length} role{userRoles.length > 1 ? 's' : ''}. Click to switch dashboards.
                       </div>
                     </div>
-                    
-              
+
+
 
                     <div className="field-row">
                       <div className="field">
