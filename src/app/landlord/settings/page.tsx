@@ -429,7 +429,7 @@ export default function SettingsPage() {
                     </div>
 
                     {/* Role switching section */}
-                    {/* <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: '14px 16px', marginBottom: 18 }}>
+                    <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: '14px 16px', marginBottom: 18 }}>
                       <div style={{ fontSize: 12.5, fontWeight: 700, color: '#374151', marginBottom: 10 }}>Switch Role</div>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         {Object.entries(ROLE_INFO).map(([role, info]) => (
@@ -452,95 +452,9 @@ export default function SettingsPage() {
                       <div style={{ fontSize: 11.5, color: '#94A3B8', marginTop: 8 }}>
                         You have access to {userRoles.length} role{userRoles.length > 1 ? 's' : ''}. Click to switch dashboards.
                       </div>
-                    </div> */}
-                    
-                    <div style={{
-                      background: '#020617', // Rentura Obsidian
-                      border: '1px solid #1E293B', // Grid Slate
-                      borderRadius: 14,
-                      padding: '18px',
-                      marginBottom: 18,
-                      boxShadow: '0 4px 20px rgba(0,0,0,0.4)'
-                    }}>
-                      {/* Header */}
-                      <div style={{ 
-                        fontSize: 11, 
-                        fontWeight: 800, 
-                        color: '#94A3B8', // Slate Gray
-                        marginBottom: 14, 
-                        textTransform: 'uppercase', 
-                        letterSpacing: '0.1em' 
-                      }}>
-                        Switch Operating Context
-                      </div>
-
-                      {/* Button Grid */}
-                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                        {Object.entries(ROLE_INFO).map(([role, info]) => {
-                          const isOwned = userRoles.includes(role);
-                          const isActive = activeRole === role;
-
-                          return (
-                            <button 
-                              key={role}
-                              onClick={() => handleRoleSwitch(role)}
-                              style={{
-                                padding: '10px 16px',
-                                borderRadius: 10,
-                                // Border turns Blue if active, Slate if owned, Transparent if locked
-                                border: `1.5px solid ${isActive ? '#007BFF' : (isOwned ? '#1E293B' : 'transparent')}`,
-                                // Background is dark, but glows Blue if active
-                                background: isActive ? 'rgba(0, 123, 255, 0.15)' : '#0F172A',
-                                color: isActive ? '#FFFFFF' : (isOwned ? '#94A3B8' : '#475569'),
-                                fontSize: 13,
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                transition: 'all 0.2s ease',
-                                opacity: isOwned ? 1 : 0.6,
-                                position: 'relative'
-                              }}
-                            >
-                              {info.icon} 
-                              {info.label}
-                              
-                              {/* Status Indicators */}
-                              {isActive ? (
-                                <span style={{ 
-                                  fontSize: 9, 
-                                  background: '#007BFF', 
-                                  color: '#fff', 
-                                  borderRadius: 5, 
-                                  padding: '2px 6px', 
-                                  fontWeight: 800 
-                                }}>
-                                  LIVE
-                                </span>
-                              ) : !isOwned && (
-                                <span style={{ fontSize: 10, color: '#475569' }}>🔒</span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {/* Footer Info */}
-                      <div style={{ 
-                        fontSize: 11, 
-                        color: '#475569', 
-                        marginTop: 12, 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: 4 
-                      }}>
-                        <span style={{ color: '#007BFF' }}>●</span> 
-                        You have {userRoles.length} active licenses. 
-                        {!userRoles.includes('provider') && " Click locked roles to onboard."}
-                      </div>
                     </div>
+                    
+              
 
                     <div className="field-row">
                       <div className="field">
