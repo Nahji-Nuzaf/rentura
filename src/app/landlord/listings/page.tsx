@@ -172,12 +172,10 @@ Write ONLY a JSON object (no markdown, no backticks) with exactly two keys:
 The tone should be professional yet approachable. Focus on the lifestyle and convenience.`
 
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('/api/ai/listing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1000,
           messages: [{ role: 'user', content: prompt }],
         }),
       })
