@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Image from 'next/image';
 
 type Stats = {
   totalProperties: number
@@ -554,7 +555,17 @@ export default function LandlordDashboard() {
         {/* SIDEBAR */}
         <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="sb-logo">
-            {/* <div className="sb-logo-icon">🏘️</div> */}
+            <div className="sb-logo-icon">
+              <Image 
+                src="/icon.png" 
+                alt="Rentura Logo" 
+                width={24} 
+                height={24} 
+              />
+            </div>
+            {/* <div className="sb-logo-icon">
+              <img src="/icon.png" alt="Rentura Logo" style={{ width: '24px', height: '24px' }} />
+            </div> */}
             <span className="sb-logo-name">Rentura</span>
           </div>
           <nav className="sb-nav">
