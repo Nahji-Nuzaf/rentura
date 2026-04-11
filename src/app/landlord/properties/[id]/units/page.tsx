@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Image from 'next/image'
 
 type Unit = {
   id: string
@@ -27,45 +28,45 @@ type Property = {
 }
 
 const UNIT_STATUS: Record<string, { label: string; bg: string; color: string }> = {
-  occupied:    { label: 'Occupied',    bg: '#DCFCE7', color: '#16A34A' },
-  vacant:      { label: 'Vacant',      bg: '#FEF3C7', color: '#D97706' },
+  occupied: { label: 'Occupied', bg: '#DCFCE7', color: '#16A34A' },
+  vacant: { label: 'Vacant', bg: '#FEF3C7', color: '#D97706' },
   maintenance: { label: 'Maintenance', bg: '#FEE2E2', color: '#DC2626' },
 }
 
 const BEDROOM_PRESETS = [
-  { label: 'Studio', icon: '🛋️', rent: 300  },
-  { label: '1 Bed',  icon: '🛏️', rent: 450  },
-  { label: '2 Bed',  icon: '🛏️🛏️', rent: 600 },
-  { label: '3 Bed',  icon: '🏠', rent: 800  },
-  { label: '4 Bed',  icon: '🏡', rent: 1000 },
+  { label: 'Studio', icon: '🛋️', rent: 300 },
+  { label: '1 Bed', icon: '🛏️', rent: 450 },
+  { label: '2 Bed', icon: '🛏️🛏️', rent: 600 },
+  { label: '3 Bed', icon: '🏠', rent: 800 },
+  { label: '4 Bed', icon: '🏡', rent: 1000 },
   { label: 'Luxury', icon: '💎', rent: 1500 },
 ]
 
 export default function UnitsPage() {
-  const router   = useRouter()
-  const params   = useParams()
+  const router = useRouter()
+  const params = useParams()
   const propertyId = params?.id as string
 
   const [userInitials, setUserInitials] = useState('NN')
-  const [fullName, setFullName]         = useState('User')
-  const [sidebarOpen, setSidebarOpen]   = useState(false)
-  const [property, setProperty]         = useState<Property | null>(null)
-  const [units, setUnits]               = useState<Unit[]>([])
-  const [loading, setLoading]           = useState(true)
-  const [filter, setFilter]             = useState<'all'|'occupied'|'vacant'|'maintenance'>('all')
-  const [search, setSearch]             = useState('')
+  const [fullName, setFullName] = useState('User')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [property, setProperty] = useState<Property | null>(null)
+  const [units, setUnits] = useState<Unit[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<'all' | 'occupied' | 'vacant' | 'maintenance'>('all')
+  const [search, setSearch] = useState('')
 
-  const [editUnit, setEditUnit]   = useState<Unit | null>(null)
-  const [saving, setSaving]       = useState(false)
+  const [editUnit, setEditUnit] = useState<Unit | null>(null)
+  const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [editForm, setEditForm]   = useState({
+  const [editForm, setEditForm] = useState({
     unit_number: '', monthly_rent: '', rent_due_day: '1',
     status: 'vacant', lease_start: '', lease_end: '',
   })
 
-  const [bulkMode, setBulkMode]     = useState(false)
-  const [selected, setSelected]     = useState<Set<string>>(new Set())
-  const [bulkRent, setBulkRent]     = useState('')
+  const [bulkMode, setBulkMode] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkRent, setBulkRent] = useState('')
   const [bulkStatus, setBulkStatus] = useState('')
   const [bulkSaving, setBulkSaving] = useState(false)
 
@@ -103,17 +104,17 @@ export default function UnitsPage() {
           .from('profiles')
           .select('id,full_name,email')
           .in('id', profileIds)
-        ;(profilesData || []).forEach((p: any) => { profileMap[p.id] = p })
+          ; (profilesData || []).forEach((p: any) => { profileMap[p.id] = p })
       }
 
       // Build tenant map — include any tenant linked to a unit
-      ;(tenantsData || []).forEach((t: any) => {
+      ; (tenantsData || []).forEach((t: any) => {
         if (t.unit_id && t.profile_id) {
           const profile = profileMap[t.profile_id]
           if (profile) {
             tenantMap[t.unit_id] = {
-              name:      profile.full_name || 'Tenant',
-              email:     profile.email || '',
+              name: profile.full_name || 'Tenant',
+              email: profile.email || '',
               tenant_id: t.id,
             }
           }
@@ -135,36 +136,36 @@ export default function UnitsPage() {
     }
 
     const shaped: Unit[] = (unitsData || []).map((u: any) => ({
-      id:           u.id,
-      unit_number:  u.unit_number,
+      id: u.id,
+      unit_number: u.unit_number,
       monthly_rent: u.monthly_rent || 0,
-      currency:     u.currency || 'USD',
+      currency: u.currency || 'USD',
       rent_due_day: u.rent_due_day || 1,
-      status:       tenantMap[u.id] ? 'occupied' : (u.status || 'vacant'),
-      lease_start:  u.lease_start,
-      lease_end:    u.lease_end,
-      created_at:   u.created_at,
-      tenant_name:  tenantMap[u.id]?.name,
+      status: tenantMap[u.id] ? 'occupied' : (u.status || 'vacant'),
+      lease_start: u.lease_start,
+      lease_end: u.lease_end,
+      created_at: u.created_at,
+      tenant_name: tenantMap[u.id]?.name,
       tenant_email: tenantMap[u.id]?.email,
-      tenant_id:    tenantMap[u.id]?.tenant_id,
+      tenant_id: tenantMap[u.id]?.tenant_id,
     }))
     setUnits(shaped)
   }
 
   useEffect(() => {
     if (!propertyId) return
-    ;(async () => {
-      try {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) { router.push('/login'); return }
-        const name = user.user_metadata?.full_name || 'User'
-        setFullName(name)
-        setUserInitials(name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2))
-        await loadUnits(supabase)
-      } catch (err) { console.error('Load error:', err) }
-      finally { setLoading(false) }
-    })()
+      ; (async () => {
+        try {
+          const supabase = createClient()
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) { router.push('/login'); return }
+          const name = user.user_metadata?.full_name || 'User'
+          setFullName(name)
+          setUserInitials(name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2))
+          await loadUnits(supabase)
+        } catch (err) { console.error('Load error:', err) }
+        finally { setLoading(false) }
+      })()
   }, [propertyId, router])
 
   const filtered = units.filter(u => {
@@ -176,9 +177,9 @@ export default function UnitsPage() {
   })
 
   const counts = {
-    all:         units.length,
-    occupied:    units.filter(u => u.status === 'occupied').length,
-    vacant:      units.filter(u => u.status === 'vacant').length,
+    all: units.length,
+    occupied: units.filter(u => u.status === 'occupied').length,
+    vacant: units.filter(u => u.status === 'vacant').length,
     maintenance: units.filter(u => u.status === 'maintenance').length,
   }
 
@@ -188,12 +189,12 @@ export default function UnitsPage() {
   function openEdit(u: Unit) {
     setEditUnit(u)
     setEditForm({
-      unit_number:  u.unit_number,
+      unit_number: u.unit_number,
       monthly_rent: String(u.monthly_rent || ''),
       rent_due_day: String(u.rent_due_day || 1),
-      status:       u.status,
-      lease_start:  u.lease_start || '',
-      lease_end:    u.lease_end || '',
+      status: u.status,
+      lease_start: u.lease_start || '',
+      lease_end: u.lease_end || '',
     })
     setSaveError(null)
   }
@@ -210,13 +211,13 @@ export default function UnitsPage() {
     try {
       const supabase = createClient()
       const payload: any = {
-        unit_number:  editForm.unit_number.trim(),
+        unit_number: editForm.unit_number.trim(),
         monthly_rent: rent,
         rent_due_day: dueDay,
         status: editUnit.tenant_id ? editUnit.status : editForm.status,
       }
       if (editForm.lease_start) payload.lease_start = editForm.lease_start
-      if (editForm.lease_end)   payload.lease_end   = editForm.lease_end
+      if (editForm.lease_end) payload.lease_end = editForm.lease_end
       const { error } = await supabase.from('units').update(payload).eq('id', editUnit.id)
       if (error) throw new Error(error.message)
       setUnits(prev => prev.map(u => u.id === editUnit.id ? { ...u, ...payload } : u))
@@ -424,17 +425,17 @@ export default function UnitsPage() {
         }
       `}</style>
 
-      <div className={`sb-overlay${sidebarOpen?' open':''}`} onClick={()=>setSidebarOpen(false)}/>
-      <div className={`drawer-overlay${editUnit?' open':''}`} onClick={()=>setEditUnit(null)}/>
+      <div className={`sb-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
+      <div className={`drawer-overlay${editUnit ? ' open' : ''}`} onClick={() => setEditUnit(null)} />
 
       {/* Edit Drawer */}
-      <div className={`drawer${editUnit?' open':''}`}>
+      <div className={`drawer${editUnit ? ' open' : ''}`}>
         <div className="drawer-head">
           <div>
             <div className="drawer-title">Edit Unit</div>
             {editUnit && <div className="drawer-sub">{property?.name} · {editUnit.unit_number}</div>}
           </div>
-          <button className="drawer-close" onClick={()=>setEditUnit(null)}>✕</button>
+          <button className="drawer-close" onClick={() => setEditUnit(null)}>✕</button>
         </div>
         <div className="drawer-body">
           {editUnit && isOccupied(editUnit) && (
@@ -443,76 +444,86 @@ export default function UnitsPage() {
           <div className="field">
             <label>Unit Number / Name *</label>
             <input placeholder="e.g. Unit 5A" value={editForm.unit_number}
-              onChange={e=>setEditForm(f=>({...f,unit_number:e.target.value}))}/>
+              onChange={e => setEditForm(f => ({ ...f, unit_number: e.target.value }))} />
           </div>
-          <div className="divider"/>
+          <div className="divider" />
           <div className="section-label">Rent & Payment</div>
           <div className="field-row">
             <div className="field">
               <label>Monthly Rent (USD)</label>
               <input type="number" min="0" placeholder="e.g. 500" value={editForm.monthly_rent}
-                onChange={e=>setEditForm(f=>({...f,monthly_rent:e.target.value}))}/>
+                onChange={e => setEditForm(f => ({ ...f, monthly_rent: e.target.value }))} />
             </div>
             <div className="field">
               <label>Rent Due Day (1–28)</label>
               <input type="number" min="1" max="28" placeholder="e.g. 1" value={editForm.rent_due_day}
-                onChange={e=>setEditForm(f=>({...f,rent_due_day:e.target.value}))}/>
+                onChange={e => setEditForm(f => ({ ...f, rent_due_day: e.target.value }))} />
             </div>
           </div>
-          <div style={{fontSize:'12px',color:'#94A3B8'}}>💡 Quick rent presets:</div>
+          <div style={{ fontSize: '12px', color: '#94A3B8' }}>💡 Quick rent presets:</div>
           <div className="preset-grid">
-            {BEDROOM_PRESETS.map(p=>(
+            {BEDROOM_PRESETS.map(p => (
               <button key={p.label} className="preset-btn"
                 disabled={!!(editUnit && isOccupied(editUnit))}
-                onClick={()=>{
+                onClick={() => {
                   if (editUnit && isOccupied(editUnit)) return
-                  const base = editForm.unit_number.replace(/\s*\(.*\)$/,'')
-                  setEditForm(f=>({...f,unit_number:`${base} (${p.label})`,monthly_rent:String(p.rent)}))
+                  const base = editForm.unit_number.replace(/\s*\(.*\)$/, '')
+                  setEditForm(f => ({ ...f, unit_number: `${base} (${p.label})`, monthly_rent: String(p.rent) }))
                 }}>
-                <span style={{fontSize:18}}>{p.icon}</span>
-                <span style={{fontSize:11.5,fontWeight:600,color:'#475569'}}>{p.label}</span>
-                <span style={{fontSize:10,color:'#94A3B8',marginTop:2}}>${p.rent}/mo</span>
+                <span style={{ fontSize: 18 }}>{p.icon}</span>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: '#475569' }}>{p.label}</span>
+                <span style={{ fontSize: 10, color: '#94A3B8', marginTop: 2 }}>${p.rent}/mo</span>
               </button>
             ))}
           </div>
-          <div className="divider"/>
+          <div className="divider" />
           <div className="section-label">Status & Lease</div>
           <div className="field">
-            <label>Unit Status {editUnit && isOccupied(editUnit) && <span style={{color:'#16A34A',fontWeight:400}}>(locked — tenant active)</span>}</label>
+            <label>Unit Status {editUnit && isOccupied(editUnit) && <span style={{ color: '#16A34A', fontWeight: 400 }}>(locked — tenant active)</span>}</label>
             {editUnit && isOccupied(editUnit)
               ? <div className="locked-badge">🔒 Occupied — tenant is active</div>
-              : <select value={editForm.status} onChange={e=>setEditForm(f=>({...f,status:e.target.value}))}>
-                  <option value="vacant">Vacant (available)</option>
-                  <option value="occupied">Occupied (has tenant)</option>
-                  <option value="maintenance">Maintenance (unavailable)</option>
-                </select>
+              : <select value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}>
+                <option value="vacant">Vacant (available)</option>
+                <option value="occupied">Occupied (has tenant)</option>
+                <option value="maintenance">Maintenance (unavailable)</option>
+              </select>
             }
           </div>
           <div className="field-row">
             <div className="field">
               <label>Lease Start</label>
               <input type="date" value={editForm.lease_start}
-                onChange={e=>setEditForm(f=>({...f,lease_start:e.target.value}))}/>
+                onChange={e => setEditForm(f => ({ ...f, lease_start: e.target.value }))} />
             </div>
             <div className="field">
               <label>Lease End</label>
               <input type="date" value={editForm.lease_end}
-                onChange={e=>setEditForm(f=>({...f,lease_end:e.target.value}))}/>
+                onChange={e => setEditForm(f => ({ ...f, lease_end: e.target.value }))} />
             </div>
           </div>
           {saveError && <div className="err-box">⚠️ {saveError}</div>}
         </div>
         <div className="drawer-footer">
           <div className="btn-row">
-            <button className="btn-cancel" onClick={()=>setEditUnit(null)}>Cancel</button>
-            <button className="btn-save" disabled={saving} onClick={handleSaveUnit}>{saving?'Saving…':'Save Unit'}</button>
+            <button className="btn-cancel" onClick={() => setEditUnit(null)}>Cancel</button>
+            <button className="btn-save" disabled={saving} onClick={handleSaveUnit}>{saving ? 'Saving…' : 'Save Unit'}</button>
           </div>
         </div>
       </div>
 
       <div className="shell">
-        <aside className={`sidebar${sidebarOpen?' open':''}`}>
-          <div className="sb-logo"><div className="sb-logo-icon">🏘️</div><span className="sb-logo-name">Rentura</span></div>
+        <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
+          <div className="sb-logo">
+            <div className="sb-logo-icon">
+              <Image
+                src="/icon.png"
+                alt="Rentura Logo"
+                width={24}
+                height={24}
+              />
+            </div>
+            <span className="sb-logo-name">Rentura</span>
+          </div>
           <nav className="sb-nav">
             <span className="sb-section">Overview</span>
             <a href="/landlord" className="sb-item"><span className="sb-ico">⊞</span>Dashboard</a>
@@ -533,7 +544,7 @@ export default function UnitsPage() {
             <div className="sb-upgrade">
               <div className="sb-up-title">⭐ Upgrade to Pro</div>
               <div className="sb-up-sub">Unlimited properties, reports & priority support.</div>
-              <button className="sb-up-btn" onClick={()=>window.location.href='/landlord/upgrade'}>See Plans →</button>
+              <button className="sb-up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
             </div>
             <div className="sb-user">
               <div className="sb-av">{userInitials}</div>
@@ -545,19 +556,19 @@ export default function UnitsPage() {
         <div className="main">
           <div className="topbar">
             <div className="tb-left">
-              <button className="hamburger" onClick={()=>setSidebarOpen(true)}>☰</button>
+              <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
               <div className="breadcrumb">
                 <a href="/landlord/properties">Properties</a>
-                <span style={{margin:'0 4px',color:'#CBD5E1'}}>/</span>
-                <span>{property?.name||'…'}</span>
-                <span style={{margin:'0 4px',color:'#CBD5E1'}}>/</span>
+                <span style={{ margin: '0 4px', color: '#CBD5E1' }}>/</span>
+                <span>{property?.name || '…'}</span>
+                <span style={{ margin: '0 4px', color: '#CBD5E1' }}>/</span>
                 <b>Units</b>
               </div>
             </div>
             <div className="tb-actions">
               {!bulkMode
-                ? <button className="btn-outline" onClick={()=>{setBulkMode(true);setSelected(new Set())}}>✏️ <span className="tb-label">Bulk Edit</span></button>
-                : <button className="btn-outline" onClick={()=>{setBulkMode(false);setSelected(new Set())}}>✕ <span className="tb-label">Cancel</span></button>
+                ? <button className="btn-outline" onClick={() => { setBulkMode(true); setSelected(new Set()) }}>✏️ <span className="tb-label">Bulk Edit</span></button>
+                : <button className="btn-outline" onClick={() => { setBulkMode(false); setSelected(new Set()) }}>✕ <span className="tb-label">Cancel</span></button>
               }
               <a href="/landlord/properties" className="btn-outline">← <span className="tb-label">Back</span></a>
             </div>
@@ -571,18 +582,18 @@ export default function UnitsPage() {
             </div>
 
             <div className="stat-strip">
-              <div className="sstat"><div className="sstat-ico" style={{background:'#EFF6FF'}}>🏗️</div><div><div className="sstat-num">{counts.all}</div><div className="sstat-lbl">Total Units</div></div></div>
-              <div className="sstat"><div className="sstat-ico" style={{background:'#DCFCE7'}}>✅</div><div><div className="sstat-num">{counts.occupied}</div><div className="sstat-lbl">Occupied</div></div></div>
-              <div className="sstat"><div className="sstat-ico" style={{background:'#FEF3C7'}}>🔑</div><div><div className="sstat-num">{counts.vacant}</div><div className="sstat-lbl">Vacant</div></div></div>
-              <div className="sstat"><div className="sstat-ico" style={{background:'#DCFCE7'}}>💰</div><div><div className="sstat-num">${totalRevenue.toLocaleString()}</div><div className="sstat-lbl">Monthly Revenue</div></div></div>
+              <div className="sstat"><div className="sstat-ico" style={{ background: '#EFF6FF' }}>🏗️</div><div><div className="sstat-num">{counts.all}</div><div className="sstat-lbl">Total Units</div></div></div>
+              <div className="sstat"><div className="sstat-ico" style={{ background: '#DCFCE7' }}>✅</div><div><div className="sstat-num">{counts.occupied}</div><div className="sstat-lbl">Occupied</div></div></div>
+              <div className="sstat"><div className="sstat-ico" style={{ background: '#FEF3C7' }}>🔑</div><div><div className="sstat-num">{counts.vacant}</div><div className="sstat-lbl">Vacant</div></div></div>
+              <div className="sstat"><div className="sstat-ico" style={{ background: '#DCFCE7' }}>💰</div><div><div className="sstat-num">${totalRevenue.toLocaleString()}</div><div className="sstat-lbl">Monthly Revenue</div></div></div>
             </div>
 
             <div className="toolbar">
               <div className="filter-row-wrap">
                 <div className="filter-tabs">
-                  {(['all','occupied','vacant','maintenance'] as const).map(f=>(
-                    <button key={f} className={`ftab${filter===f?' active':''}`} onClick={()=>setFilter(f)}>
-                      {{all:'All',occupied:'Occupied',vacant:'Vacant',maintenance:'Maintenance'}[f]}
+                  {(['all', 'occupied', 'vacant', 'maintenance'] as const).map(f => (
+                    <button key={f} className={`ftab${filter === f ? ' active' : ''}`} onClick={() => setFilter(f)}>
+                      {{ all: 'All', occupied: 'Occupied', vacant: 'Vacant', maintenance: 'Maintenance' }[f]}
                       <span className="fc">{counts[f]}</span>
                     </button>
                   ))}
@@ -590,27 +601,27 @@ export default function UnitsPage() {
               </div>
               <div className="search-wrap">
                 <span className="search-ico">🔍</span>
-                <input className="search-input" placeholder="Search unit or tenant…" value={search} onChange={e=>setSearch(e.target.value)}/>
+                <input className="search-input" placeholder="Search unit or tenant…" value={search} onChange={e => setSearch(e.target.value)} />
               </div>
             </div>
 
             {bulkMode && selected.size > 0 && (
               <div className="bulk-bar">
-                <div className="bulk-info">{selected.size} unit{selected.size>1?'s':''} selected</div>
+                <div className="bulk-info">{selected.size} unit{selected.size > 1 ? 's' : ''} selected</div>
                 <div className="bulk-field">
                   <span className="bulk-label">Rent $</span>
-                  <input className="bulk-input" type="number" placeholder="e.g. 600" value={bulkRent} onChange={e=>setBulkRent(e.target.value)}/>
+                  <input className="bulk-input" type="number" placeholder="e.g. 600" value={bulkRent} onChange={e => setBulkRent(e.target.value)} />
                 </div>
                 <div className="bulk-field">
                   <span className="bulk-label">Status</span>
-                  <select className="bulk-select" value={bulkStatus} onChange={e=>setBulkStatus(e.target.value)}>
+                  <select className="bulk-select" value={bulkStatus} onChange={e => setBulkStatus(e.target.value)}>
                     <option value="">— keep —</option>
                     <option value="vacant">Vacant</option>
                     <option value="maintenance">Maintenance</option>
                   </select>
                 </div>
-                <button className="bulk-apply" disabled={bulkSaving||(!bulkRent&&!bulkStatus)} onClick={applyBulk}>{bulkSaving?'Applying…':'Apply'}</button>
-                <button className="bulk-cancel" onClick={()=>setSelected(new Set())}>Clear</button>
+                <button className="bulk-apply" disabled={bulkSaving || (!bulkRent && !bulkStatus)} onClick={applyBulk}>{bulkSaving ? 'Applying…' : 'Apply'}</button>
+                <button className="bulk-cancel" onClick={() => setSelected(new Set())}>Clear</button>
               </div>
             )}
 
@@ -618,14 +629,14 @@ export default function UnitsPage() {
               <div className="units-table-wrap">
                 <table className="units-table">
                   <thead><tr><th>Unit</th><th>Tenant</th><th>Rent</th><th>Status</th><th>Lease</th><th></th></tr></thead>
-                  <tbody>{[1,2,3,4,5].map(i=>(
+                  <tbody>{[1, 2, 3, 4, 5].map(i => (
                     <tr key={i}>
-                      <td><div className="skeleton" style={{width:60}}/></td>
-                      <td><div className="skeleton" style={{width:120}}/></td>
-                      <td><div className="skeleton" style={{width:70}}/></td>
-                      <td><div className="skeleton" style={{width:80,height:24,borderRadius:99}}/></td>
-                      <td><div className="skeleton" style={{width:100}}/></td>
-                      <td><div className="skeleton" style={{width:60,height:30,borderRadius:8}}/></td>
+                      <td><div className="skeleton" style={{ width: 60 }} /></td>
+                      <td><div className="skeleton" style={{ width: 120 }} /></td>
+                      <td><div className="skeleton" style={{ width: 70 }} /></td>
+                      <td><div className="skeleton" style={{ width: 80, height: 24, borderRadius: 99 }} /></td>
+                      <td><div className="skeleton" style={{ width: 100 }} /></td>
+                      <td><div className="skeleton" style={{ width: 60, height: 30, borderRadius: 8 }} /></td>
                     </tr>
                   ))}</tbody>
                 </table>
@@ -639,29 +650,29 @@ export default function UnitsPage() {
                   <table className="units-table">
                     <thead>
                       <tr>
-                        {bulkMode && <th className="check-col"><input type="checkbox" checked={selected.size===filtered.length&&filtered.length>0} onChange={toggleSelectAll}/></th>}
+                        {bulkMode && <th className="check-col"><input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0} onChange={toggleSelectAll} /></th>}
                         <th>Unit</th><th>Tenant</th><th>Monthly Rent</th><th>Status</th><th>Lease</th><th></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filtered.map(u=>{
-                        const sc = UNIT_STATUS[u.status]||UNIT_STATUS.vacant
+                      {filtered.map(u => {
+                        const sc = UNIT_STATUS[u.status] || UNIT_STATUS.vacant
                         let leasePct = 0
                         if (u.lease_start && u.lease_end) {
-                          const s=new Date(u.lease_start).getTime(),e=new Date(u.lease_end).getTime(),n=Date.now()
-                          leasePct=Math.min(100,Math.max(0,Math.round(((n-s)/(e-s))*100)))
+                          const s = new Date(u.lease_start).getTime(), e = new Date(u.lease_end).getTime(), n = Date.now()
+                          leasePct = Math.min(100, Math.max(0, Math.round(((n - s) / (e - s)) * 100)))
                         }
-                        const rowClass = selected.has(u.id)?'selected-row':isOccupied(u)?'occupied-row':''
+                        const rowClass = selected.has(u.id) ? 'selected-row' : isOccupied(u) ? 'occupied-row' : ''
                         return (
                           <tr key={u.id} className={rowClass}>
-                            {bulkMode && <td className="check-col"><input type="checkbox" checked={selected.has(u.id)} onChange={()=>toggleSelect(u.id)}/></td>}
+                            {bulkMode && <td className="check-col"><input type="checkbox" checked={selected.has(u.id)} onChange={() => toggleSelect(u.id)} /></td>}
                             <td><span className="unit-num">{u.unit_number}</span></td>
                             <td>
                               {u.tenant_name
                                 ? <div className="unit-tenant">
-                                    <span className="tenant-name">👤 {u.tenant_name}</span>
-                                    <span className="tenant-email">{u.tenant_email}</span>
-                                  </div>
+                                  <span className="tenant-name">👤 {u.tenant_name}</span>
+                                  <span className="tenant-email">{u.tenant_email}</span>
+                                </div>
                                 : <span className="no-tenant">No tenant</span>
                               }
                             </td>
@@ -669,19 +680,19 @@ export default function UnitsPage() {
                               <div className="rent-cell">${u.monthly_rent.toLocaleString()}</div>
                               <div className="rent-sub">due day {u.rent_due_day}</div>
                             </td>
-                            <td><span className="badge" style={{background:sc.bg,color:sc.color}}>● {sc.label}</span></td>
+                            <td><span className="badge" style={{ background: sc.bg, color: sc.color }}>● {sc.label}</span></td>
                             <td>
                               {u.lease_start && u.lease_end
                                 ? <div>
-                                    <div className="lease-dates">
-                                      {new Date(u.lease_start).toLocaleDateString('en-US',{month:'short',year:'numeric'})} → {new Date(u.lease_end).toLocaleDateString('en-US',{month:'short',year:'numeric'})}
-                                    </div>
-                                    <div className="lease-bar"><div className="lease-fill" style={{width:`${leasePct}%`}}/></div>
+                                  <div className="lease-dates">
+                                    {new Date(u.lease_start).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} → {new Date(u.lease_end).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
                                   </div>
-                                : <span style={{fontSize:12,color:'#94A3B8'}}>—</span>
+                                  <div className="lease-bar"><div className="lease-fill" style={{ width: `${leasePct}%` }} /></div>
+                                </div>
+                                : <span style={{ fontSize: 12, color: '#94A3B8' }}>—</span>
                               }
                             </td>
-                            <td><button className="edit-btn" onClick={()=>openEdit(u)}>Edit</button></td>
+                            <td><button className="edit-btn" onClick={() => openEdit(u)}>Edit</button></td>
                           </tr>
                         )
                       })}
@@ -691,18 +702,18 @@ export default function UnitsPage() {
 
                 {/* Mobile cards */}
                 <div className="unit-cards">
-                  {filtered.map(u=>{
-                    const sc=UNIT_STATUS[u.status]||UNIT_STATUS.vacant
-                    let leasePct=0
-                    if(u.lease_start&&u.lease_end){
-                      const s=new Date(u.lease_start).getTime(),e=new Date(u.lease_end).getTime(),n=Date.now()
-                      leasePct=Math.min(100,Math.max(0,Math.round(((n-s)/(e-s))*100)))
+                  {filtered.map(u => {
+                    const sc = UNIT_STATUS[u.status] || UNIT_STATUS.vacant
+                    let leasePct = 0
+                    if (u.lease_start && u.lease_end) {
+                      const s = new Date(u.lease_start).getTime(), e = new Date(u.lease_end).getTime(), n = Date.now()
+                      leasePct = Math.min(100, Math.max(0, Math.round(((n - s) / (e - s)) * 100)))
                     }
                     return (
-                      <div key={u.id} className={`unit-card${isOccupied(u)?' occupied-card':''}`}>
+                      <div key={u.id} className={`unit-card${isOccupied(u) ? ' occupied-card' : ''}`}>
                         <div className="uc-top">
                           <span className="uc-num">{u.unit_number}</span>
-                          <span className="uc-badge" style={{background:sc.bg,color:sc.color}}>● {sc.label}</span>
+                          <span className="uc-badge" style={{ background: sc.bg, color: sc.color }}>● {sc.label}</span>
                         </div>
                         <div className="uc-body">
                           <div className="uc-field">
@@ -712,27 +723,27 @@ export default function UnitsPage() {
                           </div>
                           <div className="uc-field">
                             <div className="uc-label">Lease</div>
-                            {u.lease_start&&u.lease_end
+                            {u.lease_start && u.lease_end
                               ? <>
-                                  <div className="uc-sub" style={{marginTop:2}}>{new Date(u.lease_start).toLocaleDateString('en-US',{month:'short',year:'numeric'})}</div>
-                                  <div className="uc-sub">→ {new Date(u.lease_end).toLocaleDateString('en-US',{month:'short',year:'numeric'})}</div>
-                                  <div style={{height:4,background:'#E2E8F0',borderRadius:99,overflow:'hidden',marginTop:5}}>
-                                    <div style={{height:'100%',width:`${leasePct}%`,background:'#3B82F6',borderRadius:99}}/>
-                                  </div>
-                                </>
-                              : <div className="uc-sub" style={{marginTop:2}}>No lease set</div>
+                                <div className="uc-sub" style={{ marginTop: 2 }}>{new Date(u.lease_start).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</div>
+                                <div className="uc-sub">→ {new Date(u.lease_end).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</div>
+                                <div style={{ height: 4, background: '#E2E8F0', borderRadius: 99, overflow: 'hidden', marginTop: 5 }}>
+                                  <div style={{ height: '100%', width: `${leasePct}%`, background: '#3B82F6', borderRadius: 99 }} />
+                                </div>
+                              </>
+                              : <div className="uc-sub" style={{ marginTop: 2 }}>No lease set</div>
                             }
                           </div>
                         </div>
                         <div className="uc-footer">
                           {u.tenant_name
                             ? <div className="uc-tenant">
-                                <div className="uc-tname">👤 {u.tenant_name}</div>
-                                {u.tenant_email&&<div className="uc-temail">{u.tenant_email}</div>}
-                              </div>
+                              <div className="uc-tname">👤 {u.tenant_name}</div>
+                              {u.tenant_email && <div className="uc-temail">{u.tenant_email}</div>}
+                            </div>
                             : <span className="uc-no-tenant">No tenant assigned</span>
                           }
-                          <button className="edit-btn" onClick={()=>openEdit(u)}>Edit</button>
+                          <button className="edit-btn" onClick={() => openEdit(u)}>Edit</button>
                         </div>
                       </div>
                     )

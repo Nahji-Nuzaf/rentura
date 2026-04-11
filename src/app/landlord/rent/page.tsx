@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Image from 'next/image'
 
 type RentRecord = {
   id: string
@@ -19,13 +20,13 @@ type RentRecord = {
   color: string
 }
 
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const NOW = new Date()
 
 const STATUS_CFG = {
-  paid:    { label:'Paid',    bg:'#DCFCE7', color:'#16A34A' },
-  overdue: { label:'Overdue', bg:'#FEE2E2', color:'#DC2626' },
-  pending: { label:'Pending', bg:'#FEF3C7', color:'#D97706' },
+  paid: { label: 'Paid', bg: '#DCFCE7', color: '#16A34A' },
+  overdue: { label: 'Overdue', bg: '#FEE2E2', color: '#DC2626' },
+  pending: { label: 'Pending', bg: '#FEF3C7', color: '#D97706' },
 }
 
 const AVATAR_COLORS = [
@@ -40,28 +41,28 @@ const AVATAR_COLORS = [
 export default function RentTrackerPage() {
   const router = useRouter()
   const [userInitials, setUserInitials] = useState('NN')
-  const [fullName, setFullName]         = useState('User')
-  const [userId, setUserId]             = useState('')
-  const [sidebarOpen, setSidebarOpen]   = useState(false)
-  const [records, setRecords]           = useState<RentRecord[]>([])
-  const [loading, setLoading]           = useState(true)
-  const [generating, setGenerating]     = useState(false)
-  const [updating, setUpdating]         = useState<string | null>(null)
+  const [fullName, setFullName] = useState('User')
+  const [userId, setUserId] = useState('')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [records, setRecords] = useState<RentRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState(false)
+  const [updating, setUpdating] = useState<string | null>(null)
   const [selectedMonth, setSelectedMonth] = useState(MONTHS[NOW.getMonth()])
-  const [selectedYear]                  = useState(NOW.getFullYear())
-  const [filter, setFilter]             = useState<'all'|'paid'|'overdue'|'pending'>('all')
-  const [toast, setToast]               = useState<{msg:string; type:'success'|'error'} | null>(null)
+  const [selectedYear] = useState(NOW.getFullYear())
+  const [filter, setFilter] = useState<'all' | 'paid' | 'overdue' | 'pending'>('all')
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
-  function showToast(msg: string, type: 'success'|'error' = 'success') {
+  function showToast(msg: string, type: 'success' | 'error' = 'success') {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 3500)
   }
 
   function monthRange(month: string, year: number) {
-    const mi      = MONTHS.indexOf(month)
+    const mi = MONTHS.indexOf(month)
     const lastDay = new Date(year, mi + 1, 0).getDate()
-    const from    = `${year}-${String(mi + 1).padStart(2,'0')}-01`
-    const to      = `${year}-${String(mi + 1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`
+    const from = `${year}-${String(mi + 1).padStart(2, '0')}-01`
+    const to = `${year}-${String(mi + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
     return { from, to }
   }
 
@@ -102,32 +103,32 @@ export default function RentTrackerPage() {
           const { data: pArr } = await supabase
             .from('profiles').select('id,full_name').in('id', profileIds)
           const pidMap: Record<string, string> = {}
-          ;(pArr || []).forEach((p: any) => { pidMap[p.id] = p.full_name })
-          ;(tArr || []).forEach((t: any) => { profileMap[t.id] = pidMap[t.profile_id] || 'Unknown' })
+            ; (pArr || []).forEach((p: any) => { pidMap[p.id] = p.full_name })
+            ; (tArr || []).forEach((t: any) => { profileMap[t.id] = pidMap[t.profile_id] || 'Unknown' })
         }
       }
 
       const unitMap: Record<string, any> = {}
-      ;(unitsArr || []).forEach((u: any) => { unitMap[u.id] = u })
+        ; (unitsArr || []).forEach((u: any) => { unitMap[u.id] = u })
       const propMap: Record<string, string> = {}
-      ;(props || []).forEach((p: any) => { propMap[p.id] = p.name })
+        ; (props || []).forEach((p: any) => { propMap[p.id] = p.name })
 
       const shaped: RentRecord[] = (payments || []).map((row: any, i: number) => {
         const tName = profileMap[row.tenant_id] || 'Unknown'
-        const unit  = unitMap[row.unit_id] || {}
+        const unit = unitMap[row.unit_id] || {}
         return {
-          id:        row.id,
-          tenant:    tName,
-          initials:  tName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0,2),
-          property:  propMap[unit.property_id] || '—',
-          unit:      unit.unit_number || '—',
-          unit_id:   row.unit_id,
+          id: row.id,
+          tenant: tName,
+          initials: tName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
+          property: propMap[unit.property_id] || '—',
+          unit: unit.unit_number || '—',
+          unit_id: row.unit_id,
           tenant_id: row.tenant_id,
-          amount:    row.amount || 0,
-          due_date:  row.due_date || '',
+          amount: row.amount || 0,
+          due_date: row.due_date || '',
           paid_date: row.paid_date || undefined,
-          status:    row.status || 'pending',
-          color:     AVATAR_COLORS[i % AVATAR_COLORS.length],
+          status: row.status || 'pending',
+          color: AVATAR_COLORS[i % AVATAR_COLORS.length],
         }
       })
       setRecords(shaped)
@@ -147,7 +148,7 @@ export default function RentTrackerPage() {
       const name = user.user_metadata?.full_name || 'User'
       setFullName(name)
       setUserId(user.id)
-      setUserInitials(name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0,2))
+      setUserInitials(name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2))
       await loadRecords(user.id, selectedMonth, selectedYear)
     }
     init()
@@ -191,7 +192,7 @@ export default function RentTrackerPage() {
       }
 
       const unitTenantMap: Record<string, string> = {}
-      ;(tenantRows || []).forEach((t: any) => { unitTenantMap[t.unit_id] = t.id })
+        ; (tenantRows || []).forEach((t: any) => { unitTenantMap[t.unit_id] = t.id })
 
       const { from, to } = monthRange(selectedMonth, selectedYear)
       const { data: existing } = await supabase
@@ -204,16 +205,16 @@ export default function RentTrackerPage() {
       const existingUnitIds = new Set((existing || []).map((e: any) => e.unit_id))
 
       const unitRentMap: Record<string, any> = {}
-      ;(occupiedUnits || []).forEach((u: any) => { unitRentMap[u.id] = u })
+        ; (occupiedUnits || []).forEach((u: any) => { unitRentMap[u.id] = u })
 
       const toInsert = occupiedUnitIds
         .filter(uid => !existingUnitIds.has(uid) && unitTenantMap[uid])
         .map(uid => ({
-          unit_id:   uid,
+          unit_id: uid,
           tenant_id: unitTenantMap[uid],
-          amount:    unitRentMap[uid]?.monthly_rent || 0,
-          due_date:  `${selectedYear}-${String(mi + 1).padStart(2,'0')}-${String(unitRentMap[uid]?.rent_due_day || 1).padStart(2,'0')}`,
-          status:    'pending',
+          amount: unitRentMap[uid]?.monthly_rent || 0,
+          due_date: `${selectedYear}-${String(mi + 1).padStart(2, '0')}-${String(unitRentMap[uid]?.rent_due_day || 1).padStart(2, '0')}`,
+          status: 'pending',
         }))
 
       if (toInsert.length === 0) {
@@ -262,9 +263,9 @@ export default function RentTrackerPage() {
 
   const filtered = records.filter(r => filter === 'all' || derivedStatus(r) === filter)
   const totalCollected = records.filter(r => r.status === 'paid').reduce((s, r) => s + r.amount, 0)
-  const totalOverdue   = records.filter(r => derivedStatus(r) === 'overdue').reduce((s, r) => s + r.amount, 0)
-  const totalPending   = records.filter(r => derivedStatus(r) === 'pending').reduce((s, r) => s + r.amount, 0)
-  const totalExpected  = records.reduce((s, r) => s + r.amount, 0)
+  const totalOverdue = records.filter(r => derivedStatus(r) === 'overdue').reduce((s, r) => s + r.amount, 0)
+  const totalPending = records.filter(r => derivedStatus(r) === 'pending').reduce((s, r) => s + r.amount, 0)
+  const totalExpected = records.reduce((s, r) => s + r.amount, 0)
   const collectionRate = totalExpected > 0 ? Math.round((totalCollected / totalExpected) * 100) : 0
 
   return (
@@ -403,11 +404,21 @@ export default function RentTrackerPage() {
       {/* Toast */}
       {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
 
-      <div className={`sb-overlay${sidebarOpen?' open':''}`} onClick={()=>setSidebarOpen(false)}/>
+      <div className={`sb-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
 
       <div className="shell">
-        <aside className={`sidebar${sidebarOpen?' open':''}`}>
-          <div className="sb-logo"><div className="sb-logo-icon">🏘️</div><span className="sb-logo-name">Rentura</span></div>
+        <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
+          <div className="sb-logo">
+            <div className="sb-logo-icon">
+              <Image
+                src="/icon.png"
+                alt="Rentura Logo"
+                width={24}
+                height={24}
+              />
+            </div>
+            <span className="sb-logo-name">Rentura</span>
+          </div>
           <nav className="sb-nav">
             <span className="sb-section">Overview</span>
             <a href="/landlord" className="sb-item"><span className="sb-ico">⊞</span>Dashboard</a>
@@ -428,7 +439,7 @@ export default function RentTrackerPage() {
             <div className="sb-upgrade">
               <div className="sb-up-title">⭐ Upgrade to Pro</div>
               <div className="sb-up-sub">Unlimited properties, reports & priority support.</div>
-              <button className="sb-up-btn" onClick={()=>window.location.href='/landlord/upgrade'}>See Plans →</button>
+              <button className="sb-up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
             </div>
             <div className="sb-user">
               <div className="sb-av">{userInitials}</div>
@@ -440,7 +451,7 @@ export default function RentTrackerPage() {
         <div className="main">
           <div className="topbar">
             <div className="tb-left">
-              <button className="hamburger" onClick={()=>setSidebarOpen(true)}>☰</button>
+              <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
               <div className="breadcrumb">Rentura &nbsp;/&nbsp; <b>Rent Tracker</b></div>
             </div>
             <button className="btn-primary" disabled={generating} onClick={generatePayments}>
@@ -461,22 +472,22 @@ export default function RentTrackerPage() {
 
             <div className="summary">
               <div className="sum-card">
-                <div className="sum-top"><div className="sum-ico" style={{background:'#F0FDF4'}}>💰</div><span className="sum-tag" style={{background:'#DCFCE7',color:'#16A34A'}}>{collectionRate}%</span></div>
+                <div className="sum-top"><div className="sum-ico" style={{ background: '#F0FDF4' }}>💰</div><span className="sum-tag" style={{ background: '#DCFCE7', color: '#16A34A' }}>{collectionRate}%</span></div>
                 <div className="sum-val">${totalCollected.toLocaleString()}</div>
                 <div className="sum-lbl">Collected</div>
               </div>
               <div className="sum-card">
-                <div className="sum-top"><div className="sum-ico" style={{background:'#FEE2E2'}}>⚠️</div><span className="sum-tag" style={{background:'#FEE2E2',color:'#DC2626'}}>{records.filter(r=>derivedStatus(r)==='overdue').length} overdue</span></div>
+                <div className="sum-top"><div className="sum-ico" style={{ background: '#FEE2E2' }}>⚠️</div><span className="sum-tag" style={{ background: '#FEE2E2', color: '#DC2626' }}>{records.filter(r => derivedStatus(r) === 'overdue').length} overdue</span></div>
                 <div className="sum-val">${totalOverdue.toLocaleString()}</div>
                 <div className="sum-lbl">Overdue</div>
               </div>
               <div className="sum-card">
-                <div className="sum-top"><div className="sum-ico" style={{background:'#FEF3C7'}}>⏳</div><span className="sum-tag" style={{background:'#FEF3C7',color:'#D97706'}}>{records.filter(r=>derivedStatus(r)==='pending').length} pending</span></div>
+                <div className="sum-top"><div className="sum-ico" style={{ background: '#FEF3C7' }}>⏳</div><span className="sum-tag" style={{ background: '#FEF3C7', color: '#D97706' }}>{records.filter(r => derivedStatus(r) === 'pending').length} pending</span></div>
                 <div className="sum-val">${totalPending.toLocaleString()}</div>
                 <div className="sum-lbl">Pending</div>
               </div>
               <div className="sum-card">
-                <div className="sum-top"><div className="sum-ico" style={{background:'#EFF6FF'}}>📊</div><span className="sum-tag" style={{background:'#EFF6FF',color:'#2563EB'}}>{records.length} total</span></div>
+                <div className="sum-top"><div className="sum-ico" style={{ background: '#EFF6FF' }}>📊</div><span className="sum-tag" style={{ background: '#EFF6FF', color: '#2563EB' }}>{records.length} total</span></div>
                 <div className="sum-val">${totalExpected.toLocaleString()}</div>
                 <div className="sum-lbl">Expected</div>
               </div>
@@ -487,26 +498,26 @@ export default function RentTrackerPage() {
                 <span className="coll-title">Collection Rate — {selectedMonth} {selectedYear}</span>
                 <span className="coll-pct">{collectionRate}%</span>
               </div>
-              <div className="coll-bar"><div className="coll-fill" style={{width:`${collectionRate}%`}}/></div>
+              <div className="coll-bar"><div className="coll-fill" style={{ width: `${collectionRate}%` }} /></div>
               <div className="coll-legend">
-                <span className="cl-item"><span className="cl-dot" style={{background:'#2563EB'}}/>Collected ${totalCollected.toLocaleString()}</span>
-                <span className="cl-item"><span className="cl-dot" style={{background:'#DC2626'}}/>Overdue ${totalOverdue.toLocaleString()}</span>
-                <span className="cl-item"><span className="cl-dot" style={{background:'#D97706'}}/>Pending ${totalPending.toLocaleString()}</span>
+                <span className="cl-item"><span className="cl-dot" style={{ background: '#2563EB' }} />Collected ${totalCollected.toLocaleString()}</span>
+                <span className="cl-item"><span className="cl-dot" style={{ background: '#DC2626' }} />Overdue ${totalOverdue.toLocaleString()}</span>
+                <span className="cl-item"><span className="cl-dot" style={{ background: '#D97706' }} />Pending ${totalPending.toLocaleString()}</span>
               </div>
             </div>
 
             <div className="month-bar">
-              {MONTHS.map(m=>(
-                <button key={m} className={`m-btn${selectedMonth===m?' active':''}`} onClick={()=>setSelectedMonth(m)}>{m}</button>
+              {MONTHS.map(m => (
+                <button key={m} className={`m-btn${selectedMonth === m ? ' active' : ''}`} onClick={() => setSelectedMonth(m)}>{m}</button>
               ))}
             </div>
 
             <div className="toolbar">
               <div className="filter-row">
-                {(['all','paid','overdue','pending'] as const).map(f=>(
-                  <button key={f} className={`ftab${filter===f?' active':''}`} onClick={()=>setFilter(f)}>
-                    {f.charAt(0).toUpperCase()+f.slice(1)}
-                    <span className="fc">{f==='all'?records.length:records.filter(r=>derivedStatus(r)===f).length}</span>
+                {(['all', 'paid', 'overdue', 'pending'] as const).map(f => (
+                  <button key={f} className={`ftab${filter === f ? ' active' : ''}`} onClick={() => setFilter(f)}>
+                    {f.charAt(0).toUpperCase() + f.slice(1)}
+                    <span className="fc">{f === 'all' ? records.length : records.filter(r => derivedStatus(r) === f).length}</span>
                   </button>
                 ))}
               </div>
@@ -515,24 +526,24 @@ export default function RentTrackerPage() {
             <div className="rent-card">
               <div className="rent-head">
                 <div className="rent-title">Payment Records — {selectedMonth} {selectedYear}</div>
-                <div style={{fontSize:12,color:'#94A3B8'}}>{filtered.length} record{filtered.length!==1?'s':''}</div>
+                <div style={{ fontSize: 12, color: '#94A3B8' }}>{filtered.length} record{filtered.length !== 1 ? 's' : ''}</div>
               </div>
 
               {loading ? (
                 <table className="rtable">
                   <thead><tr><th>Tenant</th><th>Amount</th><th>Due Date</th><th>Paid Date</th><th>Status</th><th>Actions</th></tr></thead>
                   <tbody>
-                    {[1,2,3].map(i=>(
+                    {[1, 2, 3].map(i => (
                       <tr key={i}>
-                        <td><div style={{display:'flex',alignItems:'center',gap:10}}>
-                          <div className="skeleton" style={{width:36,height:36,borderRadius:10,flexShrink:0}}/>
-                          <div><div className="skeleton" style={{height:12,width:120,marginBottom:5}}/><div className="skeleton" style={{height:10,width:80}}/></div>
+                        <td><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div className="skeleton" style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0 }} />
+                          <div><div className="skeleton" style={{ height: 12, width: 120, marginBottom: 5 }} /><div className="skeleton" style={{ height: 10, width: 80 }} /></div>
                         </div></td>
-                        <td><div className="skeleton" style={{height:12,width:50}}/></td>
-                        <td><div className="skeleton" style={{height:12,width:70}}/></td>
-                        <td><div className="skeleton" style={{height:12,width:70}}/></td>
-                        <td><div className="skeleton" style={{height:22,width:65,borderRadius:99}}/></td>
-                        <td><div className="skeleton" style={{height:30,width:90,borderRadius:8}}/></td>
+                        <td><div className="skeleton" style={{ height: 12, width: 50 }} /></td>
+                        <td><div className="skeleton" style={{ height: 12, width: 70 }} /></td>
+                        <td><div className="skeleton" style={{ height: 12, width: 70 }} /></td>
+                        <td><div className="skeleton" style={{ height: 22, width: 65, borderRadius: 99 }} /></td>
+                        <td><div className="skeleton" style={{ height: 30, width: 90, borderRadius: 8 }} /></td>
                       </tr>
                     ))}
                   </tbody>
@@ -547,27 +558,27 @@ export default function RentTrackerPage() {
                       : 'No records match the current filter.'}
                   </div>
                   {records.length === 0 && (
-                    <button className="btn-primary" style={{margin:'0 auto'}} disabled={generating} onClick={generatePayments}>
+                    <button className="btn-primary" style={{ margin: '0 auto' }} disabled={generating} onClick={generatePayments}>
                       {generating ? '⏳ Generating…' : `⚡ Generate ${selectedMonth} Payments`}
                     </button>
                   )}
                 </div>
               ) : (
-                <div style={{overflowX:'auto'}}>
+                <div style={{ overflowX: 'auto' }}>
                   <table className="rtable">
                     <thead>
                       <tr><th>Tenant</th><th>Amount</th><th>Due Date</th><th>Paid Date</th><th>Status</th><th>Actions</th></tr>
                     </thead>
                     <tbody>
-                      {filtered.map(r=>{
+                      {filtered.map(r => {
                         const ds = derivedStatus(r)
-                        const sc = STATUS_CFG[ds]||STATUS_CFG.pending
-                        const isBusy = updating===r.id
+                        const sc = STATUS_CFG[ds] || STATUS_CFG.pending
+                        const isBusy = updating === r.id
                         return (
                           <tr key={r.id}>
                             <td>
-                              <div style={{display:'flex',alignItems:'center',gap:10}}>
-                                <div className="t-av" style={{background:r.color}}>{r.initials}</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <div className="t-av" style={{ background: r.color }}>{r.initials}</div>
                                 <div>
                                   <div className="t-name">{r.tenant}</div>
                                   <div className="t-prop">{r.property} · {r.unit}</div>
@@ -576,14 +587,14 @@ export default function RentTrackerPage() {
                             </td>
                             <td><span className="amt">${r.amount.toLocaleString()}</span></td>
                             <td><span className="date-txt">{r.due_date}</span></td>
-                            <td><span className="date-txt">{r.paid_date||'—'}</span></td>
-                            <td><span className="badge" style={{background:sc.bg,color:sc.color}}>● {sc.label}</span></td>
+                            <td><span className="date-txt">{r.paid_date || '—'}</span></td>
+                            <td><span className="badge" style={{ background: sc.bg, color: sc.color }}>● {sc.label}</span></td>
                             <td>
-                              {r.status==='paid'
-                                ? <span style={{fontSize:12,color:'#16A34A',fontWeight:600}}>✓ Received</span>
-                                : <button className="act-btn act-btn-green" disabled={isBusy} onClick={()=>markPaid(r.id)}>
-                                    {isBusy?'…':'✓ Mark Paid'}
-                                  </button>
+                              {r.status === 'paid'
+                                ? <span style={{ fontSize: 12, color: '#16A34A', fontWeight: 600 }}>✓ Received</span>
+                                : <button className="act-btn act-btn-green" disabled={isBusy} onClick={() => markPaid(r.id)}>
+                                  {isBusy ? '…' : '✓ Mark Paid'}
+                                </button>
                               }
                             </td>
                           </tr>
@@ -597,30 +608,30 @@ export default function RentTrackerPage() {
               {/* Mobile cards */}
               {!loading && filtered.length > 0 && (
                 <div className="rent-mobile-cards">
-                  {filtered.map(r=>{
-                    const ds=derivedStatus(r)
-                    const sc=STATUS_CFG[ds]||STATUS_CFG.pending
-                    const isBusy=updating===r.id
+                  {filtered.map(r => {
+                    const ds = derivedStatus(r)
+                    const sc = STATUS_CFG[ds] || STATUS_CFG.pending
+                    const isBusy = updating === r.id
                     return (
                       <div key={r.id} className="rmc">
-                        <div className="t-av" style={{background:r.color}}>{r.initials}</div>
+                        <div className="t-av" style={{ background: r.color }}>{r.initials}</div>
                         <div className="rmc-info">
                           <div className="rmc-name">{r.tenant}</div>
                           <div className="rmc-sub">{r.property} · {r.unit} · Due {r.due_date}</div>
-                          <div style={{marginTop:4,display:'flex',alignItems:'center',gap:8}}>
-                            <span className="badge" style={{background:sc.bg,color:sc.color}}>● {sc.label}</span>
-                            {r.paid_date&&<span style={{fontSize:11,color:'#94A3B8'}}>Paid {r.paid_date}</span>}
+                          <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span className="badge" style={{ background: sc.bg, color: sc.color }}>● {sc.label}</span>
+                            {r.paid_date && <span style={{ fontSize: 11, color: '#94A3B8' }}>Paid {r.paid_date}</span>}
                           </div>
                         </div>
                         <div className="rmc-right">
                           <div className="rmc-amt">${r.amount.toLocaleString()}</div>
                           <div className="rmc-actions">
-                            {r.status!=='paid'
+                            {r.status !== 'paid'
                               ? <button className="act-btn act-btn-green" disabled={isBusy}
-                                  onClick={()=>markPaid(r.id)} style={{padding:'5px 10px',fontSize:11.5}}>
-                                  {isBusy?'…':'✓ Paid'}
-                                </button>
-                              : <span style={{fontSize:11.5,color:'#16A34A',fontWeight:600}}>✓ Received</span>
+                                onClick={() => markPaid(r.id)} style={{ padding: '5px 10px', fontSize: 11.5 }}>
+                                {isBusy ? '…' : '✓ Paid'}
+                              </button>
+                              : <span style={{ fontSize: 11.5, color: '#16A34A', fontWeight: 600 }}>✓ Received</span>
                             }
                           </div>
                         </div>

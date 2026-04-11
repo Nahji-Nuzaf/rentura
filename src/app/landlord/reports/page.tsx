@@ -3,28 +3,29 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Image from 'next/image'
 
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const NOW = new Date()
 
 type MonthStat = { month: string; collected: number; overdue: number; pending: number; total: number }
-type OccStat   = { month: string; rate: number }
-type PropStat  = { name: string; units: number; occupied: number; revenue: number }
+type OccStat = { month: string; rate: number }
+type PropStat = { name: string; units: number; occupied: number; revenue: number }
 
 export default function ReportsPage() {
   const router = useRouter()
   const [userInitials, setUserInitials] = useState('NN')
-  const [fullName, setFullName]         = useState('User')
-  const [sidebarOpen, setSidebarOpen]   = useState(false)
-  const [loading, setLoading]           = useState(true)
-  const [monthStats, setMonthStats]     = useState<MonthStat[]>([])
-  const [occStats, setOccStats]         = useState<OccStat[]>([])
-  const [propStats, setPropStats]       = useState<PropStat[]>([])
+  const [fullName, setFullName] = useState('User')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [monthStats, setMonthStats] = useState<MonthStat[]>([])
+  const [occStats, setOccStats] = useState<OccStat[]>([])
+  const [propStats, setPropStats] = useState<PropStat[]>([])
   const [totalCollected, setTotalCollected] = useState(0)
-  const [totalOverdue, setTotalOverdue]     = useState(0)
-  const [totalPending, setTotalPending]     = useState(0)
-  const [openMaint, setOpenMaint]           = useState(0)
-  const [resolvedMaint, setResolvedMaint]   = useState(0)
+  const [totalOverdue, setTotalOverdue] = useState(0)
+  const [totalPending, setTotalPending] = useState(0)
+  const [openMaint, setOpenMaint] = useState(0)
+  const [resolvedMaint, setResolvedMaint] = useState(0)
 
   useEffect(() => {
     const init = async () => {
@@ -33,7 +34,7 @@ export default function ReportsPage() {
       if (!user) { router.push('/login'); return }
       const name = user.user_metadata?.full_name || 'User'
       setFullName(name)
-      setUserInitials(name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0,2))
+      setUserInitials(name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2))
       await loadReports(user.id)
     }
     init()
@@ -53,61 +54,61 @@ export default function ReportsPage() {
       const unitIds = (units || []).map((u: any) => u.id)
 
       const ps: PropStat[] = (props || []).map((p: any) => {
-        const pu  = (units || []).filter((u: any) => u.property_id === p.id)
+        const pu = (units || []).filter((u: any) => u.property_id === p.id)
         const occ = pu.filter((u: any) => u.status === 'occupied').length
-        const rev = pu.filter((u: any) => u.status === 'occupied').reduce((s: number, u: any) => s + (u.monthly_rent||0), 0)
+        const rev = pu.filter((u: any) => u.status === 'occupied').reduce((s: number, u: any) => s + (u.monthly_rent || 0), 0)
         return { name: p.name, units: p.total_units, occupied: occ, revenue: rev }
       })
       setPropStats(ps)
 
       const buckets: Record<string, MonthStat> = {}
       for (let i = 5; i >= 0; i--) {
-        const d   = new Date(NOW.getFullYear(), NOW.getMonth() - i, 1)
-        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+        const d = new Date(NOW.getFullYear(), NOW.getMonth() - i, 1)
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
         buckets[key] = { month: MONTHS[d.getMonth()], collected: 0, overdue: 0, pending: 0, total: 0 }
       }
 
-      const sixAgo = new Date(NOW.getFullYear(), NOW.getMonth()-5, 1).toISOString()
+      const sixAgo = new Date(NOW.getFullYear(), NOW.getMonth() - 5, 1).toISOString()
       const { data: payments } = await supabase
         .from('rent_payments').select('amount,status,due_date')
         .in('unit_id', unitIds).gte('due_date', sixAgo).order('due_date', { ascending: true })
 
-      ;(payments || []).forEach((p: any) => {
-        const key = p.due_date?.slice(0,7)
-        if (!buckets[key]) return
-        const amt = p.amount || 0
-        if (p.status === 'paid')    { buckets[key].collected += amt }
-        else if (p.status === 'overdue') { buckets[key].overdue += amt }
-        else                        { buckets[key].pending  += amt }
-        buckets[key].total += amt
-      })
+        ; (payments || []).forEach((p: any) => {
+          const key = p.due_date?.slice(0, 7)
+          if (!buckets[key]) return
+          const amt = p.amount || 0
+          if (p.status === 'paid') { buckets[key].collected += amt }
+          else if (p.status === 'overdue') { buckets[key].overdue += amt }
+          else { buckets[key].pending += amt }
+          buckets[key].total += amt
+        })
 
       const allTotals = Object.values(buckets).map(b => b.total)
-      const maxReal   = Math.max(...allTotals, 1)
+      const maxReal = Math.max(...allTotals, 1)
       const ms: MonthStat[] = Object.values(buckets).map(b => ({
         ...b,
         _ghost: b.total === 0 ? maxReal * 0.15 : 0,
       } as any))
 
       setMonthStats(ms)
-      const curKey = `${NOW.getFullYear()}-${String(NOW.getMonth()+1).padStart(2,'0')}`
+      const curKey = `${NOW.getFullYear()}-${String(NOW.getMonth() + 1).padStart(2, '0')}`
       setTotalCollected(buckets[curKey]?.collected || 0)
       setTotalOverdue(buckets[curKey]?.overdue || 0)
       setTotalPending(buckets[curKey]?.pending || 0)
 
-      const totalU  = (units || []).length
-      const occU    = (units || []).filter((u: any) => u.status === 'occupied').length
-      const occRate = totalU > 0 ? Math.round((occU/totalU)*100) : 0
+      const totalU = (units || []).length
+      const occU = (units || []).filter((u: any) => u.status === 'occupied').length
+      const occRate = totalU > 0 ? Math.round((occU / totalU) * 100) : 0
       const occData: OccStat[] = ms.map((m, i) => ({
         month: m.month,
-        rate: Math.max(5, Math.min(100, occRate + (i-3)*3 + (i%2===0?2:-1)))
+        rate: Math.max(5, Math.min(100, occRate + (i - 3) * 3 + (i % 2 === 0 ? 2 : -1)))
       }))
       setOccStats(occData)
 
       const { data: maint } = await supabase
         .from('maintenance_requests').select('status').in('property_id', propIds)
-      setOpenMaint((maint||[]).filter((m: any) => m.status !== 'resolved').length)
-      setResolvedMaint((maint||[]).filter((m: any) => m.status === 'resolved').length)
+      setOpenMaint((maint || []).filter((m: any) => m.status !== 'resolved').length)
+      setResolvedMaint((maint || []).filter((m: any) => m.status === 'resolved').length)
 
     } catch (err: any) {
       console.error('Reports error:', err?.message)
@@ -116,12 +117,12 @@ export default function ReportsPage() {
     }
   }
 
-  const maxBar = Math.max(...monthStats.map((m: any) => Math.max(m.total, m._ghost||0)), 1)
-  const collectionRate = (totalCollected+totalOverdue+totalPending) > 0
-    ? Math.round((totalCollected/(totalCollected+totalOverdue+totalPending))*100) : 0
-  const resolutionRate = (openMaint+resolvedMaint) > 0
-    ? Math.round((resolvedMaint/(openMaint+resolvedMaint))*100) : 0
-  const proRevenue = [3200,3400,3100,3600,3500,3900,3700,4200,4000,4400,4200,4600]
+  const maxBar = Math.max(...monthStats.map((m: any) => Math.max(m.total, m._ghost || 0)), 1)
+  const collectionRate = (totalCollected + totalOverdue + totalPending) > 0
+    ? Math.round((totalCollected / (totalCollected + totalOverdue + totalPending)) * 100) : 0
+  const resolutionRate = (openMaint + resolvedMaint) > 0
+    ? Math.round((resolvedMaint / (openMaint + resolvedMaint)) * 100) : 0
+  const proRevenue = [3200, 3400, 3100, 3600, 3500, 3900, 3700, 4200, 4000, 4400, 4200, 4600]
 
   return (
     <>
@@ -276,11 +277,21 @@ export default function ReportsPage() {
         }
       `}</style>
 
-      <div className={`sb-overlay${sidebarOpen?' open':''}`} onClick={()=>setSidebarOpen(false)}/>
+      <div className={`sb-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
 
       <div className="shell">
-        <aside className={`sidebar${sidebarOpen?' open':''}`}>
-          <div className="sb-logo"><div className="sb-logo-icon">🏘️</div><span className="sb-logo-name">Rentura</span></div>
+        <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
+          <div className="sb-logo">
+            <div className="sb-logo-icon">
+              <Image
+                src="/icon.png"
+                alt="Rentura Logo"
+                width={24}
+                height={24}
+              />
+            </div>
+            <span className="sb-logo-name">Rentura</span>
+          </div>
           <nav className="sb-nav">
             <span className="sb-section">Overview</span>
             <a href="/landlord" className="sb-item"><span className="sb-ico">⊞</span>Dashboard</a>
@@ -301,7 +312,7 @@ export default function ReportsPage() {
             <div className="sb-upgrade">
               <div className="sb-up-title">⭐ Upgrade to Pro</div>
               <div className="sb-up-sub">Unlock full reports, CSV exports & advanced analytics.</div>
-              <button className="sb-up-btn" onClick={()=>window.location.href='/landlord/upgrade'}>See Plans →</button>
+              <button className="sb-up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
             </div>
             <div className="sb-user">
               <div className="sb-av">{userInitials}</div>
@@ -313,7 +324,7 @@ export default function ReportsPage() {
         <div className="main">
           <div className="topbar">
             <div className="tb-left">
-              <button className="hamburger" onClick={()=>setSidebarOpen(true)}>☰</button>
+              <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
               <div className="breadcrumb">Rentura &nbsp;/&nbsp; <b>Reports</b></div>
             </div>
             <div className="hd-actions">
@@ -335,34 +346,34 @@ export default function ReportsPage() {
             <div className="summary">
               <div className="sum-card">
                 <div className="sum-top">
-                  <div className="sum-ico" style={{background:'#F0FDF4'}}>💰</div>
-                  <span className="sum-tag" style={{background:'#DCFCE7',color:'#16A34A'}}>{collectionRate}%</span>
+                  <div className="sum-ico" style={{ background: '#F0FDF4' }}>💰</div>
+                  <span className="sum-tag" style={{ background: '#DCFCE7', color: '#16A34A' }}>{collectionRate}%</span>
                 </div>
-                {loading ? <div className="skeleton" style={{height:22,width:80,marginBottom:6}}/> : <div className="sum-val">${totalCollected.toLocaleString()}</div>}
+                {loading ? <div className="skeleton" style={{ height: 22, width: 80, marginBottom: 6 }} /> : <div className="sum-val">${totalCollected.toLocaleString()}</div>}
                 <div className="sum-lbl">Collected This Month</div>
               </div>
               <div className="sum-card">
                 <div className="sum-top">
-                  <div className="sum-ico" style={{background:'#FEE2E2'}}>⚠️</div>
-                  <span className="sum-tag" style={{background:totalOverdue>0?'#FEE2E2':'#F1F5F9',color:totalOverdue>0?'#DC2626':'#94A3B8'}}>{totalOverdue>0?'Overdue':'Clear'}</span>
+                  <div className="sum-ico" style={{ background: '#FEE2E2' }}>⚠️</div>
+                  <span className="sum-tag" style={{ background: totalOverdue > 0 ? '#FEE2E2' : '#F1F5F9', color: totalOverdue > 0 ? '#DC2626' : '#94A3B8' }}>{totalOverdue > 0 ? 'Overdue' : 'Clear'}</span>
                 </div>
-                {loading ? <div className="skeleton" style={{height:22,width:80,marginBottom:6}}/> : <div className="sum-val" style={{color:totalOverdue>0?'#DC2626':'#0F172A'}}>${totalOverdue.toLocaleString()}</div>}
+                {loading ? <div className="skeleton" style={{ height: 22, width: 80, marginBottom: 6 }} /> : <div className="sum-val" style={{ color: totalOverdue > 0 ? '#DC2626' : '#0F172A' }}>${totalOverdue.toLocaleString()}</div>}
                 <div className="sum-lbl">Overdue This Month</div>
               </div>
               <div className="sum-card">
                 <div className="sum-top">
-                  <div className="sum-ico" style={{background:'#FEF3C7'}}>🔧</div>
-                  <span className="sum-tag" style={{background:'#FEF3C7',color:'#D97706'}}>{openMaint} open</span>
+                  <div className="sum-ico" style={{ background: '#FEF3C7' }}>🔧</div>
+                  <span className="sum-tag" style={{ background: '#FEF3C7', color: '#D97706' }}>{openMaint} open</span>
                 </div>
-                {loading ? <div className="skeleton" style={{height:22,width:50,marginBottom:6}}/> : <div className="sum-val">{openMaint+resolvedMaint}</div>}
+                {loading ? <div className="skeleton" style={{ height: 22, width: 50, marginBottom: 6 }} /> : <div className="sum-val">{openMaint + resolvedMaint}</div>}
                 <div className="sum-lbl">Total Maintenance</div>
               </div>
               <div className="sum-card">
                 <div className="sum-top">
-                  <div className="sum-ico" style={{background:'#EFF6FF'}}>✅</div>
-                  <span className="sum-tag" style={{background:'#EFF6FF',color:'#2563EB'}}>{resolvedMaint} resolved</span>
+                  <div className="sum-ico" style={{ background: '#EFF6FF' }}>✅</div>
+                  <span className="sum-tag" style={{ background: '#EFF6FF', color: '#2563EB' }}>{resolvedMaint} resolved</span>
                 </div>
-                {loading ? <div className="skeleton" style={{height:22,width:50,marginBottom:6}}/> : <div className="sum-val" style={{color:'#2563EB'}}>{resolutionRate}%</div>}
+                {loading ? <div className="skeleton" style={{ height: 22, width: 50, marginBottom: 6 }} /> : <div className="sum-val" style={{ color: '#2563EB' }}>{resolutionRate}%</div>}
                 <div className="sum-lbl">Resolution Rate</div>
               </div>
             </div>
@@ -378,41 +389,41 @@ export default function ReportsPage() {
                   <span className="free-badge">✓ Free</span>
                 </div>
                 {loading ? (
-                  <div style={{display:'flex',gap:6,height:130,alignItems:'flex-end'}}>
-                    {[55,40,65,45,70,90].map((h,i)=><div key={i} className="skeleton" style={{flex:1,height:`${h}%`,borderRadius:6}}/>)}
+                  <div style={{ display: 'flex', gap: 6, height: 130, alignItems: 'flex-end' }}>
+                    {[55, 40, 65, 45, 70, 90].map((h, i) => <div key={i} className="skeleton" style={{ flex: 1, height: `${h}%`, borderRadius: 6 }} />)}
                   </div>
                 ) : (
                   <>
                     <div className="chart-area">
                       {monthStats.map((m: any, i: number) => {
                         const isGhost = m.total === 0
-                        const ch = m.total>0 ? Math.max(4, Math.round((m.collected/maxBar)*100)) : 0
-                        const oh = m.total>0 ? Math.max(0, Math.round((m.overdue/maxBar)*100)) : 0
-                        const ph = m.total>0 ? Math.max(0, Math.round((m.pending/maxBar)*100)) : 0
+                        const ch = m.total > 0 ? Math.max(4, Math.round((m.collected / maxBar) * 100)) : 0
+                        const oh = m.total > 0 ? Math.max(0, Math.round((m.overdue / maxBar) * 100)) : 0
+                        const ph = m.total > 0 ? Math.max(0, Math.round((m.pending / maxBar) * 100)) : 0
                         const isCurrent = i === 5
                         return (
                           <div key={i} className="bar-col">
-                            <div style={{width:'100%',flex:1,display:'flex',flexDirection:'column',justifyContent:'flex-end',gap:1}}>
+                            <div style={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: 1 }}>
                               {isGhost
-                                ? <div style={{width:'100%',height:'20%',minHeight:6,borderRadius:5,background:'#F1F5F9',border:'1.5px dashed #E2E8F0'}}/>
+                                ? <div style={{ width: '100%', height: '20%', minHeight: 6, borderRadius: 5, background: '#F1F5F9', border: '1.5px dashed #E2E8F0' }} />
                                 : <>
-                                    {ph>0&&<div style={{width:'100%',height:`${ph}%`,minHeight:3,borderRadius:'3px 3px 0 0',background:'#FEF3C7',border:'1px solid #FDE68A'}}/>}
-                                    {oh>0&&<div style={{width:'100%',height:`${oh}%`,minHeight:3,background:'#FECACA',border:'1px solid #FCA5A5'}}/>}
-                                    {ch>0&&<div style={{width:'100%',height:`${ch}%`,minHeight:5,borderRadius:oh===0&&ph===0?'5px 5px 0 0':'0',background:isCurrent?'linear-gradient(180deg,#2563EB,#6366F1)':'linear-gradient(180deg,#93C5FD,#818CF8)'}}/>}
-                                  </>
+                                  {ph > 0 && <div style={{ width: '100%', height: `${ph}%`, minHeight: 3, borderRadius: '3px 3px 0 0', background: '#FEF3C7', border: '1px solid #FDE68A' }} />}
+                                  {oh > 0 && <div style={{ width: '100%', height: `${oh}%`, minHeight: 3, background: '#FECACA', border: '1px solid #FCA5A5' }} />}
+                                  {ch > 0 && <div style={{ width: '100%', height: `${ch}%`, minHeight: 5, borderRadius: oh === 0 && ph === 0 ? '5px 5px 0 0' : '0', background: isCurrent ? 'linear-gradient(180deg,#2563EB,#6366F1)' : 'linear-gradient(180deg,#93C5FD,#818CF8)' }} />}
+                                </>
                               }
                             </div>
-                            <div className="bar-lbl" style={{fontWeight:isCurrent?700:400,color:isCurrent?'#0F172A':'#94A3B8'}}>{m.month}</div>
+                            <div className="bar-lbl" style={{ fontWeight: isCurrent ? 700 : 400, color: isCurrent ? '#0F172A' : '#94A3B8' }}>{m.month}</div>
                           </div>
                         )
                       })}
                     </div>
-                    <div className="chart-divider"/>
+                    <div className="chart-divider" />
                     <div className="legend">
-                      <span className="leg-item"><span className="leg-dot" style={{background:'#3B82F6'}}/>Collected</span>
-                      <span className="leg-item"><span className="leg-dot" style={{background:'#FCA5A5'}}/>Overdue</span>
-                      <span className="leg-item"><span className="leg-dot" style={{background:'#FDE68A'}}/>Pending</span>
-                      <span className="leg-item"><span className="leg-dot" style={{background:'#E2E8F0',border:'1.5px dashed #CBD5E1'}}/>No data</span>
+                      <span className="leg-item"><span className="leg-dot" style={{ background: '#3B82F6' }} />Collected</span>
+                      <span className="leg-item"><span className="leg-dot" style={{ background: '#FCA5A5' }} />Overdue</span>
+                      <span className="leg-item"><span className="leg-dot" style={{ background: '#FDE68A' }} />Pending</span>
+                      <span className="leg-item"><span className="leg-dot" style={{ background: '#E2E8F0', border: '1.5px dashed #CBD5E1' }} />No data</span>
                     </div>
                   </>
                 )}
@@ -427,34 +438,34 @@ export default function ReportsPage() {
                   <span className="free-badge">✓ Free</span>
                 </div>
                 {loading ? (
-                  <div style={{display:'flex',gap:6,height:110,alignItems:'flex-end'}}>
-                    {[60,65,55,70,68,75].map((h,i)=><div key={i} className="skeleton" style={{flex:1,height:`${h}%`,borderRadius:6}}/>)}
+                  <div style={{ display: 'flex', gap: 6, height: 110, alignItems: 'flex-end' }}>
+                    {[60, 65, 55, 70, 68, 75].map((h, i) => <div key={i} className="skeleton" style={{ flex: 1, height: `${h}%`, borderRadius: 6 }} />)}
                   </div>
                 ) : (
                   <>
                     <div className="occ-area">
                       {occStats.map((o, i) => {
                         const isCurrent = i === 5
-                        const color = o.rate>=80
-                          ? (isCurrent?'linear-gradient(180deg,#10B981,#34D399)':'linear-gradient(180deg,#6EE7B7,#A7F3D0)')
-                          : o.rate>=50
-                          ? (isCurrent?'linear-gradient(180deg,#3B82F6,#6366F1)':'linear-gradient(180deg,#93C5FD,#A5B4FC)')
-                          : (isCurrent?'linear-gradient(180deg,#F59E0B,#FCD34D)':'linear-gradient(180deg,#FCD34D,#FDE68A)')
+                        const color = o.rate >= 80
+                          ? (isCurrent ? 'linear-gradient(180deg,#10B981,#34D399)' : 'linear-gradient(180deg,#6EE7B7,#A7F3D0)')
+                          : o.rate >= 50
+                            ? (isCurrent ? 'linear-gradient(180deg,#3B82F6,#6366F1)' : 'linear-gradient(180deg,#93C5FD,#A5B4FC)')
+                            : (isCurrent ? 'linear-gradient(180deg,#F59E0B,#FCD34D)' : 'linear-gradient(180deg,#FCD34D,#FDE68A)')
                         return (
                           <div key={i} className="occ-col">
-                            <div className="occ-pct-lbl" style={{color:isCurrent?'#0F172A':'#94A3B8'}}>{o.rate}%</div>
-                            <div style={{width:'100%',flex:1,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
-                              <div className="occ-bar-el" style={{height:`${o.rate}%`,minHeight:5,background:color}}/>
+                            <div className="occ-pct-lbl" style={{ color: isCurrent ? '#0F172A' : '#94A3B8' }}>{o.rate}%</div>
+                            <div style={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                              <div className="occ-bar-el" style={{ height: `${o.rate}%`, minHeight: 5, background: color }} />
                             </div>
-                            <div className="occ-month" style={{fontWeight:isCurrent?700:400,color:isCurrent?'#0F172A':'#94A3B8'}}>{o.month}</div>
+                            <div className="occ-month" style={{ fontWeight: isCurrent ? 700 : 400, color: isCurrent ? '#0F172A' : '#94A3B8' }}>{o.month}</div>
                           </div>
                         )
                       })}
                     </div>
-                    <div style={{marginTop:12,padding:'10px 12px',background:'#F8FAFC',borderRadius:10,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                      <span style={{fontSize:12.5,color:'#64748B',fontWeight:500}}>Current occupancy</span>
-                      <span style={{fontSize:13.5,fontWeight:700,color:occStats[5]?.rate>=80?'#16A34A':occStats[5]?.rate>=50?'#2563EB':'#D97706'}}>
-                        {occStats[5]?.rate||0}%
+                    <div style={{ marginTop: 12, padding: '10px 12px', background: '#F8FAFC', borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 12.5, color: '#64748B', fontWeight: 500 }}>Current occupancy</span>
+                      <span style={{ fontSize: 13.5, fontWeight: 700, color: occStats[5]?.rate >= 80 ? '#16A34A' : occStats[5]?.rate >= 50 ? '#2563EB' : '#D97706' }}>
+                        {occStats[5]?.rate || 0}%
                       </span>
                     </div>
                   </>
@@ -472,24 +483,24 @@ export default function ReportsPage() {
                   </div>
                   <span className="free-badge">✓ Free</span>
                 </div>
-                {loading ? [1,2].map(i=>(
+                {loading ? [1, 2].map(i => (
                   <div key={i} className="prop-row">
-                    <div className="skeleton" style={{width:36,height:36,borderRadius:10,flexShrink:0}}/>
-                    <div style={{flex:1}}><div className="skeleton" style={{height:12,width:'55%',marginBottom:6}}/><div className="skeleton" style={{height:6,width:'80%',borderRadius:99}}/></div>
-                    <div><div className="skeleton" style={{height:16,width:50,marginBottom:4}}/><div className="skeleton" style={{height:10,width:32}}/></div>
+                    <div className="skeleton" style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}><div className="skeleton" style={{ height: 12, width: '55%', marginBottom: 6 }} /><div className="skeleton" style={{ height: 6, width: '80%', borderRadius: 99 }} /></div>
+                    <div><div className="skeleton" style={{ height: 16, width: 50, marginBottom: 4 }} /><div className="skeleton" style={{ height: 10, width: 32 }} /></div>
                   </div>
                 )) : propStats.length === 0 ? (
-                  <div style={{textAlign:'center',padding:24,color:'#94A3B8',fontSize:13}}>No properties found</div>
+                  <div style={{ textAlign: 'center', padding: 24, color: '#94A3B8', fontSize: 13 }}>No properties found</div>
                 ) : propStats.map((p, i) => {
-                  const pct = p.units>0?Math.round((p.occupied/p.units)*100):0
-                  const bgs = ['linear-gradient(135deg,#2563EB,#6366F1)','linear-gradient(135deg,#10B981,#34D399)','linear-gradient(135deg,#F59E0B,#FCD34D)','linear-gradient(135deg,#EF4444,#F87171)']
+                  const pct = p.units > 0 ? Math.round((p.occupied / p.units) * 100) : 0
+                  const bgs = ['linear-gradient(135deg,#2563EB,#6366F1)', 'linear-gradient(135deg,#10B981,#34D399)', 'linear-gradient(135deg,#F59E0B,#FCD34D)', 'linear-gradient(135deg,#EF4444,#F87171)']
                   return (
                     <div key={i} className="prop-row">
-                      <div className="prop-ico" style={{background:bgs[i%bgs.length]}}>🏠</div>
-                      <div style={{flex:1,minWidth:0}}>
+                      <div className="prop-ico" style={{ background: bgs[i % bgs.length] }}>🏠</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div className="prop-name">{p.name}</div>
                         <div className="prop-sub">{p.occupied} of {p.units} units occupied</div>
-                        <div className="prop-bar-bg"><div className="prop-bar-fill" style={{width:`${pct}%`}}/></div>
+                        <div className="prop-bar-bg"><div className="prop-bar-fill" style={{ width: `${pct}%` }} /></div>
                       </div>
                       <div className="prop-right">
                         <div className="prop-rev">${p.revenue.toLocaleString()}</div>
@@ -508,32 +519,32 @@ export default function ReportsPage() {
                   </div>
                   <span className="free-badge">✓ Free</span>
                 </div>
-                {loading ? [1,2,3].map(i=>(
+                {loading ? [1, 2, 3].map(i => (
                   <div key={i} className="maint-item">
-                    <div><div className="skeleton" style={{height:12,width:90,marginBottom:5}}/><div className="skeleton" style={{height:10,width:65}}/></div>
-                    <div className="skeleton" style={{height:20,width:36}}/>
+                    <div><div className="skeleton" style={{ height: 12, width: 90, marginBottom: 5 }} /><div className="skeleton" style={{ height: 10, width: 65 }} /></div>
+                    <div className="skeleton" style={{ height: 20, width: 36 }} />
                   </div>
                 )) : (
                   <>
                     <div className="maint-item">
                       <div><div className="maint-label">Open Requests</div><div className="maint-desc">Needs attention</div></div>
-                      <div className="maint-val" style={{color:openMaint>0?'#D97706':'#16A34A'}}>{openMaint}</div>
+                      <div className="maint-val" style={{ color: openMaint > 0 ? '#D97706' : '#16A34A' }}>{openMaint}</div>
                     </div>
                     <div className="maint-item">
                       <div><div className="maint-label">Resolved</div><div className="maint-desc">All time</div></div>
-                      <div className="maint-val" style={{color:'#16A34A'}}>{resolvedMaint}</div>
+                      <div className="maint-val" style={{ color: '#16A34A' }}>{resolvedMaint}</div>
                     </div>
                     <div className="maint-item">
                       <div><div className="maint-label">Resolution Rate</div><div className="maint-desc">Resolved vs total</div></div>
-                      <div className="maint-val" style={{color:'#2563EB'}}>{resolutionRate}%</div>
+                      <div className="maint-val" style={{ color: '#2563EB' }}>{resolutionRate}%</div>
                     </div>
                     <div className="prog-wrap">
                       <div className="prog-top">
                         <span>Resolution progress</span>
-                        <span style={{color:'#0F172A'}}>{resolvedMaint}/{openMaint+resolvedMaint}</span>
+                        <span style={{ color: '#0F172A' }}>{resolvedMaint}/{openMaint + resolvedMaint}</span>
                       </div>
                       <div className="prog-bg">
-                        <div className="prog-fill" style={{width:`${resolutionRate}%`,background:resolutionRate>=70?'linear-gradient(90deg,#10B981,#34D399)':'linear-gradient(90deg,#F59E0B,#FCD34D)'}}/>
+                        <div className="prog-fill" style={{ width: `${resolutionRate}%`, background: resolutionRate >= 70 ? 'linear-gradient(90deg,#10B981,#34D399)' : 'linear-gradient(90deg,#F59E0B,#FCD34D)' }} />
                       </div>
                     </div>
                   </>
@@ -545,11 +556,11 @@ export default function ReportsPage() {
             <div className="pro-wrap">
               <div className="card pro-blur">
                 <div className="card-head"><div className="card-title">Annual Revenue Trend</div></div>
-                <div style={{display:'flex',alignItems:'flex-end',gap:4,height:110,marginBottom:8}}>
-                  {proRevenue.map((v,i)=>(
-                    <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center'}}>
-                      <div style={{width:'100%',height:`${Math.round((v/5000)*100)}%`,background:i===NOW.getMonth()?'linear-gradient(180deg,#2563EB,#6366F1)':'#CBD5E1',borderRadius:'4px 4px 0 0',minHeight:4}}/>
-                      <div style={{fontSize:9,color:'#94A3B8',marginTop:3}}>{MONTHS[i]}</div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 110, marginBottom: 8 }}>
+                  {proRevenue.map((v, i) => (
+                    <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <div style={{ width: '100%', height: `${Math.round((v / 5000) * 100)}%`, background: i === NOW.getMonth() ? 'linear-gradient(180deg,#2563EB,#6366F1)' : '#CBD5E1', borderRadius: '4px 4px 0 0', minHeight: 4 }} />
+                      <div style={{ fontSize: 9, color: '#94A3B8', marginTop: 3 }}>{MONTHS[i]}</div>
                     </div>
                   ))}
                 </div>
@@ -564,19 +575,19 @@ export default function ReportsPage() {
             </div>
 
             {/* PRO: Property Comparison */}
-            <div className="pro-wrap" style={{marginBottom:0}}>
+            <div className="pro-wrap" style={{ marginBottom: 0 }}>
               <div className="card pro-blur">
                 <div className="card-head"><div className="card-title">Property Performance Comparison</div></div>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
-                  {['Rush Towers','Ocean View','Green Valley'].map((name,i)=>(
-                    <div key={i} style={{padding:14,background:'#F8FAFC',borderRadius:12,border:'1px solid #E2E8F0'}}>
-                      <div style={{fontSize:12.5,fontWeight:700,color:'#0F172A',marginBottom:8}}>{name}</div>
-                      <div style={{fontFamily:'Fraunces,serif',fontSize:20,fontWeight:700,color:'#2563EB'}}>${[4200,2800,3600][i].toLocaleString()}</div>
-                      <div style={{fontSize:11.5,color:'#16A34A',fontWeight:700,marginTop:2}}>↑ +{[12,8,15][i]}% MoM</div>
-                      <div style={{marginTop:8,height:4,background:'#E2E8F0',borderRadius:99,overflow:'hidden'}}>
-                        <div style={{height:'100%',width:`${[78,55,90][i]}%`,background:'linear-gradient(90deg,#3B82F6,#6366F1)',borderRadius:99}}/>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+                  {['Rush Towers', 'Ocean View', 'Green Valley'].map((name, i) => (
+                    <div key={i} style={{ padding: 14, background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0' }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>{name}</div>
+                      <div style={{ fontFamily: 'Fraunces,serif', fontSize: 20, fontWeight: 700, color: '#2563EB' }}>${[4200, 2800, 3600][i].toLocaleString()}</div>
+                      <div style={{ fontSize: 11.5, color: '#16A34A', fontWeight: 700, marginTop: 2 }}>↑ +{[12, 8, 15][i]}% MoM</div>
+                      <div style={{ marginTop: 8, height: 4, background: '#E2E8F0', borderRadius: 99, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${[78, 55, 90][i]}%`, background: 'linear-gradient(90deg,#3B82F6,#6366F1)', borderRadius: 99 }} />
                       </div>
-                      <div style={{fontSize:11,color:'#94A3B8',marginTop:3}}>{[78,55,90][i]}% occ.</div>
+                      <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 3 }}>{[78, 55, 90][i]}% occ.</div>
                     </div>
                   ))}
                 </div>

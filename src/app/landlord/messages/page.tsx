@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Image from 'next/image'
 
 type Message = {
   id: string
@@ -41,9 +42,9 @@ function fmtTime(ts: string) {
   const d = new Date(ts)
   const now = new Date()
   const diff = now.getTime() - d.getTime()
-  if (diff < 86400000) return d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })
+  if (diff < 86400000) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   if (diff < 172800000) return 'Yesterday'
-  return d.toLocaleDateString([], { month:'short', day:'numeric' })
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
 
 export default function MessagesPage() {
@@ -74,7 +75,7 @@ export default function MessagesPage() {
       if (propIds.length === 0) { setConvos([]); setLoading(false); return }
 
       const propNameMap: Record<string, string> = {}
-      ;(props || []).forEach((p: any) => { propNameMap[p.id] = p.name })
+        ; (props || []).forEach((p: any) => { propNameMap[p.id] = p.name })
 
       const { data: tenants } = await supabase.from('tenants').select('id, profile_id, unit_id, property_id').in('property_id', propIds).eq('status', 'active')
       if (!tenants || tenants.length === 0) { setConvos([]); setLoading(false); return }
@@ -82,12 +83,12 @@ export default function MessagesPage() {
       const unitIds = [...new Set(tenants.map((t: any) => t.unit_id).filter(Boolean))]
       const { data: unitsData } = await supabase.from('units').select('id, unit_number').in('id', unitIds)
       const unitMap: Record<string, string> = {}
-      ;(unitsData || []).forEach((u: any) => { unitMap[u.id] = u.unit_number })
+        ; (unitsData || []).forEach((u: any) => { unitMap[u.id] = u.unit_number })
 
       const profileIds = [...new Set(tenants.map((t: any) => t.profile_id).filter(Boolean))]
       const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', profileIds)
       const profileMap: Record<string, string> = {}
-      ;(profiles || []).forEach((p: any) => { profileMap[p.id] = p.full_name })
+        ; (profiles || []).forEach((p: any) => { profileMap[p.id] = p.full_name })
 
       const { data: messages } = await supabase.from('messages').select('id, sender_id, receiver_id, content, read, created_at').or(`sender_id.eq.${uid},receiver_id.eq.${uid}`).order('created_at', { ascending: true })
 
@@ -162,7 +163,7 @@ export default function MessagesPage() {
     setShowMobileChat(true) // Switch to chat view on mobile
     const supabase = createClient()
     await supabase.from('messages').update({ read: true }).eq('sender_id', tid).eq('receiver_id', userId).eq('read', false)
-    setConvos(prev => prev.map(c => c.tenantId === tid ? { ...c, unread: 0, messages: c.messages.map(m => ({...m, read: true})) } : c))
+    setConvos(prev => prev.map(c => c.tenantId === tid ? { ...c, unread: 0, messages: c.messages.map(m => ({ ...m, read: true })) } : c))
   }
 
   async function sendMessage() {
@@ -298,7 +299,7 @@ export default function MessagesPage() {
       <div className={`sb-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
 
       <div className="shell">
-        <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
+        {/* <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="sb-logo"><div className="sb-logo-icon">🏘️</div><span className="sb-logo-name">Rentura</span></div>
           <nav className="sb-nav">
             <span className="sb-section">Overview</span>
@@ -325,6 +326,47 @@ export default function MessagesPage() {
               <div><div className="sb-uname">{fullName}</div><span className="sb-uplan">FREE</span></div>
             </div>
           </div>
+        </aside> */}
+
+        <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
+          <div className="sb-logo">
+            <div className="sb-logo-icon">
+              <Image
+                src="/icon.png"
+                alt="Rentura Logo"
+                width={24}
+                height={24}
+              />
+            </div>
+            <span className="sb-logo-name">Rentura</span>
+          </div>
+          <nav className="sb-nav">
+            <span className="sb-section">Overview</span>
+            <a href="/landlord" className="sb-item"><span className="sb-ico">⊞</span>Dashboard</a>
+            <a href="/landlord/properties" className="sb-item"><span className="sb-ico">🏠</span>Properties</a>
+            <a href="/landlord/tenants" className="sb-item"><span className="sb-ico">👥</span>Tenants</a>
+            <span className="sb-section">Finances</span>
+            <a href="/landlord/rent" className="sb-item"><span className="sb-ico">💰</span>Rent Tracker</a>
+            <a href="/landlord/reports" className="sb-item"><span className="sb-ico">📊</span>Reports</a>
+            <span className="sb-section">Management</span>
+            <a href="/landlord/maintenance" className="sb-item"><span className="sb-ico">🔧</span>Maintenance</a>
+            <a href="/landlord/documents" className="sb-item"><span className="sb-ico">📁</span>Documents</a>
+            <a href="/landlord/messages" className="sb-item active"><span className="sb-ico">💬</span>Messages</a>
+            <a href="/landlord/listings" className="sb-item"><span className="sb-ico">📋</span>Listings</a>
+            <span className="sb-section">Account</span>
+            <a href="/landlord/settings" className="sb-item"><span className="sb-ico">⚙️</span>Settings</a>
+          </nav>
+          <div className="sb-footer">
+            <div className="sb-upgrade">
+              <div className="sb-up-title">⭐ Upgrade to Pro</div>
+              <div className="sb-up-sub">Unlimited storage & e-signature support.</div>
+              <button className="sb-up-btn">See Plans →</button>
+            </div>
+            <div className="sb-user">
+              <div className="sb-av">{userInitials}</div>
+              <div><div className="sb-uname">{fullName}</div><span className="sb-uplan">FREE</span></div>
+            </div>
+          </div>
         </aside>
 
         <div className="main">
@@ -344,23 +386,23 @@ export default function MessagesPage() {
               </div>
               <div className="cl-items">
                 {loading ? (
-                  [1,2,3].map(i => (
-                    <div key={i} style={{padding:'13px 16px',display:'flex',gap:11,borderBottom:'1px solid #F8FAFC'}}>
-                      <div className="skeleton" style={{width:40,height:40,borderRadius:12,flexShrink:0}} />
-                      <div style={{flex:1}}><div className="skeleton" style={{height:12,width:'70%',marginBottom:7}} /><div className="skeleton" style={{height:10,width:'90%'}} /></div>
+                  [1, 2, 3].map(i => (
+                    <div key={i} style={{ padding: '13px 16px', display: 'flex', gap: 11, borderBottom: '1px solid #F8FAFC' }}>
+                      <div className="skeleton" style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0 }} />
+                      <div style={{ flex: 1 }}><div className="skeleton" style={{ height: 12, width: '70%', marginBottom: 7 }} /><div className="skeleton" style={{ height: 10, width: '90%' }} /></div>
                     </div>
                   ))
                 ) : convos.length === 0 ? (
-                  <div style={{padding:24,textAlign:'center',color:'#94A3B8',fontSize:13}}>No tenants found</div>
+                  <div style={{ padding: 24, textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>No tenants found</div>
                 ) : filteredConvos.map(c => (
                   <div key={c.tenantId} className={`convo-item${activeId === c.tenantId ? ' active' : ''}`} onClick={() => openConvo(c.tenantId)}>
-                    <div className="ci-av" style={{background:c.color}}>{c.initials}</div>
+                    <div className="ci-av" style={{ background: c.color }}>{c.initials}</div>
                     <div className="ci-body">
                       <div className="ci-top">
                         <span className="ci-name">{c.name}</span>
                         <span className="ci-time">{c.lastTime}</span>
                       </div>
-                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <span className="ci-preview">{c.lastMsg}</span>
                         {c.unread > 0 && <span className="ci-unread">{c.unread}</span>}
                       </div>
@@ -374,24 +416,24 @@ export default function MessagesPage() {
             <div className="chat-area">
               {!active ? (
                 <div className="empty-chat">
-                  <div style={{fontSize:40}}>💬</div>
-                  <div style={{fontWeight:700,color:'#0F172A'}}>Select a conversation</div>
-                  <div style={{fontSize:13,color:'#94A3B8'}}>Choose a tenant to start messaging</div>
+                  <div style={{ fontSize: 40 }}>💬</div>
+                  <div style={{ fontWeight: 700, color: '#0F172A' }}>Select a conversation</div>
+                  <div style={{ fontSize: 13, color: '#94A3B8' }}>Choose a tenant to start messaging</div>
                 </div>
               ) : (
                 <>
                   <div className="chat-head">
                     {/* BACK BUTTON FOR MOBILE */}
                     <button className="mobile-back" onClick={() => setShowMobileChat(false)}>←</button>
-                    <div className="ch-av" style={{background:active.color}}>{active.initials}</div>
-                    <div style={{flex:1}}>
+                    <div className="ch-av" style={{ background: active.color }}>{active.initials}</div>
+                    <div style={{ flex: 1 }}>
                       <div className="ch-name">{active.name}</div>
                       <div className="ch-sub">{active.property} · {active.unit}</div>
                     </div>
                   </div>
                   <div className="chat-messages">
                     {active.messages.length === 0 ? (
-                      <div style={{textAlign:'center',color:'#94A3B8',marginTop:40,fontSize:13}}>No messages yet. Say hello! 👋</div>
+                      <div style={{ textAlign: 'center', color: '#94A3B8', marginTop: 40, fontSize: 13 }}>No messages yet. Say hello! 👋</div>
                     ) : active.messages.map(m => (
                       <div key={m.id} className={`bubble-wrap ${m.from}`}>
                         <div className={`bubble ${m.from}`}>{m.content}</div>

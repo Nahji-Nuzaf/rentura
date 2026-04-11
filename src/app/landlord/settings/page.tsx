@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Image from 'next/image'
+import { profile } from 'console'
 
 type NotifSettings = { rent_due: boolean; maintenance: boolean; messages: boolean; lease_expiry: boolean }
 
@@ -343,7 +345,17 @@ export default function SettingsPage() {
 
       <div className="shell">
         <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
-          <div className="sb-logo"><div className="sb-logo-icon">🏘️</div><span className="sb-logo-name">Rentura</span></div>
+          <div className="sb-logo">
+            <div className="sb-logo-icon">
+              <Image
+                src="/icon.png"
+                alt="Rentura Logo"
+                width={24}
+                height={24}
+              />
+            </div>
+            <span className="sb-logo-name">Rentura</span>
+          </div>
           <nav className="sb-nav">
             <span className="sb-section">Overview</span>
             <a href="/landlord" className="sb-item"><span className="sb-ico">⊞</span>Dashboard</a>
@@ -369,8 +381,12 @@ export default function SettingsPage() {
               <div className="sb-up-sub">Unlimited properties & priority support.</div>
               <button className="sb-up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
             </div>
+            <div className="sb-user">
+              <div className="sb-av">{initials}</div>
+              <div><div className="sb-uname">{profile.full_name || 'User'}</div><span className="sb-uplan">FREE</span></div>
+            </div>
             {/* Role switcher */}
-            <div className="sb-role-wrap">
+            {/* <div className="sb-role-wrap">
               {rolePopoverOpen && (
                 <div className="role-popover">
                   <div className="rp-title">Switch Role</div>
@@ -397,7 +413,7 @@ export default function SettingsPage() {
                 </div>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2"><polyline points="7 15 12 20 17 15" /><polyline points="7 9 12 4 17 9" /></svg>
               </div>
-            </div>
+            </div> */}
           </div>
         </aside>
 

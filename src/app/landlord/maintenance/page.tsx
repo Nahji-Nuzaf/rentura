@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Image from 'next/image'
 
 type MRequest = {
   id: string
@@ -21,47 +22,47 @@ type MRequest = {
 }
 
 type PropertyOption = { id: string; name: string }
-type UnitOption    = { id: string; unit_number: string; property_id: string }
+type UnitOption = { id: string; unit_number: string; property_id: string }
 
 const PC = {
-  urgent: { label:'Urgent',  bg:'#FEE2E2', color:'#DC2626' },
-  high:   { label:'High',    bg:'#FEF3C7', color:'#D97706' },
-  medium: { label:'Medium',  bg:'#FEF9C3', color:'#CA8A04' },
-  low:    { label:'Low',     bg:'#DCFCE7', color:'#16A34A' },
+  urgent: { label: 'Urgent', bg: '#FEE2E2', color: '#DC2626' },
+  high: { label: 'High', bg: '#FEF3C7', color: '#D97706' },
+  medium: { label: 'Medium', bg: '#FEF9C3', color: '#CA8A04' },
+  low: { label: 'Low', bg: '#DCFCE7', color: '#16A34A' },
 }
 const SC = {
-  open:        { label:'Open',        bg:'#FEE2E2', color:'#DC2626' },
-  in_progress: { label:'In Progress', bg:'#EFF6FF', color:'#2563EB' },
-  resolved:    { label:'Resolved',    bg:'#DCFCE7', color:'#16A34A' },
+  open: { label: 'Open', bg: '#FEE2E2', color: '#DC2626' },
+  in_progress: { label: 'In Progress', bg: '#EFF6FF', color: '#2563EB' },
+  resolved: { label: 'Resolved', bg: '#DCFCE7', color: '#16A34A' },
 }
 
 function timeAgo(d: string) {
   const diff = Date.now() - new Date(d).getTime()
   const h = Math.floor(diff / 3600000), day = Math.floor(h / 24)
   if (day > 0) return `${day}d ago`
-  if (h > 0)   return `${h}h ago`
+  if (h > 0) return `${h}h ago`
   return 'Just now'
 }
 
 export default function MaintenancePage() {
   const router = useRouter()
-  const [userId, setUserId]           = useState('')
+  const [userId, setUserId] = useState('')
   const [userInitials, setUserInitials] = useState('NN')
-  const [fullName, setFullName]       = useState('User')
+  const [fullName, setFullName] = useState('User')
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [requests, setRequests]       = useState<MRequest[]>([])
-  const [loading, setLoading]         = useState(true)
-  const [selected, setSelected]       = useState<MRequest | null>(null)
-  const [sheetOpen, setSheetOpen]     = useState(false)
-  const [filter, setFilter]           = useState<'all'|'open'|'in_progress'|'resolved'>('all')
-  const [priFilter, setPriFilter]     = useState<'all'|'urgent'|'high'|'medium'|'low'>('all')
-  const [updating, setUpdating]       = useState<string | null>(null)
+  const [requests, setRequests] = useState<MRequest[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selected, setSelected] = useState<MRequest | null>(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [filter, setFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved'>('all')
+  const [priFilter, setPriFilter] = useState<'all' | 'urgent' | 'high' | 'medium' | 'low'>('all')
+  const [updating, setUpdating] = useState<string | null>(null)
 
   // Add form state
-  const [addOpen, setAddOpen]         = useState(false)
-  const [properties, setProperties]   = useState<PropertyOption[]>([])
-  const [allUnits, setAllUnits]       = useState<UnitOption[]>([])
-  const [submitting, setSubmitting]   = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
+  const [properties, setProperties] = useState<PropertyOption[]>([])
+  const [allUnits, setAllUnits] = useState<UnitOption[]>([])
+  const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState({
     title: '', description: '', priority: 'medium' as MRequest['priority'],
     property_id: '', unit_id: '', note: '',
@@ -74,16 +75,16 @@ export default function MaintenancePage() {
 
       const { data: props } = await sb.from('properties').select('id,name').eq('landlord_id', uid)
       const propIds = (props || []).map((p: any) => p.id)
-      const propNameMap: Record<string,string> = {}
-      ;(props || []).forEach((p: any) => { propNameMap[p.id] = p.name })
+      const propNameMap: Record<string, string> = {}
+        ; (props || []).forEach((p: any) => { propNameMap[p.id] = p.name })
       setProperties(props || [])
 
       if (!propIds.length) { setLoading(false); return }
 
       // flat units
       const { data: units } = await sb.from('units').select('id,unit_number,property_id').in('property_id', propIds)
-      const unitMap: Record<string,any> = {}
-      ;(units || []).forEach((u: any) => { unitMap[u.id] = u })
+      const unitMap: Record<string, any> = {}
+        ; (units || []).forEach((u: any) => { unitMap[u.id] = u })
       setAllUnits(units || [])
 
       // flat maintenance requests
@@ -96,15 +97,15 @@ export default function MaintenancePage() {
 
       // flat tenant → profile names
       const tenantIds = [...new Set((reqs || []).map((r: any) => r.tenant_id).filter(Boolean))]
-      const tenantNameMap: Record<string,string> = {}
+      const tenantNameMap: Record<string, string> = {}
       if (tenantIds.length) {
         const { data: tArr } = await sb.from('tenants').select('id,profile_id').in('id', tenantIds)
-        const pids = [...new Set((tArr||[]).map((t:any)=>t.profile_id).filter(Boolean))]
+        const pids = [...new Set((tArr || []).map((t: any) => t.profile_id).filter(Boolean))]
         if (pids.length) {
           const { data: pArr } = await sb.from('profiles').select('id,full_name').in('id', pids)
-          const pidMap: Record<string,string> = {}
-          ;(pArr||[]).forEach((p:any) => { pidMap[p.id] = p.full_name })
-          ;(tArr||[]).forEach((t:any) => { tenantNameMap[t.id] = pidMap[t.profile_id] || 'Unknown' })
+          const pidMap: Record<string, string> = {}
+            ; (pArr || []).forEach((p: any) => { pidMap[p.id] = p.full_name })
+            ; (tArr || []).forEach((t: any) => { tenantNameMap[t.id] = pidMap[t.profile_id] || 'Unknown' })
         }
       }
 
@@ -114,37 +115,37 @@ export default function MaintenancePage() {
         created_at: r.created_at, resolved_at: r.resolved_at,
         property_id: r.property_id, unit_id: r.unit_id, tenant_id: r.tenant_id,
         property_name: propNameMap[r.property_id] || '—',
-        unit_number:   unitMap[r.unit_id]?.unit_number || '—',
-        tenant_name:   r.tenant_id ? (tenantNameMap[r.tenant_id] || 'Unknown') : 'Landlord',
+        unit_number: unitMap[r.unit_id]?.unit_number || '—',
+        tenant_name: r.tenant_id ? (tenantNameMap[r.tenant_id] || 'Unknown') : 'Landlord',
       })))
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }
 
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       const sb = createClient()
       const { data: { user } } = await sb.auth.getUser()
       if (!user) { router.push('/login'); return }
       const name = user.user_metadata?.full_name || 'User'
       setFullName(name)
       setUserId(user.id)
-      setUserInitials(name.split(' ').map((n:string)=>n[0]).join('').toUpperCase().slice(0,2))
+      setUserInitials(name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2))
       await load(user.id)
     })()
   }, [router])
 
   const filtered = requests.filter(r => {
-    const sok = filter === 'all'    || r.status   === filter
+    const sok = filter === 'all' || r.status === filter
     const pok = priFilter === 'all' || r.priority === priFilter
     return sok && pok
   })
 
   const counts = {
     all: requests.length,
-    open:        requests.filter(r=>r.status==='open').length,
-    in_progress: requests.filter(r=>r.status==='in_progress').length,
-    resolved:    requests.filter(r=>r.status==='resolved').length,
+    open: requests.filter(r => r.status === 'open').length,
+    in_progress: requests.filter(r => r.status === 'in_progress').length,
+    resolved: requests.filter(r => r.status === 'resolved').length,
   }
 
   async function updateStatus(id: string, status: MRequest['status']) {
@@ -213,19 +214,19 @@ export default function MaintenancePage() {
       }
 
       const row: any = {
-        title:       form.title.trim(),
+        title: form.title.trim(),
         description: form.description.trim(),
-        priority:    form.priority,
-        status:      'open',
+        priority: form.priority,
+        status: 'open',
         property_id: form.property_id,
-        unit_id:     form.unit_id || null,
-        tenant_id:   resolvedTenantId,
+        unit_id: form.unit_id || null,
+        tenant_id: resolvedTenantId,
       }
       const { data, error } = await sb.from('maintenance_requests').insert(row).select().single()
       if (error) throw error
 
       const propName = properties.find(p => p.id === form.property_id)?.name || '—'
-      const unitNum  = allUnits.find(u => u.id === form.unit_id)?.unit_number || '—'
+      const unitNum = allUnits.find(u => u.id === form.unit_id)?.unit_number || '—'
       const newReq: MRequest = {
         ...row, id: data.id, created_at: data.created_at, resolved_at: null,
         property_name: propName, unit_number: unitNum,
@@ -233,7 +234,7 @@ export default function MaintenancePage() {
       }
       setRequests(prev => [newReq, ...prev])
       setAddOpen(false)
-      setForm({ title:'', description:'', priority:'medium', property_id:'', unit_id:'', note:'' })
+      setForm({ title: '', description: '', priority: 'medium', property_id: '', unit_id: '', note: '' })
     } catch (e: any) {
       console.error(e)
       alert('Failed to create: ' + (e?.message || 'Unknown error'))
@@ -245,54 +246,54 @@ export default function MaintenancePage() {
   function renderDetail(r: MRequest) {
     const pc = PC[r.priority], sc = SC[r.status]
     return (
-      <div style={{display:'flex',flexDirection:'column'}}>
-        <div style={{padding:'18px 20px',borderBottom:'1px solid #F1F5F9'}}>
-          <div style={{fontSize:15,fontWeight:700,color:'#0F172A',lineHeight:1.4,marginBottom:10}}>{r.title}</div>
-          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-            <span style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:11.5,fontWeight:700,borderRadius:99,padding:'3px 10px',background:pc.bg,color:pc.color}}>● {pc.label}</span>
-            <span style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:11.5,fontWeight:700,borderRadius:99,padding:'3px 10px',background:sc.bg,color:sc.color}}>{sc.label}</span>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '18px 20px', borderBottom: '1px solid #F1F5F9' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#0F172A', lineHeight: 1.4, marginBottom: 10 }}>{r.title}</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 700, borderRadius: 99, padding: '3px 10px', background: pc.bg, color: pc.color }}>● {pc.label}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 700, borderRadius: 99, padding: '3px 10px', background: sc.bg, color: sc.color }}>{sc.label}</span>
           </div>
         </div>
-        <div style={{padding:'16px 20px',display:'flex',flexDirection:'column',gap:14,flex:1}}>
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14, flex: 1 }}>
           <div>
-            <div style={{fontSize:10.5,fontWeight:700,textTransform:'uppercase',letterSpacing:'.6px',color:'#94A3B8',marginBottom:5}}>Description</div>
-            <div style={{fontSize:13.5,color:'#0F172A',fontWeight:500,lineHeight:1.6}}>{r.description || '—'}</div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: '#94A3B8', marginBottom: 5 }}>Description</div>
+            <div style={{ fontSize: 13.5, color: '#0F172A', fontWeight: 500, lineHeight: 1.6 }}>{r.description || '—'}</div>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-            {[{l:'Property',v:r.property_name},{l:'Unit',v:r.unit_number},{l:'Reported by',v:r.tenant_name},{l:'Submitted',v:timeAgo(r.created_at)}].map(({l,v})=>(
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {[{ l: 'Property', v: r.property_name }, { l: 'Unit', v: r.unit_number }, { l: 'Reported by', v: r.tenant_name }, { l: 'Submitted', v: timeAgo(r.created_at) }].map(({ l, v }) => (
               <div key={l}>
-                <div style={{fontSize:10.5,fontWeight:700,textTransform:'uppercase',letterSpacing:'.6px',color:'#94A3B8',marginBottom:4}}>{l}</div>
-                <div style={{fontSize:13,color:'#0F172A',fontWeight:500}}>{v}</div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: '#94A3B8', marginBottom: 4 }}>{l}</div>
+                <div style={{ fontSize: 13, color: '#0F172A', fontWeight: 500 }}>{v}</div>
               </div>
             ))}
           </div>
           {r.resolved_at && (
             <div>
-              <div style={{fontSize:10.5,fontWeight:700,textTransform:'uppercase',letterSpacing:'.6px',color:'#94A3B8',marginBottom:4}}>Resolved</div>
-              <div style={{fontSize:13,color:'#16A34A',fontWeight:600}}>{timeAgo(r.resolved_at)}</div>
+              <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: '#94A3B8', marginBottom: 4 }}>Resolved</div>
+              <div style={{ fontSize: 13, color: '#16A34A', fontWeight: 600 }}>{timeAgo(r.resolved_at)}</div>
             </div>
           )}
         </div>
-        <div style={{padding:'14px 20px',borderTop:'1px solid #F1F5F9',display:'flex',flexDirection:'column',gap:8}}>
+        <div style={{ padding: '14px 20px', borderTop: '1px solid #F1F5F9', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {r.status === 'resolved' ? (
-            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'10px',background:'#F0FDF4',borderRadius:10,fontSize:13,fontWeight:700,color:'#16A34A'}}>✅ Resolved</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px', background: '#F0FDF4', borderRadius: 10, fontSize: 13, fontWeight: 700, color: '#16A34A' }}>✅ Resolved</div>
           ) : (
             <>
               {r.status === 'open' && (
-                <button disabled={updating===r.id}
-                  onClick={() => updateStatus(r.id,'in_progress')}
-                  style={{width:'100%',padding:'10px',borderRadius:10,background:'#EFF6FF',color:'#2563EB',border:'1.5px solid #BFDBFE',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:"'Plus Jakarta Sans',sans-serif"}}>
-                  {updating===r.id?'Updating…':'🔵 Mark as In Progress'}
+                <button disabled={updating === r.id}
+                  onClick={() => updateStatus(r.id, 'in_progress')}
+                  style={{ width: '100%', padding: '10px', borderRadius: 10, background: '#EFF6FF', color: '#2563EB', border: '1.5px solid #BFDBFE', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
+                  {updating === r.id ? 'Updating…' : '🔵 Mark as In Progress'}
                 </button>
               )}
-              <button disabled={updating===r.id}
-                onClick={() => updateStatus(r.id,'resolved')}
-                style={{width:'100%',padding:'10px',borderRadius:10,background:'linear-gradient(135deg,#16A34A,#15803D)',color:'#fff',border:'none',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:"'Plus Jakarta Sans',sans-serif",boxShadow:'0 2px 8px rgba(22,163,74,.25)'}}>
-                {updating===r.id?'Updating…':'✅ Mark as Resolved'}
+              <button disabled={updating === r.id}
+                onClick={() => updateStatus(r.id, 'resolved')}
+                style={{ width: '100%', padding: '10px', borderRadius: 10, background: 'linear-gradient(135deg,#16A34A,#15803D)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif", boxShadow: '0 2px 8px rgba(22,163,74,.25)' }}>
+                {updating === r.id ? 'Updating…' : '✅ Mark as Resolved'}
               </button>
             </>
           )}
-          <a href="/landlord/messages" style={{width:'100%',padding:'10px',borderRadius:10,background:'#fff',color:'#475569',border:'1.5px solid #E2E8F0',fontSize:13,fontWeight:700,cursor:'pointer',textAlign:'center',textDecoration:'none',display:'block'}}>💬 Message Tenant</a>
+          <a href="/landlord/messages" style={{ width: '100%', padding: '10px', borderRadius: 10, background: '#fff', color: '#475569', border: '1.5px solid #E2E8F0', fontSize: 13, fontWeight: 700, cursor: 'pointer', textAlign: 'center', textDecoration: 'none', display: 'block' }}>💬 Message Tenant</a>
         </div>
       </div>
     )
@@ -465,10 +466,10 @@ export default function MaintenancePage() {
         }
       `}</style>
 
-      <div className={`sb-overlay${sidebarOpen?' open':''}`} onClick={() => setSidebarOpen(false)} />
+      <div className={`sb-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
 
       {/* Add Request Modal */}
-      <div className={`modal-bg${addOpen?' open':''}`} onClick={() => setAddOpen(false)}>
+      <div className={`modal-bg${addOpen ? ' open' : ''}`} onClick={() => setAddOpen(false)}>
         <div className="modal" onClick={e => e.stopPropagation()}>
           <div className="modal-head">
             <div className="modal-title">🔧 New Request</div>
@@ -478,13 +479,13 @@ export default function MaintenancePage() {
             <div className="form-group">
               <label className="form-label">Title *</label>
               <input className="form-input" placeholder="e.g. Broken pipe in kitchen"
-                value={form.title} onChange={e => setForm(f=>({...f,title:e.target.value}))} />
+                value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
             </div>
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Property *</label>
                 <select className="form-input" value={form.property_id}
-                  onChange={e => setForm(f=>({...f,property_id:e.target.value,unit_id:''}))}>
+                  onChange={e => setForm(f => ({ ...f, property_id: e.target.value, unit_id: '' }))}>
                   <option value="">Select property</option>
                   {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
@@ -492,7 +493,7 @@ export default function MaintenancePage() {
               <div className="form-group">
                 <label className="form-label">Unit</label>
                 <select className="form-input" value={form.unit_id}
-                  onChange={e => setForm(f=>({...f,unit_id:e.target.value}))}
+                  onChange={e => setForm(f => ({ ...f, unit_id: e.target.value }))}
                   disabled={!form.property_id}>
                   <option value="">Select unit</option>
                   {unitsForProp.map(u => <option key={u.id} value={u.id}>{u.unit_number}</option>)}
@@ -502,10 +503,10 @@ export default function MaintenancePage() {
             <div className="form-group">
               <label className="form-label">Priority</label>
               <div className="priority-pills">
-                {(['urgent','high','medium','low'] as const).map(p => (
-                  <button key={p} className={`ppill${form.priority===p?' sel':''}`}
-                    style={{background:PC[p].bg,color:PC[p].color}}
-                    onClick={() => setForm(f=>({...f,priority:p}))}>
+                {(['urgent', 'high', 'medium', 'low'] as const).map(p => (
+                  <button key={p} className={`ppill${form.priority === p ? ' sel' : ''}`}
+                    style={{ background: PC[p].bg, color: PC[p].color }}
+                    onClick={() => setForm(f => ({ ...f, priority: p }))}>
                     {PC[p].label}
                   </button>
                 ))}
@@ -514,7 +515,7 @@ export default function MaintenancePage() {
             <div className="form-group">
               <label className="form-label">Description</label>
               <textarea className="form-textarea" placeholder="Describe the issue in detail…"
-                value={form.description} onChange={e => setForm(f=>({...f,description:e.target.value}))} />
+                value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
             </div>
           </div>
           <div className="modal-footer">
@@ -528,16 +529,23 @@ export default function MaintenancePage() {
       </div>
 
       {/* Mobile detail sheet */}
-      <div className={`sheet-bg${sheetOpen?' open':''}`} onClick={() => setSheetOpen(false)} />
-      <div className={`sheet${sheetOpen&&selected?' open':''}`}>
+      <div className={`sheet-bg${sheetOpen ? ' open' : ''}`} onClick={() => setSheetOpen(false)} />
+      <div className={`sheet${sheetOpen && selected ? ' open' : ''}`}>
         <div className="sheet-handle" />
         {selected && renderDetail(selected)}
       </div>
 
       <div className="shell">
-        <aside className={`sidebar${sidebarOpen?' open':''}`}>
+        <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="sb-logo">
-            <div className="sb-logo-icon">🏘️</div>
+            <div className="sb-logo-icon">
+              <Image
+                src="/icon.png"
+                alt="Rentura Logo"
+                width={24}
+                height={24}
+              />
+            </div>
             <span className="sb-logo-name">Rentura</span>
           </div>
           <nav className="sb-nav">
@@ -549,7 +557,7 @@ export default function MaintenancePage() {
             <a href="/landlord/rent" className="sb-item"><span className="sb-ico">💰</span>Rent Tracker</a>
             <a href="/landlord/reports" className="sb-item"><span className="sb-ico">📊</span>Reports</a>
             <span className="sb-section">Management</span>
-            <a href="/landlord/maintenance" className="sb-item active"><span className="sb-ico">🔧</span>Maintenance{counts.open>0&&<span className="sb-badge">{counts.open}</span>}</a>
+            <a href="/landlord/maintenance" className="sb-item active"><span className="sb-ico">🔧</span>Maintenance{counts.open > 0 && <span className="sb-badge">{counts.open}</span>}</a>
             <a href="/landlord/documents" className="sb-item"><span className="sb-ico">📁</span>Documents</a>
             <a href="/landlord/messages" className="sb-item"><span className="sb-ico">💬</span>Messages</a>
             <a href="/landlord/listings" className="sb-item"><span className="sb-ico">📋</span>Listings</a>
@@ -579,20 +587,20 @@ export default function MaintenancePage() {
           </div>
 
           <div className="content">
-            <div style={{marginBottom:18}}>
-              <div style={{fontFamily:"'Fraunces',serif",fontSize:26,fontWeight:400,color:'#0F172A',letterSpacing:'-.5px',marginBottom:3}}>Maintenance</div>
-              <div style={{fontSize:13,color:'#94A3B8'}}>Track and manage repair requests across all your properties</div>
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontFamily: "'Fraunces',serif", fontSize: 26, fontWeight: 400, color: '#0F172A', letterSpacing: '-.5px', marginBottom: 3 }}>Maintenance</div>
+              <div style={{ fontSize: 13, color: '#94A3B8' }}>Track and manage repair requests across all your properties</div>
             </div>
 
             <div className="stat-strip">
               {[
-                {ico:'🔧',bg:'#F1F5F9',num:counts.all,        lbl:'Total Requests'},
-                {ico:'🚨',bg:'#FEE2E2',num:counts.open,       lbl:'Open'},
-                {ico:'⚙️',bg:'#EFF6FF',num:counts.in_progress,lbl:'In Progress'},
-                {ico:'✅',bg:'#DCFCE7',num:counts.resolved,   lbl:'Resolved'},
-              ].map(s=>(
+                { ico: '🔧', bg: '#F1F5F9', num: counts.all, lbl: 'Total Requests' },
+                { ico: '🚨', bg: '#FEE2E2', num: counts.open, lbl: 'Open' },
+                { ico: '⚙️', bg: '#EFF6FF', num: counts.in_progress, lbl: 'In Progress' },
+                { ico: '✅', bg: '#DCFCE7', num: counts.resolved, lbl: 'Resolved' },
+              ].map(s => (
                 <div key={s.lbl} className="sstat">
-                  <div className="sstat-ico" style={{background:s.bg}}>{s.ico}</div>
+                  <div className="sstat-ico" style={{ background: s.bg }}>{s.ico}</div>
                   <div>
                     <div className="sstat-num">{s.num}</div>
                     <div className="sstat-lbl">{s.lbl}</div>
@@ -603,15 +611,15 @@ export default function MaintenancePage() {
 
             <div className="filter-bar">
               <div className="filter-tabs">
-                {(['all','open','in_progress','resolved'] as const).map(f=>(
-                  <button key={f} className={`ftab${filter===f?' active':''}`} onClick={()=>setFilter(f)}>
-                    {{all:'All',open:'Open',in_progress:'In Progress',resolved:'Resolved'}[f]}
+                {(['all', 'open', 'in_progress', 'resolved'] as const).map(f => (
+                  <button key={f} className={`ftab${filter === f ? ' active' : ''}`} onClick={() => setFilter(f)}>
+                    {{ all: 'All', open: 'Open', in_progress: 'In Progress', resolved: 'Resolved' }[f]}
                     <span className="fc">{counts[f]}</span>
                   </button>
                 ))}
               </div>
               <select className="priority-select" value={priFilter}
-                onChange={e=>setPriFilter(e.target.value as typeof priFilter)}>
+                onChange={e => setPriFilter(e.target.value as typeof priFilter)}>
                 <option value="all">All Priorities</option>
                 <option value="urgent">🔴 Urgent</option>
                 <option value="high">🟡 High</option>
@@ -623,31 +631,31 @@ export default function MaintenancePage() {
             <div className="mlayout">
               <div className="req-list">
                 {loading ? (
-                  [1,2,3].map(i=>(
+                  [1, 2, 3].map(i => (
                     <div key={i} className="skel-card">
-                      <div className="skeleton" style={{height:16,width:'70%'}} />
-                      <div className="skeleton" style={{height:12,width:'40%'}} />
-                      <div className="skeleton" style={{height:36}} />
-                      <div className="skeleton" style={{height:12,width:'30%'}} />
+                      <div className="skeleton" style={{ height: 16, width: '70%' }} />
+                      <div className="skeleton" style={{ height: 12, width: '40%' }} />
+                      <div className="skeleton" style={{ height: 36 }} />
+                      <div className="skeleton" style={{ height: 12, width: '30%' }} />
                     </div>
                   ))
-                ) : filtered.length===0 ? (
+                ) : filtered.length === 0 ? (
                   <div className="empty-state">
-                    <div className="e-ico">{counts.all===0?'🎉':'🔍'}</div>
-                    <div className="e-title">{counts.all===0?'No maintenance requests':'No requests match filters'}</div>
-                    <div className="e-sub">{counts.all===0?'Click "New Request" to log an issue':'Try changing your filters'}</div>
+                    <div className="e-ico">{counts.all === 0 ? '🎉' : '🔍'}</div>
+                    <div className="e-title">{counts.all === 0 ? 'No maintenance requests' : 'No requests match filters'}</div>
+                    <div className="e-sub">{counts.all === 0 ? 'Click "New Request" to log an issue' : 'Try changing your filters'}</div>
                   </div>
-                ) : filtered.map(req=>{
-                  const pc=PC[req.priority], sc=SC[req.status]
+                ) : filtered.map(req => {
+                  const pc = PC[req.priority], sc = SC[req.status]
                   return (
                     <div key={req.id}
-                      className={`req-card${selected?.id===req.id?' sel':''}${req.priority==='urgent'?' urg':''}`}
-                      onClick={()=>openDetail(req)}>
+                      className={`req-card${selected?.id === req.id ? ' sel' : ''}${req.priority === 'urgent' ? ' urg' : ''}`}
+                      onClick={() => openDetail(req)}>
                       <div className="req-top">
                         <div className="req-title">{req.title}</div>
                         <div className="req-badges">
-                          <span className="badge" style={{background:pc.bg,color:pc.color}}>● {pc.label}</span>
-                          <span className="badge" style={{background:sc.bg,color:sc.color}}>{sc.label}</span>
+                          <span className="badge" style={{ background: pc.bg, color: pc.color }}>● {pc.label}</span>
+                          <span className="badge" style={{ background: sc.bg, color: sc.color }}>{sc.label}</span>
                         </div>
                       </div>
                       <div className="req-meta">
@@ -658,21 +666,21 @@ export default function MaintenancePage() {
                       {req.description && <div className="req-desc">{req.description}</div>}
                       <div className="req-footer">
                         <span className="req-time">🕐 {timeAgo(req.created_at)}</span>
-                        <div className="req-actions" onClick={e=>e.stopPropagation()}>
-                          {req.status==='open' && (
-                            <button className="act-btn" disabled={updating===req.id}
-                              onClick={()=>updateStatus(req.id,'in_progress')}>
-                              {updating===req.id?'…':'Start'}
+                        <div className="req-actions" onClick={e => e.stopPropagation()}>
+                          {req.status === 'open' && (
+                            <button className="act-btn" disabled={updating === req.id}
+                              onClick={() => updateStatus(req.id, 'in_progress')}>
+                              {updating === req.id ? '…' : 'Start'}
                             </button>
                           )}
-                          {req.status!=='resolved' && (
-                            <button className="act-btn green" disabled={updating===req.id}
-                              onClick={()=>updateStatus(req.id,'resolved')}>
-                              {updating===req.id?'…':'✓ Resolve'}
+                          {req.status !== 'resolved' && (
+                            <button className="act-btn green" disabled={updating === req.id}
+                              onClick={() => updateStatus(req.id, 'resolved')}>
+                              {updating === req.id ? '…' : '✓ Resolve'}
                             </button>
                           )}
-                          {req.status==='resolved' && (
-                            <span style={{fontSize:12,color:'#16A34A',fontWeight:600}}>✓ Done</span>
+                          {req.status === 'resolved' && (
+                            <span style={{ fontSize: 12, color: '#16A34A', fontWeight: 600 }}>✓ Done</span>
                           )}
                         </div>
                       </div>
@@ -683,7 +691,7 @@ export default function MaintenancePage() {
 
               <div className="detail-panel">
                 {!selected
-                  ? <div className="no-sel"><div className="no-sel-ico">🔧</div><div className="no-sel-txt">Select a request<br/>to view full details</div></div>
+                  ? <div className="no-sel"><div className="no-sel-ico">🔧</div><div className="no-sel-txt">Select a request<br />to view full details</div></div>
                   : renderDetail(selected)
                 }
               </div>

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Image from 'next/image'
 
 type Listing = {
   id: string
@@ -23,52 +24,52 @@ type Listing = {
 }
 
 type PropertyOption = { id: string; name: string; city?: string; type?: string }
-type UnitOption    = { id: string; unit_number: string; monthly_rent: number }
+type UnitOption = { id: string; unit_number: string; monthly_rent: number }
 
-const STATUS_CFG: Record<string,{label:string,bg:string,color:string}> = {
-  active:  { label:'Active',  bg:'#DCFCE7', color:'#16A34A' },
-  draft:   { label:'Draft',   bg:'#F1F5F9', color:'#64748B' },
-  pending: { label:'Pending', bg:'#FEF3C7', color:'#D97706' },
-  taken:   { label:'Taken',   bg:'#EFF6FF', color:'#2563EB' },
+const STATUS_CFG: Record<string, { label: string, bg: string, color: string }> = {
+  active: { label: 'Active', bg: '#DCFCE7', color: '#16A34A' },
+  draft: { label: 'Draft', bg: '#F1F5F9', color: '#64748B' },
+  pending: { label: 'Pending', bg: '#FEF3C7', color: '#D97706' },
+  taken: { label: 'Taken', bg: '#EFF6FF', color: '#2563EB' },
 }
 
 function fmtDate(s: string) {
   if (!s) return ''
-  return new Date(s).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})
+  return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 export default function ListingsPage() {
   const router = useRouter()
   const photoInputRef = useRef<HTMLInputElement>(null)
   const [userInitials, setUserInitials] = useState('NN')
-  const [fullName, setFullName]         = useState('User')
-  const [userId, setUserId]             = useState('')
-  const [sidebarOpen, setSidebarOpen]   = useState(false)
-  const [listings, setListings]         = useState<Listing[]>([])
-  const [loading, setLoading]           = useState(true)
-  const [saving, setSaving]             = useState(false)
-  const [filter, setFilter]             = useState<'all'|'active'|'pending'|'taken'|'draft'>('all')
-  const [drawer, setDrawer]             = useState<'add'|'edit'|null>(null)
+  const [fullName, setFullName] = useState('User')
+  const [userId, setUserId] = useState('')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [listings, setListings] = useState<Listing[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [filter, setFilter] = useState<'all' | 'active' | 'pending' | 'taken' | 'draft'>('all')
+  const [drawer, setDrawer] = useState<'add' | 'edit' | null>(null)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
-  const [editing, setEditing]           = useState<Listing|null>(null)
-  const [deleteId, setDeleteId]         = useState<string|null>(null)
-  const [properties, setProperties]     = useState<PropertyOption[]>([])
-  const [units, setUnits]               = useState<UnitOption[]>([])
-  const [propMap, setPropMap]           = useState<Record<string,string>>({})
-  const [unitMap, setUnitMap]           = useState<Record<string,string>>({})
-  const [shareId, setShareId]           = useState<string|null>(null)
-  const [shareCopied, setShareCopied]   = useState(false)
+  const [editing, setEditing] = useState<Listing | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [properties, setProperties] = useState<PropertyOption[]>([])
+  const [units, setUnits] = useState<UnitOption[]>([])
+  const [propMap, setPropMap] = useState<Record<string, string>>({})
+  const [unitMap, setUnitMap] = useState<Record<string, string>>({})
+  const [shareId, setShareId] = useState<string | null>(null)
+  const [shareCopied, setShareCopied] = useState(false)
 
   // Photo state
-  const [photoFiles, setPhotoFiles]         = useState<File[]>([])
-  const [photoPreviews, setPhotoPreviews]   = useState<string[]>([])
+  const [photoFiles, setPhotoFiles] = useState<File[]>([])
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
   const [existingPhotos, setExistingPhotos] = useState<string[]>([])
   const [uploadingPhotos, setUploadingPhotos] = useState(false)
 
   // AI writer state
-  const [aiLoading, setAiLoading]   = useState(false)
-  const [aiError, setAiError]       = useState('')
-  const [aiSuccess, setAiSuccess]   = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState('')
+  const [aiSuccess, setAiSuccess] = useState(false)
 
   const [form, setForm] = useState({
     title: '', description: '', property_id: '', unit_id: '',
@@ -83,16 +84,16 @@ export default function ListingsPage() {
       const sb = createClient()
       const { data: props } = await sb.from('properties').select('id,name,city,type').eq('landlord_id', uid)
       setProperties(props || [])
-      const pm: Record<string,string> = {}
-      ;(props||[]).forEach((p:any)=>{ pm[p.id]=p.name })
+      const pm: Record<string, string> = {}
+        ; (props || []).forEach((p: any) => { pm[p.id] = p.name })
       setPropMap(pm)
-      const propIds = (props||[]).map((p:any)=>p.id)
+      const propIds = (props || []).map((p: any) => p.id)
       if (!propIds.length) { setListings([]); setLoading(false); return }
 
       const { data: unitsData } = await sb
         .from('units').select('id,unit_number,property_id,monthly_rent').in('property_id', propIds)
-      const um: Record<string,string> = {}
-      ;(unitsData||[]).forEach((u:any)=>{ um[u.id]=u.unit_number })
+      const um: Record<string, string> = {}
+        ; (unitsData || []).forEach((u: any) => { um[u.id] = u.unit_number })
       setUnitMap(um)
 
       const { data, error } = await sb
@@ -102,36 +103,36 @@ export default function ListingsPage() {
         .order('created_at', { ascending: false })
       if (error) throw error
 
-      setListings((data||[]).map((row:any)=>({
-        id: row.id, title: row.title||'Untitled', description: row.description||'',
-        property_id: row.property_id||'', unit_id: row.unit_id||'',
-        property: pm[row.property_id]||'—', unit: um[row.unit_id]||'—',
-        bedrooms: row.bedrooms||0, bathrooms: row.bathrooms||1,
-        rent_amount: row.rent_amount||0, currency: row.currency||'USD',
-        available_from: row.available_from||'', status: row.status||'draft',
-        photos: row.photos||[], created_at: row.created_at||'',
+      setListings((data || []).map((row: any) => ({
+        id: row.id, title: row.title || 'Untitled', description: row.description || '',
+        property_id: row.property_id || '', unit_id: row.unit_id || '',
+        property: pm[row.property_id] || '—', unit: um[row.unit_id] || '—',
+        bedrooms: row.bedrooms || 0, bathrooms: row.bathrooms || 1,
+        rent_amount: row.rent_amount || 0, currency: row.currency || 'USD',
+        available_from: row.available_from || '', status: row.status || 'draft',
+        photos: row.photos || [], created_at: row.created_at || '',
       })))
-    } catch(e:any) { console.error(e?.message) }
+    } catch (e: any) { console.error(e?.message) }
     finally { setLoading(false) }
   }
 
-  useEffect(()=>{
-    ;(async()=>{
+  useEffect(() => {
+    ; (async () => {
       const sb = createClient()
-      const { data:{user} } = await sb.auth.getUser()
+      const { data: { user } } = await sb.auth.getUser()
       if (!user) { router.push('/login'); return }
-      const name = user.user_metadata?.full_name||'User'
+      const name = user.user_metadata?.full_name || 'User'
       setFullName(name); setUserId(user.id)
-      setUserInitials(name.split(' ').map((n:string)=>n[0]).join('').toUpperCase().slice(0,2))
+      setUserInitials(name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2))
       await loadAll(user.id)
     })()
-  },[router])
+  }, [router])
 
   async function loadUnitsForProperty(propId: string) {
     if (!propId) { setUnits([]); return }
     const sb = createClient()
     const { data } = await sb.from('units').select('id,unit_number,monthly_rent').eq('property_id', propId)
-    setUnits(data||[])
+    setUnits(data || [])
   }
 
   // ── AI LISTING WRITER ─────────────────────────────────────
@@ -144,12 +145,12 @@ export default function ListingsPage() {
     const propName = prop?.name || 'Property'
     const propCity = prop?.city || ''
     const propType = prop?.type || 'residential'
-    const unitNum  = unit?.unit_number || ''
-    const beds  = form.bedrooms || '1'
+    const unitNum = unit?.unit_number || ''
+    const beds = form.bedrooms || '1'
     const baths = form.bathrooms || '1'
-    const rent  = form.rent_amount || '0'
+    const rent = form.rent_amount || '0'
     const avail = form.available_from
-      ? new Date(form.available_from).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})
+      ? new Date(form.available_from).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
       : 'immediately'
 
     const prompt = `You are a professional real estate copywriter. Write a compelling rental listing for the following property.
@@ -207,7 +208,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
 
   // ── PHOTO HANDLING ────────────────────────────────────────
   function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files||[])
+    const files = Array.from(e.target.files || [])
     if (!files.length) return
     const combined = [...photoFiles, ...files].slice(0, 8)
     setPhotoFiles(combined)
@@ -216,13 +217,13 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
   }
 
   function removeNewPhoto(idx: number) {
-    const nf = photoFiles.filter((_,i)=>i!==idx)
+    const nf = photoFiles.filter((_, i) => i !== idx)
     setPhotoFiles(nf)
-    setPhotoPreviews(nf.map(f=>URL.createObjectURL(f)))
+    setPhotoPreviews(nf.map(f => URL.createObjectURL(f)))
   }
 
   function removeExistingPhoto(url: string) {
-    setExistingPhotos(prev=>prev.filter(u=>u!==url))
+    setExistingPhotos(prev => prev.filter(u => u !== url))
   }
 
   async function uploadPhotos(): Promise<string[]> {
@@ -230,7 +231,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
     const sb = createClient()
     const urls: string[] = []
     for (const file of photoFiles) {
-      const ext  = file.name.split('.').pop()
+      const ext = file.name.split('.').pop()
       const path = `${userId}/listings/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
       const { error } = await sb.storage.from('documents').upload(path, file)
       if (error) { console.error('Photo upload error:', error); continue }
@@ -242,7 +243,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
 
   // ── SAVE ─────────────────────────────────────────────────
   async function handleSave() {
-    if (!form.title||!form.property_id) { alert('Please fill in title and property.'); return }
+    if (!form.title || !form.property_id) { alert('Please fill in title and property.'); return }
     const totalPhotos = existingPhotos.length + photoFiles.length
     if (totalPhotos < 4) { alert('Please add at least 4 photos to your listing.'); return }
     setSaving(true); setUploadingPhotos(true)
@@ -253,19 +254,19 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
       const allPhotos = [...existingPhotos, ...newUrls]
       const payload: any = {
         landlord_id: userId,
-        property_id: form.property_id||null,
-        unit_id:     form.unit_id||null,
-        title:       form.title,
+        property_id: form.property_id || null,
+        unit_id: form.unit_id || null,
+        title: form.title,
         description: form.description,
-        bedrooms:    parseInt(form.bedrooms)||0,
-        bathrooms:   parseInt(form.bathrooms)||1,
-        rent_amount: parseFloat(form.rent_amount)||0,
-        currency:    'USD',
-        available_from: form.available_from||null,
-        status:      form.status,
-        photos:      allPhotos,
+        bedrooms: parseInt(form.bedrooms) || 0,
+        bathrooms: parseInt(form.bathrooms) || 1,
+        rent_amount: parseFloat(form.rent_amount) || 0,
+        currency: 'USD',
+        available_from: form.available_from || null,
+        status: form.status,
+        photos: allPhotos,
       }
-      if (drawer==='add') {
+      if (drawer === 'add') {
         const { error } = await sb.from('listings').insert(payload)
         if (error) throw error
       } else if (editing) {
@@ -274,7 +275,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
       }
       await loadAll(userId)
       setDrawer(null); setPhotoFiles([]); setPhotoPreviews([]); setExistingPhotos([])
-    } catch(e:any) { alert('Error: '+(e?.message||'Failed to save')) }
+    } catch (e: any) { alert('Error: ' + (e?.message || 'Failed to save')) }
     finally { setSaving(false); setUploadingPhotos(false) }
   }
 
@@ -283,22 +284,24 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
     try {
       const sb = createClient()
       await sb.from('listings').delete().eq('id', deleteId)
-      setListings(prev=>prev.filter(l=>l.id!==deleteId))
-    } catch(e:any) { console.error(e?.message) }
+      setListings(prev => prev.filter(l => l.id !== deleteId))
+    } catch (e: any) { console.error(e?.message) }
     finally { setDeleteId(null) }
   }
 
   async function toggleStatus(id: string, status: Listing['status']) {
     const sb = createClient()
-    await sb.from('listings').update({status}).eq('id', id)
-    setListings(prev=>prev.map(l=>l.id===id?{...l,status}:l))
+    await sb.from('listings').update({ status }).eq('id', id)
+    setListings(prev => prev.map(l => l.id === id ? { ...l, status } : l))
   }
 
   function openAdd() {
-    const activeCount = listings.filter(l=>l.status==='active').length
+    const activeCount = listings.filter(l => l.status === 'active').length
     if (activeCount >= 2) { setShowUpgradeModal(true); return }
-    setForm({title:'',description:'',property_id:properties[0]?.id||'',unit_id:'',
-      bedrooms:'1',bathrooms:'1',rent_amount:'',available_from:'',status:'draft'})
+    setForm({
+      title: '', description: '', property_id: properties[0]?.id || '', unit_id: '',
+      bedrooms: '1', bathrooms: '1', rent_amount: '', available_from: '', status: 'draft'
+    })
     if (properties[0]?.id) loadUnitsForProperty(properties[0].id)
     setPhotoFiles([]); setPhotoPreviews([]); setExistingPhotos([])
     setAiError(''); setAiSuccess(false)
@@ -306,11 +309,13 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
   }
 
   function openEdit(l: Listing) {
-    setForm({title:l.title,description:l.description,property_id:l.property_id,
-      unit_id:l.unit_id,bedrooms:String(l.bedrooms),bathrooms:String(l.bathrooms),
-      rent_amount:String(l.rent_amount),available_from:l.available_from,status:l.status})
+    setForm({
+      title: l.title, description: l.description, property_id: l.property_id,
+      unit_id: l.unit_id, bedrooms: String(l.bedrooms), bathrooms: String(l.bathrooms),
+      rent_amount: String(l.rent_amount), available_from: l.available_from, status: l.status
+    })
     loadUnitsForProperty(l.property_id)
-    setPhotoFiles([]); setPhotoPreviews([]); setExistingPhotos(l.photos||[])
+    setPhotoFiles([]); setPhotoPreviews([]); setExistingPhotos(l.photos || [])
     setAiError(''); setAiSuccess(false)
     setEditing(l); setDrawer('edit')
   }
@@ -324,17 +329,17 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
     try {
       await navigator.clipboard.writeText(getShareUrl(id))
       setShareCopied(true)
-      setTimeout(()=>setShareCopied(false), 2500)
+      setTimeout(() => setShareCopied(false), 2500)
     } catch { }
   }
 
-  const filtered = listings.filter(l=>filter==='all'||l.status===filter)
-  const counts: Record<string,number> = {
-    all:listings.length,
-    active:listings.filter(l=>l.status==='active').length,
-    draft:listings.filter(l=>l.status==='draft').length,
-    pending:listings.filter(l=>l.status==='pending').length,
-    taken:listings.filter(l=>l.status==='taken').length,
+  const filtered = listings.filter(l => filter === 'all' || l.status === filter)
+  const counts: Record<string, number> = {
+    all: listings.length,
+    active: listings.filter(l => l.status === 'active').length,
+    draft: listings.filter(l => l.status === 'draft').length,
+    pending: listings.filter(l => l.status === 'pending').length,
+    taken: listings.filter(l => l.status === 'taken').length,
   }
   const totalPhotosInForm = existingPhotos.length + photoFiles.length
 
@@ -515,52 +520,52 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
       `}</style>
 
       {/* Share Modal */}
-      <div className={`share-modal-bg${shareId?' open':''}`} onClick={()=>setShareId(null)}>
-        <div className="share-modal" onClick={e=>e.stopPropagation()}>
+      <div className={`share-modal-bg${shareId ? ' open' : ''}`} onClick={() => setShareId(null)}>
+        <div className="share-modal" onClick={e => e.stopPropagation()}>
           <div className="share-title">🔗 Share Listing</div>
           <div className="share-sub">Share this listing with potential tenants</div>
           <div className="share-url-box">
-            <input className="share-url-input" readOnly value={shareId?getShareUrl(shareId):''} />
-            <button className={`share-copy-btn${shareCopied?' copied':''}`} onClick={()=>shareId&&copyShareUrl(shareId)}>
-              {shareCopied?'✓ Copied!':'Copy'}
+            <input className="share-url-input" readOnly value={shareId ? getShareUrl(shareId) : ''} />
+            <button className={`share-copy-btn${shareCopied ? ' copied' : ''}`} onClick={() => shareId && copyShareUrl(shareId)}>
+              {shareCopied ? '✓ Copied!' : 'Copy'}
             </button>
           </div>
           <div className="share-socials">
-            <button className="share-soc-btn" onClick={()=>{if(shareId)window.open(`https://wa.me/?text=${encodeURIComponent('Check out this rental listing: '+getShareUrl(shareId))}`)}}>💬 WhatsApp</button>
-            <button className="share-soc-btn" onClick={()=>{if(shareId)window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getShareUrl(shareId))}`)}}>📘 Facebook</button>
-            <button className="share-soc-btn" onClick={()=>{if(shareId)window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent('🏠 Rental available!')}&url=${encodeURIComponent(getShareUrl(shareId))}`)}}>🐦 Twitter / X</button>
-            <button className="share-soc-btn" onClick={()=>{if(shareId)window.open(`mailto:?subject=Rental Listing&body=${encodeURIComponent('Check out this rental listing: '+getShareUrl(shareId))}`)}}>📧 Email</button>
+            <button className="share-soc-btn" onClick={() => { if (shareId) window.open(`https://wa.me/?text=${encodeURIComponent('Check out this rental listing: ' + getShareUrl(shareId))}`) }}>💬 WhatsApp</button>
+            <button className="share-soc-btn" onClick={() => { if (shareId) window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getShareUrl(shareId))}`) }}>📘 Facebook</button>
+            <button className="share-soc-btn" onClick={() => { if (shareId) window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent('🏠 Rental available!')}&url=${encodeURIComponent(getShareUrl(shareId))}`) }}>🐦 Twitter / X</button>
+            <button className="share-soc-btn" onClick={() => { if (shareId) window.open(`mailto:?subject=Rental Listing&body=${encodeURIComponent('Check out this rental listing: ' + getShareUrl(shareId))}`) }}>📧 Email</button>
           </div>
-          <button className="share-close-btn" onClick={()=>setShareId(null)}>Close</button>
+          <button className="share-close-btn" onClick={() => setShareId(null)}>Close</button>
         </div>
       </div>
 
       {/* Drawer */}
-      <div className={`drawer-overlay${drawer?' open':''}`} onClick={()=>setDrawer(null)} />
-      <div className={`drawer${drawer?' open':''}`}>
+      <div className={`drawer-overlay${drawer ? ' open' : ''}`} onClick={() => setDrawer(null)} />
+      <div className={`drawer${drawer ? ' open' : ''}`}>
         <div className="dr-head">
           <span className="dr-title">
-            {drawer==='add'?'New Listing':'Edit Listing'}
+            {drawer === 'add' ? 'New Listing' : 'Edit Listing'}
             <span className="ai-badge">✨ AI</span>
           </span>
-          <button className="dr-close" onClick={()=>setDrawer(null)}>✕</button>
+          <button className="dr-close" onClick={() => setDrawer(null)}>✕</button>
         </div>
         <div className="dr-body">
 
           {/* ── AI WRITER ── */}
-          <div style={{background:'linear-gradient(135deg,rgba(124,58,237,.06),rgba(37,99,235,.06))',border:'1.5px solid rgba(124,58,237,.15)',borderRadius:14,padding:'14px 16px',marginBottom:18}}>
-            <div style={{fontSize:13,fontWeight:700,color:'#4C1D95',marginBottom:4,display:'flex',alignItems:'center',gap:6}}>
+          <div style={{ background: 'linear-gradient(135deg,rgba(124,58,237,.06),rgba(37,99,235,.06))', border: '1.5px solid rgba(124,58,237,.15)', borderRadius: 14, padding: '14px 16px', marginBottom: 18 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#4C1D95', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
               ✨ AI Listing Writer
-              <span style={{fontSize:10,fontWeight:600,color:'#7C3AED',background:'rgba(124,58,237,.1)',padding:'1px 7px',borderRadius:99}}>Beta</span>
+              <span style={{ fontSize: 10, fontWeight: 600, color: '#7C3AED', background: 'rgba(124,58,237,.1)', padding: '1px 7px', borderRadius: 99 }}>Beta</span>
             </div>
-            <div style={{fontSize:12,color:'#64748B',marginBottom:10,lineHeight:1.5}}>
+            <div style={{ fontSize: 12, color: '#64748B', marginBottom: 10, lineHeight: 1.5 }}>
               Fill in property, bedrooms, bathrooms & rent — then let AI generate a professional title and description instantly.
             </div>
             <button
               className="ai-btn"
               disabled={aiLoading || !form.property_id}
               onClick={handleAiWrite}>
-              {aiLoading && <span className="ai-btn-shimmer"/>}
+              {aiLoading && <span className="ai-btn-shimmer" />}
               {aiLoading ? '✨ Writing your listing...' : '✨ Generate with AI'}
             </button>
             {aiSuccess && (
@@ -572,84 +577,84 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
           </div>
 
           {/* Photos */}
-          <div style={{marginBottom:16}}>
+          <div style={{ marginBottom: 16 }}>
             <div className="photo-section-label">
               <span>Photos</span>
-              <span className={`photo-req${totalPhotosInForm>=4?' ok':''}`}>
-                {totalPhotosInForm}/4 min {totalPhotosInForm>=4?'✓':''}
+              <span className={`photo-req${totalPhotosInForm >= 4 ? ' ok' : ''}`}>
+                {totalPhotosInForm}/4 min {totalPhotosInForm >= 4 ? '✓' : ''}
               </span>
             </div>
             {totalPhotosInForm > 0 && (
               <div className="photo-grid">
-                {existingPhotos.map((url,i)=>(
+                {existingPhotos.map((url, i) => (
                   <div key={`ex-${i}`} className="photo-thumb">
                     <img src={url} alt="" />
-                    <button className="photo-thumb-del" onClick={()=>removeExistingPhoto(url)}>✕</button>
+                    <button className="photo-thumb-del" onClick={() => removeExistingPhoto(url)}>✕</button>
                   </div>
                 ))}
-                {photoPreviews.map((url,i)=>(
+                {photoPreviews.map((url, i) => (
                   <div key={`nw-${i}`} className="photo-thumb">
                     <img src={url} alt="" />
-                    <button className="photo-thumb-del" onClick={()=>removeNewPhoto(i)}>✕</button>
+                    <button className="photo-thumb-del" onClick={() => removeNewPhoto(i)}>✕</button>
                   </div>
                 ))}
               </div>
             )}
             {totalPhotosInForm < 8 && (
-              <div className="photo-upload-zone" onClick={()=>photoInputRef.current?.click()}>
-                📷 {totalPhotosInForm===0?'Click to add photos (min 4 required)':'Add more photos'}
-                <div style={{fontSize:11,marginTop:3,color:'#94A3B8'}}>{8-totalPhotosInForm} slot{8-totalPhotosInForm!==1?'s':''} remaining · JPG, PNG</div>
+              <div className="photo-upload-zone" onClick={() => photoInputRef.current?.click()}>
+                📷 {totalPhotosInForm === 0 ? 'Click to add photos (min 4 required)' : 'Add more photos'}
+                <div style={{ fontSize: 11, marginTop: 3, color: '#94A3B8' }}>{8 - totalPhotosInForm} slot{8 - totalPhotosInForm !== 1 ? 's' : ''} remaining · JPG, PNG</div>
               </div>
             )}
-            <input ref={photoInputRef} type="file" accept="image/*" multiple style={{display:'none'}} onChange={handlePhotoSelect} />
+            <input ref={photoInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handlePhotoSelect} />
             {totalPhotosInForm > 0 && totalPhotosInForm < 4 && (
-              <div className="photo-warn">⚠️ Add {4-totalPhotosInForm} more photo{4-totalPhotosInForm!==1?'s':''} to publish</div>
+              <div className="photo-warn">⚠️ Add {4 - totalPhotosInForm} more photo{4 - totalPhotosInForm !== 1 ? 's' : ''} to publish</div>
             )}
           </div>
 
           <div className="field">
             <label>Property *</label>
-            <select value={form.property_id} onChange={e=>{
-              setForm(f=>({...f,property_id:e.target.value,unit_id:''}))
+            <select value={form.property_id} onChange={e => {
+              setForm(f => ({ ...f, property_id: e.target.value, unit_id: '' }))
               loadUnitsForProperty(e.target.value)
             }}>
               <option value="">Select property</option>
-              {properties.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+              {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
           <div className="field">
             <label>Unit</label>
-            <select value={form.unit_id} onChange={e=>{
-              const u = units.find(u=>u.id===e.target.value)
-              setForm(f=>({...f,unit_id:e.target.value,rent_amount:u?String(u.monthly_rent):f.rent_amount}))
+            <select value={form.unit_id} onChange={e => {
+              const u = units.find(u => u.id === e.target.value)
+              setForm(f => ({ ...f, unit_id: e.target.value, rent_amount: u ? String(u.monthly_rent) : f.rent_amount }))
             }}>
               <option value="">Select unit (optional)</option>
-              {units.map(u=><option key={u.id} value={u.id}>{u.unit_number} — ${u.monthly_rent}/mo</option>)}
+              {units.map(u => <option key={u.id} value={u.id}>{u.unit_number} — ${u.monthly_rent}/mo</option>)}
             </select>
           </div>
           <div className="field-row">
             <div className="field">
               <label>Bedrooms</label>
-              <input type="number" min="0" value={form.bedrooms} onChange={e=>setForm(f=>({...f,bedrooms:e.target.value}))} />
+              <input type="number" min="0" value={form.bedrooms} onChange={e => setForm(f => ({ ...f, bedrooms: e.target.value }))} />
             </div>
             <div className="field">
               <label>Bathrooms</label>
-              <input type="number" min="1" value={form.bathrooms} onChange={e=>setForm(f=>({...f,bathrooms:e.target.value}))} />
+              <input type="number" min="1" value={form.bathrooms} onChange={e => setForm(f => ({ ...f, bathrooms: e.target.value }))} />
             </div>
           </div>
           <div className="field-row">
             <div className="field">
               <label>Rent / Month ($)</label>
-              <input type="number" value={form.rent_amount} onChange={e=>setForm(f=>({...f,rent_amount:e.target.value}))} placeholder="0" />
+              <input type="number" value={form.rent_amount} onChange={e => setForm(f => ({ ...f, rent_amount: e.target.value }))} placeholder="0" />
             </div>
             <div className="field">
               <label>Available From</label>
-              <input type="date" value={form.available_from} onChange={e=>setForm(f=>({...f,available_from:e.target.value}))} />
+              <input type="date" value={form.available_from} onChange={e => setForm(f => ({ ...f, available_from: e.target.value }))} />
             </div>
           </div>
           <div className="field">
             <label>Status</label>
-            <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value as Listing['status']}))}>
+            <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as Listing['status'] }))}>
               <option value="active">Active</option>
               <option value="draft">Draft</option>
               <option value="pending">Pending</option>
@@ -658,48 +663,58 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
           </div>
 
           {/* Title + Description AFTER AI can fill them */}
-          <div style={{borderTop:'1px solid #F1F5F9',paddingTop:14,marginTop:4}}>
-            <div style={{fontSize:11.5,fontWeight:700,color:'#374151',textTransform:'uppercase',letterSpacing:'.4px',marginBottom:12,display:'flex',alignItems:'center',gap:6}}>
+          <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: 14, marginTop: 4 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
               Content
-              {aiSuccess && <span style={{fontSize:10,fontWeight:700,color:'#7C3AED',background:'rgba(124,58,237,.1)',padding:'1px 7px',borderRadius:99}}>✨ AI Generated</span>}
+              {aiSuccess && <span style={{ fontSize: 10, fontWeight: 700, color: '#7C3AED', background: 'rgba(124,58,237,.1)', padding: '1px 7px', borderRadius: 99 }}>✨ AI Generated</span>}
             </div>
             <div className="field">
               <label>Title *</label>
-              <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="e.g. Bright 2BR in Colombo 03" />
+              <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Bright 2BR in Colombo 03" />
             </div>
             <div className="field">
               <label>Description</label>
-              <textarea value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} placeholder="Describe the property — or use AI to generate above..." style={{minHeight:110}} />
+              <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Describe the property — or use AI to generate above..." style={{ minHeight: 110 }} />
             </div>
           </div>
 
         </div>
         <div className="dr-footer">
-          <button className="dr-cancel" onClick={()=>setDrawer(null)}>Cancel</button>
+          <button className="dr-cancel" onClick={() => setDrawer(null)}>Cancel</button>
           <button className="dr-save" disabled={saving} onClick={handleSave}>
-            {uploadingPhotos?'⬆ Uploading…':saving?'Saving…':drawer==='add'?'Create Listing':'Save Changes'}
+            {uploadingPhotos ? '⬆ Uploading…' : saving ? 'Saving…' : drawer === 'add' ? 'Create Listing' : 'Save Changes'}
           </button>
         </div>
       </div>
 
       {/* Delete confirm */}
-      <div className={`del-overlay${deleteId?' open':''}`}>
+      <div className={`del-overlay${deleteId ? ' open' : ''}`}>
         <div className="del-box">
           <div className="del-ico">🗑️</div>
           <div className="del-title">Delete Listing?</div>
           <div className="del-sub">This will permanently remove the listing.</div>
           <div className="del-actions">
-            <button className="del-cancel" onClick={()=>setDeleteId(null)}>Cancel</button>
+            <button className="del-cancel" onClick={() => setDeleteId(null)}>Cancel</button>
             <button className="del-confirm" onClick={handleDelete}>Delete</button>
           </div>
         </div>
       </div>
 
-      <div className={`sb-overlay${sidebarOpen?' open':''}`} onClick={()=>setSidebarOpen(false)} />
+      <div className={`sb-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
 
       <div className="shell">
-        <aside className={`sidebar${sidebarOpen?' open':''}`}>
-          <div className="sb-logo"><div className="sb-logo-icon">🏘️</div><span className="sb-logo-name">Rentura</span></div>
+        <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
+          <div className="sb-logo">
+            <div className="sb-logo-icon">
+              <Image
+                src="/icon.png"
+                alt="Rentura Logo"
+                width={24}
+                height={24}
+              />
+            </div>
+            <span className="sb-logo-name">Rentura</span>
+          </div>
           <nav className="sb-nav">
             <span className="sb-section">Overview</span>
             <a href="/landlord" className="sb-item"><span className="sb-ico">⊞</span>Dashboard</a>
@@ -720,7 +735,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
             <div className="sb-upgrade">
               <div className="sb-up-title">⭐ Upgrade to Pro</div>
               <div className="sb-up-sub">Unlimited listings & AI features.</div>
-              <button className="sb-up-btn" onClick={()=>window.location.href='/landlord/upgrade'}>See Plans →</button>
+              <button className="sb-up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
             </div>
             <div className="sb-user">
               <div className="sb-av">{userInitials}</div>
@@ -732,28 +747,28 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
         <div className="main">
           <div className="topbar">
             <div className="tb-left">
-              <button className="hamburger" onClick={()=>setSidebarOpen(true)}>☰</button>
+              <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
               <div className="breadcrumb">Rentura &nbsp;/&nbsp; <b>Listings</b></div>
             </div>
             <button className="btn-primary" onClick={openAdd}>+ New Listing</button>
           </div>
 
           <div className="content">
-            <div style={{marginBottom:16}}>
-              <div style={{fontFamily:"'Fraunces',serif",fontSize:26,fontWeight:400,color:'#0F172A',letterSpacing:'-.5px',marginBottom:3}}>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontFamily: "'Fraunces',serif", fontSize: 26, fontWeight: 400, color: '#0F172A', letterSpacing: '-.5px', marginBottom: 3 }}>
                 Listings
                 <span className="ai-badge">✨ AI</span>
               </div>
-              <div style={{fontSize:13,color:'#94A3B8'}}>{counts.all} listing{counts.all!==1?'s':''} · {counts.active} active · AI-powered descriptions available</div>
+              <div style={{ fontSize: 13, color: '#94A3B8' }}>{counts.all} listing{counts.all !== 1 ? 's' : ''} · {counts.active} active · AI-powered descriptions available</div>
             </div>
 
             <div className="stat-strip">
-              {[{ico:'📋',bg:'#EFF6FF',n:counts.all,l:'Total'},
-                {ico:'✅',bg:'#DCFCE7',n:counts.active,l:'Active'},
-                {ico:'📝',bg:'#FEF3C7',n:counts.draft,l:'Drafts'},
-                {ico:'🔑',bg:'#F0FDF4',n:counts.taken,l:'Taken'}].map(s=>(
+              {[{ ico: '📋', bg: '#EFF6FF', n: counts.all, l: 'Total' },
+              { ico: '✅', bg: '#DCFCE7', n: counts.active, l: 'Active' },
+              { ico: '📝', bg: '#FEF3C7', n: counts.draft, l: 'Drafts' },
+              { ico: '🔑', bg: '#F0FDF4', n: counts.taken, l: 'Taken' }].map(s => (
                 <div key={s.l} className="sstat">
-                  <div className="sstat-ico" style={{background:s.bg}}>{s.ico}</div>
+                  <div className="sstat-ico" style={{ background: s.bg }}>{s.ico}</div>
                   <div><div className="sstat-num">{s.n}</div><div className="sstat-lbl">{s.l}</div></div>
                 </div>
               ))}
@@ -761,9 +776,9 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
 
             <div className="filter-row-wrap">
               <div className="filter-tabs">
-                {(['all','active','draft','pending','taken'] as const).map(f=>(
-                  <button key={f} className={`ftab${filter===f?' active':''}`} onClick={()=>setFilter(f)}>
-                    {f.charAt(0).toUpperCase()+f.slice(1)}<span className="fc">{counts[f]}</span>
+                {(['all', 'active', 'draft', 'pending', 'taken'] as const).map(f => (
+                  <button key={f} className={`ftab${filter === f ? ' active' : ''}`} onClick={() => setFilter(f)}>
+                    {f.charAt(0).toUpperCase() + f.slice(1)}<span className="fc">{counts[f]}</span>
                   </button>
                 ))}
               </div>
@@ -771,28 +786,28 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
 
             {loading ? (
               <div className="listing-grid">
-                {[1,2,3].map(i=>(
+                {[1, 2, 3].map(i => (
                   <div key={i} className="listing-card">
-                    <div className="skeleton" style={{height:160}} />
-                    <div style={{padding:16,display:'flex',flexDirection:'column',gap:8}}>
-                      <div className="skeleton" style={{height:14,width:'80%'}} />
-                      <div className="skeleton" style={{height:11,width:'55%'}} />
-                      <div className="skeleton" style={{height:20,width:'40%'}} />
+                    <div className="skeleton" style={{ height: 160 }} />
+                    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div className="skeleton" style={{ height: 14, width: '80%' }} />
+                      <div className="skeleton" style={{ height: 11, width: '55%' }} />
+                      <div className="skeleton" style={{ height: 20, width: '40%' }} />
                     </div>
                   </div>
                 ))}
               </div>
-            ) : filtered.length===0 ? (
+            ) : filtered.length === 0 ? (
               <div className="empty-state">
                 <div className="e-ico">📋</div>
-                <div className="e-title">{filter==='all'?'No listings yet':`No ${filter} listings`}</div>
+                <div className="e-title">{filter === 'all' ? 'No listings yet' : `No ${filter} listings`}</div>
                 <div className="e-sub">Create your first listing — use AI to write the perfect description.</div>
-                {filter==='all'&&<button className="btn-primary" style={{margin:'0 auto'}} onClick={openAdd}>+ New Listing</button>}
+                {filter === 'all' && <button className="btn-primary" style={{ margin: '0 auto' }} onClick={openAdd}>+ New Listing</button>}
               </div>
             ) : (
               <div className="listing-grid">
-                {filtered.map((l)=>{
-                  const sc = STATUS_CFG[l.status]||STATUS_CFG.draft
+                {filtered.map((l) => {
+                  const sc = STATUS_CFG[l.status] || STATUS_CFG.draft
                   const hasPhotos = l.photos && l.photos.length > 0
                   return (
                     <div key={l.id} className="listing-card">
@@ -804,27 +819,27 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
                         {hasPhotos && l.photos.length > 1 && (
                           <div className="lc-photo-count">📷 {l.photos.length} photos</div>
                         )}
-                        <span className="lc-status" style={{background:sc.bg,color:sc.color}}>● {sc.label}</span>
+                        <span className="lc-status" style={{ background: sc.bg, color: sc.color }}>● {sc.label}</span>
                       </div>
                       <div className="lc-body">
                         <div className="lc-title">{l.title}</div>
-                        <div className="lc-sub">📍 {l.property}{l.unit!=='—'?` · ${l.unit}`:''}</div>
-                        <div className="lc-price">${l.rent_amount.toLocaleString()}<span style={{fontSize:12,fontFamily:'Plus Jakarta Sans',fontWeight:500,color:'#94A3B8'}}>/mo</span></div>
+                        <div className="lc-sub">📍 {l.property}{l.unit !== '—' ? ` · ${l.unit}` : ''}</div>
+                        <div className="lc-price">${l.rent_amount.toLocaleString()}<span style={{ fontSize: 12, fontFamily: 'Plus Jakarta Sans', fontWeight: 500, color: '#94A3B8' }}>/mo</span></div>
                         <div className="lc-facts">
-                          {l.bedrooms>0&&<span className="lc-fact">🛏 {l.bedrooms} bed</span>}
+                          {l.bedrooms > 0 && <span className="lc-fact">🛏 {l.bedrooms} bed</span>}
                           <span className="lc-fact">🚿 {l.bathrooms} bath</span>
-                          {l.available_from&&<span className="lc-fact">📅 {fmtDate(l.available_from)}</span>}
+                          {l.available_from && <span className="lc-fact">📅 {fmtDate(l.available_from)}</span>}
                         </div>
-                        {l.description&&<div className="lc-desc">{l.description}</div>}
+                        {l.description && <div className="lc-desc">{l.description}</div>}
                       </div>
                       <div className="lc-footer">
-                        <button className="lf-btn" onClick={()=>openEdit(l)}>✏️ Edit</button>
-                        {l.status==='draft'&&<button className="lf-btn lf-btn-green" onClick={()=>toggleStatus(l.id,'active')}>▶ Publish</button>}
-                        {l.status==='active'&&<button className="lf-btn" onClick={()=>toggleStatus(l.id,'pending')}>⏸ Pause</button>}
-                        {l.status==='pending'&&<button className="lf-btn lf-btn-green" onClick={()=>toggleStatus(l.id,'active')}>▶ Resume</button>}
-                        {l.status==='taken'&&<button className="lf-btn lf-btn-green" onClick={()=>toggleStatus(l.id,'active')}>▶ Re-list</button>}
-                        <button className="lf-btn lf-btn-share" onClick={()=>{setShareId(l.id);setShareCopied(false)}}>🔗 Share</button>
-                        <button className="lf-btn lf-btn-red" onClick={()=>setDeleteId(l.id)}>🗑️</button>
+                        <button className="lf-btn" onClick={() => openEdit(l)}>✏️ Edit</button>
+                        {l.status === 'draft' && <button className="lf-btn lf-btn-green" onClick={() => toggleStatus(l.id, 'active')}>▶ Publish</button>}
+                        {l.status === 'active' && <button className="lf-btn" onClick={() => toggleStatus(l.id, 'pending')}>⏸ Pause</button>}
+                        {l.status === 'pending' && <button className="lf-btn lf-btn-green" onClick={() => toggleStatus(l.id, 'active')}>▶ Resume</button>}
+                        {l.status === 'taken' && <button className="lf-btn lf-btn-green" onClick={() => toggleStatus(l.id, 'active')}>▶ Re-list</button>}
+                        <button className="lf-btn lf-btn-share" onClick={() => { setShareId(l.id); setShareCopied(false) }}>🔗 Share</button>
+                        <button className="lf-btn lf-btn-red" onClick={() => setDeleteId(l.id)}>🗑️</button>
                       </div>
                     </div>
                   )
@@ -835,20 +850,20 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
         </div>
       </div>
 
-      {showUpgradeModal&&(
-        <div className="umodal-overlay" onClick={()=>setShowUpgradeModal(false)}>
-          <div className="umodal" onClick={e=>e.stopPropagation()}>
+      {showUpgradeModal && (
+        <div className="umodal-overlay" onClick={() => setShowUpgradeModal(false)}>
+          <div className="umodal" onClick={e => e.stopPropagation()}>
             <div className="umodal-icon">📋</div>
             <div className="umodal-title">Unlock More Listings</div>
             <div className="umodal-sub">You've reached the Free plan limit of 2 active listings. Upgrade to Pro for unlimited.</div>
             <div className="umodal-limit">⚠️ Free plan: 2 active listings max</div>
             <div className="umodal-features">
-              {['Unlimited active listings','AI listing writer (unlimited use)','Featured listing placement','Advanced analytics & reports'].map(f=>(
-                <div key={f} className="umodal-feat"><span style={{color:'#16A34A'}}>✓</span>{f}</div>
+              {['Unlimited active listings', 'AI listing writer (unlimited use)', 'Featured listing placement', 'Advanced analytics & reports'].map(f => (
+                <div key={f} className="umodal-feat"><span style={{ color: '#16A34A' }}>✓</span>{f}</div>
               ))}
             </div>
-            <button className="umodal-btn-pro" onClick={()=>{setShowUpgradeModal(false);window.location.href='/landlord/upgrade'}}>⭐ Upgrade to Pro →</button>
-            <button className="umodal-btn-cancel" onClick={()=>setShowUpgradeModal(false)}>Maybe later</button>
+            <button className="umodal-btn-pro" onClick={() => { setShowUpgradeModal(false); window.location.href = '/landlord/upgrade' }}>⭐ Upgrade to Pro →</button>
+            <button className="umodal-btn-cancel" onClick={() => setShowUpgradeModal(false)}>Maybe later</button>
           </div>
         </div>
       )}

@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Image from 'next/image'
 
 type Doc = {
   id: string
@@ -17,13 +18,13 @@ type Doc = {
 }
 
 const TYPE_CFG = {
-  lease:      { label:'Lease',      ico:'📄', bg:'#EFF6FF', color:'#2563EB' },
-  invoice:    { label:'Invoice',    ico:'🧾', bg:'#F0FDF4', color:'#16A34A' },
-  notice:     { label:'Notice',     ico:'📢', bg:'#FEF3C7', color:'#D97706' },
-  contract:   { label:'Contract',   ico:'📋', bg:'#F5F3FF', color:'#7C3AED' },
-  inspection: { label:'Inspection', ico:'🔍', bg:'#FFF7ED', color:'#EA580C' },
-  insurance:  { label:'Insurance',  ico:'🛡️', bg:'#F0FDF4', color:'#15803D' },
-  other:      { label:'Other',      ico:'📁', bg:'#F1F5F9', color:'#64748B' },
+  lease: { label: 'Lease', ico: '📄', bg: '#EFF6FF', color: '#2563EB' },
+  invoice: { label: 'Invoice', ico: '🧾', bg: '#F0FDF4', color: '#16A34A' },
+  notice: { label: 'Notice', ico: '📢', bg: '#FEF3C7', color: '#D97706' },
+  contract: { label: 'Contract', ico: '📋', bg: '#F5F3FF', color: '#7C3AED' },
+  inspection: { label: 'Inspection', ico: '🔍', bg: '#FFF7ED', color: '#EA580C' },
+  insurance: { label: 'Insurance', ico: '🛡️', bg: '#F0FDF4', color: '#15803D' },
+  other: { label: 'Other', ico: '📁', bg: '#F1F5F9', color: '#64748B' },
 }
 
 function fmtSize(bytes: number | null) {
@@ -34,29 +35,29 @@ function fmtSize(bytes: number | null) {
 }
 
 function fmtDate(str: string) {
-  return new Date(str).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' })
+  return new Date(str).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 export default function DocumentsPage() {
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
   const [userInitials, setUserInitials] = useState('NN')
-  const [fullName, setFullName]         = useState('User')
-  const [userId, setUserId]             = useState('')
-  const [sidebarOpen, setSidebarOpen]   = useState(false)
-  const [docs, setDocs]                 = useState<Doc[]>([])
-  const [loading, setLoading]           = useState(true)
-  const [filter, setFilter]             = useState<'all' | Doc['type']>('all')
-  const [search, setSearch]             = useState('')
-  const [deleteId, setDeleteId]         = useState<string | null>(null)
-  const [deleting, setDeleting]         = useState(false)
-  const [uploadOpen, setUploadOpen]     = useState(false)
-  const [uploading, setUploading]       = useState(false)
-  const [uploadErr, setUploadErr]       = useState<string | null>(null)
+  const [fullName, setFullName] = useState('User')
+  const [userId, setUserId] = useState('')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [docs, setDocs] = useState<Doc[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<'all' | Doc['type']>('all')
+  const [search, setSearch] = useState('')
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [uploadOpen, setUploadOpen] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadErr, setUploadErr] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [properties, setProperties]     = useState<{id:string,name:string}[]>([])
-  const [tenants, setTenants]           = useState<{id:string,name:string}[]>([])
-  const [isPro, setIsPro]               = useState(false)
+  const [properties, setProperties] = useState<{ id: string, name: string }[]>([])
+  const [tenants, setTenants] = useState<{ id: string, name: string }[]>([])
+  const [isPro, setIsPro] = useState(false)
   const FREE_DOC_LIMIT = 5
   const [form, setForm] = useState({
     name: '', type: 'lease' as Doc['type'],
@@ -74,7 +75,7 @@ export default function DocumentsPage() {
         const name = user.user_metadata?.full_name || 'User'
         setFullName(name)
         setUserId(user.id)
-        setUserInitials(name.split(' ').map((n:string) => n[0]).join('').toUpperCase().slice(0,2))
+        setUserInitials(name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2))
 
         // Check subscription plan
         const { data: sub } = await supabase
@@ -86,18 +87,18 @@ export default function DocumentsPage() {
           .from('properties').select('id, name').eq('landlord_id', user.id)
         setProperties(props || [])
 
-        const propIds = (props || []).map((p:any) => p.id)
+        const propIds = (props || []).map((p: any) => p.id)
 
         // Load tenants for upload form (flat - no nested joins)
         if (propIds.length > 0) {
           const { data: tns } = await supabase
-            .from('tenants').select('id, profile_id').in('property_id', propIds).eq('status','active')
-          const tpids = [...new Set((tns||[]).map((t:any)=>t.profile_id).filter(Boolean))]
+            .from('tenants').select('id, profile_id').in('property_id', propIds).eq('status', 'active')
+          const tpids = [...new Set((tns || []).map((t: any) => t.profile_id).filter(Boolean))]
           if (tpids.length) {
             const { data: profs } = await supabase.from('profiles').select('id,full_name').in('id', tpids)
-            const profMap: Record<string,string> = {}
-            ;(profs||[]).forEach((p:any) => { profMap[p.id] = p.full_name })
-            setTenants((tns||[]).map((t:any) => ({ id: t.id, name: profMap[t.profile_id] || 'Unknown' })))
+            const profMap: Record<string, string> = {}
+              ; (profs || []).forEach((p: any) => { profMap[p.id] = p.full_name })
+            setTenants((tns || []).map((t: any) => ({ id: t.id, name: profMap[t.profile_id] || 'Unknown' })))
           }
         }
 
@@ -112,29 +113,29 @@ export default function DocumentsPage() {
         if (error) throw error
 
         // flat prop name lookup
-        const propNameMap: Record<string,string> = {}
-        ;(props||[]).forEach((p:any) => { propNameMap[p.id] = p.name })
+        const propNameMap: Record<string, string> = {}
+          ; (props || []).forEach((p: any) => { propNameMap[p.id] = p.name })
 
         // flat tenant→profile name lookup for docs
-        const docTenantIds = [...new Set((rawDocs||[]).map((d:any)=>d.tenant_id).filter(Boolean))]
-        const docTenantNameMap: Record<string,string> = {}
+        const docTenantIds = [...new Set((rawDocs || []).map((d: any) => d.tenant_id).filter(Boolean))]
+        const docTenantNameMap: Record<string, string> = {}
         if (docTenantIds.length) {
           const { data: dtArr } = await supabase.from('tenants').select('id,profile_id').in('id', docTenantIds)
-          const dpids = [...new Set((dtArr||[]).map((t:any)=>t.profile_id).filter(Boolean))]
+          const dpids = [...new Set((dtArr || []).map((t: any) => t.profile_id).filter(Boolean))]
           if (dpids.length) {
             const { data: dpArr } = await supabase.from('profiles').select('id,full_name').in('id', dpids)
-            const dpMap: Record<string,string> = {}
-            ;(dpArr||[]).forEach((p:any) => { dpMap[p.id] = p.full_name })
-            ;(dtArr||[]).forEach((t:any) => { docTenantNameMap[t.id] = dpMap[t.profile_id] || 'Unknown' })
+            const dpMap: Record<string, string> = {}
+              ; (dpArr || []).forEach((p: any) => { dpMap[p.id] = p.full_name })
+              ; (dtArr || []).forEach((t: any) => { docTenantNameMap[t.id] = dpMap[t.profile_id] || 'Unknown' })
           }
         }
 
-        const shaped: Doc[] = (rawDocs||[]).map((d:any) => ({
-          id:            d.id, name: d.name, type: d.type || 'other',
-          file_url:      d.file_url, file_size: d.file_size,
-          shared_with:   d.shared_with, created_at: d.created_at,
+        const shaped: Doc[] = (rawDocs || []).map((d: any) => ({
+          id: d.id, name: d.name, type: d.type || 'other',
+          file_url: d.file_url, file_size: d.file_size,
+          shared_with: d.shared_with, created_at: d.created_at,
           property_name: propNameMap[d.property_id] || '—',
-          tenant_name:   docTenantNameMap[d.tenant_id] || '—',
+          tenant_name: docTenantNameMap[d.tenant_id] || '—',
         }))
         setDocs(shaped)
       } catch (err) {
@@ -147,7 +148,7 @@ export default function DocumentsPage() {
   }, [router])
 
   const filtered = docs.filter(d => {
-    const typeOk   = filter === 'all' || d.type === filter
+    const typeOk = filter === 'all' || d.type === filter
     const searchOk = search === '' ||
       d.name.toLowerCase().includes(search.toLowerCase()) ||
       d.property_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -174,44 +175,44 @@ export default function DocumentsPage() {
 
       // Upload file to Supabase Storage if one is selected
       if (selectedFile) {
-        const ext  = selectedFile.name.split('.').pop()
+        const ext = selectedFile.name.split('.').pop()
         const path = `${userId}/${Date.now()}.${ext}`
         const { error: uploadError } = await supabase.storage
           .from('documents')
           .upload(path, selectedFile)
         if (uploadError) throw new Error(uploadError.message)
         const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
-        file_url  = urlData.publicUrl
+        file_url = urlData.publicUrl
         file_size = selectedFile.size
       }
 
       const payload: any = {
-        owner_id:  userId,
-        name:      form.name.trim(),
-        type:      form.type,
+        owner_id: userId,
+        name: form.name.trim(),
+        type: form.type,
         file_url: file_url || '',
         file_size,
         shared_with: [],
       }
       if (form.property_id) payload.property_id = form.property_id
-      if (form.tenant_id)   payload.tenant_id   = form.tenant_id
+      if (form.tenant_id) payload.tenant_id = form.tenant_id
 
       const { data: newDoc, error: dbErr } = await supabase
         .from('documents').insert(payload).select().single()
       if (dbErr) throw new Error(dbErr.message)
 
       const propName = properties.find(p => p.id === form.property_id)?.name || '—'
-      const tenName  = tenants.find(t => t.id === form.tenant_id)?.name || '—'
+      const tenName = tenants.find(t => t.id === form.tenant_id)?.name || '—'
 
       setDocs(prev => [{
         ...newDoc,
         property_name: propName,
-        tenant_name:   tenName,
+        tenant_name: tenName,
       }, ...prev])
 
       setUploadOpen(false)
       setSelectedFile(null)
-      setForm({ name:'', type:'lease', property_id:'', tenant_id:'' })
+      setForm({ name: '', type: 'lease', property_id: '', tenant_id: '' })
     } catch (err: any) {
       setUploadErr(err?.message || 'Upload failed. Please try again.')
     } finally {
@@ -438,7 +439,7 @@ export default function DocumentsPage() {
               ? `✅ ${selectedFile.name} (${fmtSize(selectedFile.size)})`
               : '📎 Click to select a file\nPDF, DOCX, PNG — max 10MB'}
           </div>
-          <input ref={fileRef} type="file" style={{display:'none'}}
+          <input ref={fileRef} type="file" style={{ display: 'none' }}
             accept=".pdf,.docx,.doc,.png,.jpg,.jpeg"
             onChange={e => {
               const f = e.target.files?.[0]
@@ -477,7 +478,7 @@ export default function DocumentsPage() {
           </div>
 
           <div className="field">
-            <label>Tenant <span style={{color:'#94A3B8',fontWeight:400}}>(optional)</span></label>
+            <label>Tenant <span style={{ color: '#94A3B8', fontWeight: 400 }}>(optional)</span></label>
             <select value={form.tenant_id} onChange={e => setForm(f => ({ ...f, tenant_id: e.target.value }))}>
               <option value="">— None —</option>
               {tenants.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -512,7 +513,17 @@ export default function DocumentsPage() {
 
       <div className="shell">
         <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
-          <div className="sb-logo"><div className="sb-logo-icon">🏘️</div><span className="sb-logo-name">Rentura</span></div>
+          <div className="sb-logo">
+            <div className="sb-logo-icon">
+              <Image
+                src="/icon.png"
+                alt="Rentura Logo"
+                width={24}
+                height={24}
+              />
+            </div>
+            <span className="sb-logo-name">Rentura</span>
+          </div>
           <nav className="sb-nav">
             <span className="sb-section">Overview</span>
             <a href="/landlord" className="sb-item"><span className="sb-ico">⊞</span>Dashboard</a>
@@ -571,7 +582,7 @@ export default function DocumentsPage() {
               </div>
             )}
             {!isPro && docs.length < FREE_DOC_LIMIT && docs.length > 0 && (
-              <div style={{fontSize:12,color:'#94A3B8',marginBottom:12,textAlign:'right'}}>
+              <div style={{ fontSize: 12, color: '#94A3B8', marginBottom: 12, textAlign: 'right' }}>
                 📁 {docs.length}/{FREE_DOC_LIMIT} documents used on Free plan
               </div>
             )}
@@ -583,7 +594,7 @@ export default function DocumentsPage() {
                   value={search} onChange={e => setSearch(e.target.value)} />
               </div>
               <div className="type-tabs">
-                {(['all','lease','invoice','notice','contract','other'] as const).map(t => (
+                {(['all', 'lease', 'invoice', 'notice', 'contract', 'other'] as const).map(t => (
                   <button key={t} className={`ttab${filter === t ? ' active' : ''}`} onClick={() => setFilter(t)}>
                     {t === 'all' ? 'All' : TYPE_CFG[t as Doc['type']]?.label}
                     <span className="tc">{counts[t] || 0}</span>
@@ -594,17 +605,17 @@ export default function DocumentsPage() {
 
             {loading ? (
               <div className="doc-list">
-                {[1,2,3,4].map(i => (
-                  <div key={i} style={{display:'flex',alignItems:'center',gap:14,padding:'14px 18px',borderBottom:'1px solid #F8FAFC'}}>
-                    <div className="skeleton" style={{width:38,height:38,borderRadius:10,flexShrink:0}} />
-                    <div style={{flex:1,display:'flex',flexDirection:'column',gap:7}}>
-                      <div className="skeleton" style={{height:13,width:'55%'}} />
-                      <div className="skeleton" style={{height:10,width:'35%'}} />
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderBottom: '1px solid #F8FAFC' }}>
+                    <div className="skeleton" style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0 }} />
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                      <div className="skeleton" style={{ height: 13, width: '55%' }} />
+                      <div className="skeleton" style={{ height: 10, width: '35%' }} />
                     </div>
-                    <div className="skeleton" style={{height:22,width:60,borderRadius:99}} />
-                    <div className="skeleton" style={{height:10,width:50}} />
-                    <div className="skeleton" style={{height:10,width:80}} />
-                    <div className="skeleton" style={{height:30,width:100,borderRadius:8}} />
+                    <div className="skeleton" style={{ height: 22, width: 60, borderRadius: 99 }} />
+                    <div className="skeleton" style={{ height: 10, width: 50 }} />
+                    <div className="skeleton" style={{ height: 10, width: 80 }} />
+                    <div className="skeleton" style={{ height: 30, width: 100, borderRadius: 8 }} />
                   </div>
                 ))}
               </div>
@@ -614,7 +625,7 @@ export default function DocumentsPage() {
                 <div className="e-title">{docs.length === 0 ? 'No documents yet' : 'No documents match'}</div>
                 <div className="e-sub">{docs.length === 0 ? 'Upload leases, contracts and notices to keep everything in one place.' : 'Try a different filter or search.'}</div>
                 {docs.length === 0 && (
-                  <button className="btn-primary" style={{margin:'0 auto'}} onClick={() => setUploadOpen(true)}>+ Upload Document</button>
+                  <button className="btn-primary" style={{ margin: '0 auto' }} onClick={() => setUploadOpen(true)}>+ Upload Document</button>
                 )}
               </div>
             ) : (
@@ -626,28 +637,28 @@ export default function DocumentsPage() {
                     <div className="dlh">Type</div>
                     <div className="dlh">Size</div>
                     <div className="dlh">Uploaded</div>
-                    <div className="dlh" style={{textAlign:'right'}}>Actions</div>
+                    <div className="dlh" style={{ textAlign: 'right' }}>Actions</div>
                   </div>
                   {filtered.map(d => {
                     const tc = TYPE_CFG[d.type] || TYPE_CFG.other
                     return (
                       <div key={d.id} className="doc-row">
                         <div className="dr-main">
-                          <div className="dr-ico" style={{background:tc.bg}}>{tc.ico}</div>
-                          <div style={{minWidth:0}}>
+                          <div className="dr-ico" style={{ background: tc.bg }}>{tc.ico}</div>
+                          <div style={{ minWidth: 0 }}>
                             <div className="dr-name">{d.name}</div>
                             <div className="dr-sub">
-                              {[d.tenant_name!=='—'?d.tenant_name:null,d.property_name!=='—'?d.property_name:null].filter(Boolean).join(' · ') || '—'}
+                              {[d.tenant_name !== '—' ? d.tenant_name : null, d.property_name !== '—' ? d.property_name : null].filter(Boolean).join(' · ') || '—'}
                             </div>
                           </div>
                         </div>
-                        <div><span className="dr-tag" style={{background:tc.bg,color:tc.color}}>{tc.label}</span></div>
+                        <div><span className="dr-tag" style={{ background: tc.bg, color: tc.color }}>{tc.label}</span></div>
                         <div className="dr-info">{fmtSize(d.file_size)}</div>
                         <div className="dr-date">{fmtDate(d.created_at)}</div>
                         <div className="dr-actions">
                           {d.file_url
                             ? <a href={d.file_url} target="_blank" rel="noreferrer" className="df-btn">⬇ Download</a>
-                            : <button className="df-btn" style={{opacity:0.4,cursor:'not-allowed'}}>⬇</button>
+                            : <button className="df-btn" style={{ opacity: 0.4, cursor: 'not-allowed' }}>⬇</button>
                           }
                           <button className="df-btn df-btn-red" onClick={() => setDeleteId(d.id)}>🗑️</button>
                         </div>
@@ -662,23 +673,23 @@ export default function DocumentsPage() {
                     const tc = TYPE_CFG[d.type] || TYPE_CFG.other
                     return (
                       <div key={d.id} className="dmc">
-                        <div className="dr-ico" style={{background:tc.bg,width:42,height:42,borderRadius:11,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>{tc.ico}</div>
+                        <div className="dr-ico" style={{ background: tc.bg, width: 42, height: 42, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{tc.ico}</div>
                         <div className="dmc-info">
                           <div className="dmc-name">{d.name}</div>
                           <div className="dmc-sub">
-                            {[d.tenant_name!=='—'?d.tenant_name:null,d.property_name!=='—'?d.property_name:null].filter(Boolean).join(' · ') || '—'}
+                            {[d.tenant_name !== '—' ? d.tenant_name : null, d.property_name !== '—' ? d.property_name : null].filter(Boolean).join(' · ') || '—'}
                           </div>
                           <div className="dmc-footer">
-                            <span className="dr-tag" style={{background:tc.bg,color:tc.color,fontSize:11,padding:'2px 8px'}}>{tc.label}</span>
+                            <span className="dr-tag" style={{ background: tc.bg, color: tc.color, fontSize: 11, padding: '2px 8px' }}>{tc.label}</span>
                             <span className="dmc-size">{fmtSize(d.file_size)} · {fmtDate(d.created_at)}</span>
                           </div>
                         </div>
                         <div className="dmc-actions">
                           {d.file_url
-                            ? <a href={d.file_url} target="_blank" rel="noreferrer" className="df-btn" style={{padding:'6px 10px',fontSize:11.5}}>⬇</a>
-                            : <button className="df-btn" style={{opacity:0.4,cursor:'not-allowed',padding:'6px 10px'}}>⬇</button>
+                            ? <a href={d.file_url} target="_blank" rel="noreferrer" className="df-btn" style={{ padding: '6px 10px', fontSize: 11.5 }}>⬇</a>
+                            : <button className="df-btn" style={{ opacity: 0.4, cursor: 'not-allowed', padding: '6px 10px' }}>⬇</button>
                           }
-                          <button className="df-btn df-btn-red" style={{padding:'6px 8px'}} onClick={() => setDeleteId(d.id)}>🗑️</button>
+                          <button className="df-btn df-btn-red" style={{ padding: '6px 8px' }} onClick={() => setDeleteId(d.id)}>🗑️</button>
                         </div>
                       </div>
                     )

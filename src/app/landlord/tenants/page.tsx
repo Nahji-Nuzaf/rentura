@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Image from 'next/image'
 
 type Tenant = {
   id: string
@@ -46,10 +47,10 @@ function deriveStatus(leaseEnd: string | null): Tenant['status'] {
 }
 
 const SC = {
-  active:   { label: 'Active',   bg: '#DCFCE7', color: '#16A34A' },
-  late:     { label: 'Late',     bg: '#FEE2E2', color: '#DC2626' },
+  active: { label: 'Active', bg: '#DCFCE7', color: '#16A34A' },
+  late: { label: 'Late', bg: '#FEE2E2', color: '#DC2626' },
   expiring: { label: 'Expiring', bg: '#FEF3C7', color: '#D97706' },
-  ended:    { label: 'Ended',    bg: '#F1F5F9', color: '#64748B' },
+  ended: { label: 'Ended', bg: '#F1F5F9', color: '#64748B' },
 }
 
 const AV = [
@@ -92,47 +93,47 @@ function generateToken() {
 export default function TenantsPage() {
   const router = useRouter()
   const [userInitials, setUserInitials] = useState('NN')
-  const [fullName, setFullName]         = useState('User')
-  const [sidebarOpen, setSidebarOpen]   = useState(false)
-  const [tenants, setTenants]           = useState<Tenant[]>([])
-  const [loading, setLoading]           = useState(true)
-  const [filter, setFilter]             = useState<'all'|'active'|'late'|'expiring'|'ended'>('all')
-  const [search, setSearch]             = useState('')
-  const [selected, setSelected]         = useState<Tenant | null>(null)
-  const [sheetOpen, setSheetOpen]       = useState(false)
-  const [inviteOpen, setInviteOpen]     = useState(false)
-  const [inviteStep, setInviteStep]     = useState<1|2>(1)
-  const [inviteCode, setInviteCode]     = useState('')
-  const [copied, setCopied]             = useState(false)
-  const [delConfirm, setDelConfirm]     = useState<string | null>(null)
+  const [fullName, setFullName] = useState('User')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [tenants, setTenants] = useState<Tenant[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<'all' | 'active' | 'late' | 'expiring' | 'ended'>('all')
+  const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState<Tenant | null>(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteStep, setInviteStep] = useState<1 | 2>(1)
+  const [inviteCode, setInviteCode] = useState('')
+  const [copied, setCopied] = useState(false)
+  const [delConfirm, setDelConfirm] = useState<string | null>(null)
 
   // Invite flow — property/unit picker
-  const [inviteProps, setInviteProps]   = useState<{id:string;name:string}[]>([])
-  const [inviteUnits, setInviteUnits]   = useState<{id:string;unit_number:string;monthly_rent:number;currency:string;status:string}[]>([])
+  const [inviteProps, setInviteProps] = useState<{ id: string; name: string }[]>([])
+  const [inviteUnits, setInviteUnits] = useState<{ id: string; unit_number: string; monthly_rent: number; currency: string; status: string }[]>([])
   const [invitePropId, setInvitePropId] = useState('')
   const [inviteUnitId, setInviteUnitId] = useState('')
   const [inviteLoading, setInviteLoading] = useState(false)
-  const [inviteError, setInviteError]   = useState('')
+  const [inviteError, setInviteError] = useState('')
 
   // ── Lease setup modal (fires when tenant accepts invite) ──────────────────
-  const [leaseModal, setLeaseModal]       = useState(false)
+  const [leaseModal, setLeaseModal] = useState(false)
   const [leaseTenantId, setLeaseTenantId] = useState('')
-  const [leaseUnitId, setLeaseUnitId]     = useState('')
+  const [leaseUnitId, setLeaseUnitId] = useState('')
   const [leaseTenantName, setLeaseTenantName] = useState('')
-  const [leaseStart, setLeaseStart]       = useState('')
-  const [leaseEnd, setLeaseEnd]           = useState('')
-  const [leaseRent, setLeaseRent]         = useState('')
-  const [leaseSaving, setLeaseSaving]     = useState(false)
-  const [leaseError, setLeaseError]       = useState('')
+  const [leaseStart, setLeaseStart] = useState('')
+  const [leaseEnd, setLeaseEnd] = useState('')
+  const [leaseRent, setLeaseRent] = useState('')
+  const [leaseSaving, setLeaseSaving] = useState(false)
+  const [leaseError, setLeaseError] = useState('')
 
   // ── Rent history drawer ────────────────────────────────────────────────────
-  const [historyOpen, setHistoryOpen]       = useState(false)
-  const [historyTenant, setHistoryTenant]   = useState<Tenant | null>(null)
-  const [rentHistory, setRentHistory]       = useState<RentPayment[]>([])
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyTenant, setHistoryTenant] = useState<Tenant | null>(null)
+  const [rentHistory, setRentHistory] = useState<RentPayment[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
 
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       try {
         const sb = createClient()
         const { data: { user } } = await sb.auth.getUser()
@@ -144,7 +145,7 @@ export default function TenantsPage() {
         const { data: props } = await sb.from('properties').select('id,name').eq('landlord_id', user.id)
         const propIds = (props || []).map((p: any) => p.id)
         const propMap: Record<string, string> = {}
-        ;(props || []).forEach((p: any) => { propMap[p.id] = p.name })
+          ; (props || []).forEach((p: any) => { propMap[p.id] = p.name })
         if (!propIds.length) { setLoading(false); return }
 
         const { data: raw } = await sb.from('tenants')
@@ -155,7 +156,7 @@ export default function TenantsPage() {
         const profMap: Record<string, any> = {}
         if (pids.length) {
           const { data: pa } = await sb.from('profiles').select('id,full_name,email,phone,avatar_url').in('id', pids)
-          ;(pa || []).forEach((p: any) => { profMap[p.id] = p })
+            ; (pa || []).forEach((p: any) => { profMap[p.id] = p })
         }
 
         const uids = [...new Set((raw || []).map((t: any) => t.unit_id).filter(Boolean))]
@@ -163,7 +164,7 @@ export default function TenantsPage() {
         if (uids.length) {
           const { data: ua } = await sb.from('units')
             .select('id,unit_number,monthly_rent,currency,rent_due_day,lease_start,lease_end').in('id', uids)
-          ;(ua || []).forEach((u: any) => { unitMap[u.id] = u })
+            ; (ua || []).forEach((u: any) => { unitMap[u.id] = u })
         }
 
         setTenants((raw || []).map((row: any) => {
@@ -172,20 +173,20 @@ export default function TenantsPage() {
           return {
             id: row.id, profile_id: row.profile_id,
             property_id: row.property_id, unit_id: row.unit_id,
-            full_name:   p.full_name   || 'Unknown',
-            email:       p.email       || '—',
-            phone:       p.phone       || '—',
-            avatar_url:  p.avatar_url  || null,
-            property:    propMap[row.property_id] || '—',
-            unit:        u.unit_number  || '—',
+            full_name: p.full_name || 'Unknown',
+            email: p.email || '—',
+            phone: p.phone || '—',
+            avatar_url: p.avatar_url || null,
+            property: propMap[row.property_id] || '—',
+            unit: u.unit_number || '—',
             rent_amount: u.monthly_rent || 0,
-            currency:    u.currency     || 'USD',
+            currency: u.currency || 'USD',
             rent_due_day: u.rent_due_day || 1,
-            lease_start: u.lease_start  || '—',
-            lease_end:   u.lease_end    || '—',
-            status:      row.status || deriveStatus(u.lease_end || null),
+            lease_start: u.lease_start || '—',
+            lease_end: u.lease_end || '—',
+            status: row.status || deriveStatus(u.lease_end || null),
             invite_token: row.invite_token,
-            created_at:  row.created_at,
+            created_at: row.created_at,
           }
         }))
       } catch (e) { console.error(e) }
@@ -196,7 +197,7 @@ export default function TenantsPage() {
   // ── Save lease dates ──────────────────────────────────────────────────────
   async function handleSaveLease() {
     if (!leaseStart) { setLeaseError('Please set a lease start date.'); return }
-    if (!leaseEnd)   { setLeaseError('Please set a lease end date.'); return }
+    if (!leaseEnd) { setLeaseError('Please set a lease end date.'); return }
     if (new Date(leaseEnd) <= new Date(leaseStart)) { setLeaseError('Lease end must be after start.'); return }
 
     setLeaseSaving(true); setLeaseError('')
@@ -215,9 +216,9 @@ export default function TenantsPage() {
         .single()
 
       // 2. Get the final rent amount and currency from unit
-      const finalRent     = rent || unitData?.monthly_rent || 0
+      const finalRent = rent || unitData?.monthly_rent || 0
       const finalCurrency = unitData?.currency || 'USD'
-      const dueDay        = unitData?.rent_due_day || 1
+      const dueDay = unitData?.rent_due_day || 1
 
       // 3. Delete any existing pending payments for this tenant (clean slate)
       await sb.from('rent_payments')
@@ -228,7 +229,7 @@ export default function TenantsPage() {
       // 4. Generate 3 upcoming monthly payment rows
       // Start from the lease start date, find the first due date on or after it
       const leaseStartDate = new Date(leaseStart)
-      const leaseEndDate   = new Date(leaseEnd)
+      const leaseEndDate = new Date(leaseEnd)
       const payments: any[] = []
 
       // Find first due date: same month as lease start, on due day
@@ -241,11 +242,11 @@ export default function TenantsPage() {
       for (let i = 0; i < 3; i++) {
         if (dueDate > leaseEndDate) break
         payments.push({
-          tenant_id:  leaseTenantId,
-          unit_id:    leaseUnitId,
-          amount:     finalRent,
-          due_date:   dueDate.toISOString().split('T')[0],
-          status:     'pending',
+          tenant_id: leaseTenantId,
+          unit_id: leaseUnitId,
+          amount: finalRent,
+          due_date: dueDate.toISOString().split('T')[0],
+          status: 'pending',
         })
         // Move to next month
         dueDate = new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, dueDay)
@@ -258,8 +259,10 @@ export default function TenantsPage() {
       // 5. Update local state
       setTenants(prev => prev.map(t =>
         t.id === leaseTenantId
-          ? { ...t, lease_start: leaseStart, lease_end: leaseEnd,
-              rent_amount: finalRent, currency: finalCurrency }
+          ? {
+            ...t, lease_start: leaseStart, lease_end: leaseEnd,
+            rent_amount: finalRent, currency: finalCurrency
+          }
           : t
       ))
       setLeaseModal(false)
@@ -291,10 +294,10 @@ export default function TenantsPage() {
 
   const counts = {
     all: tenants.length,
-    active:   tenants.filter(t => t.status === 'active').length,
-    late:     tenants.filter(t => t.status === 'late').length,
+    active: tenants.filter(t => t.status === 'active').length,
+    late: tenants.filter(t => t.status === 'late').length,
     expiring: tenants.filter(t => t.status === 'expiring').length,
-    ended:    tenants.filter(t => t.status === 'ended').length,
+    ended: tenants.filter(t => t.status === 'ended').length,
   }
 
   // ── Open invite modal — load properties first ─────────────────────────────
@@ -324,7 +327,7 @@ export default function TenantsPage() {
     const sb = createClient()
     const { data: { user } } = await sb.auth.getUser()
     if (!user) return
-    const { data: props } = await sb.from('properties').select('id,name').eq('landlord_id', user.id).eq('status','active')
+    const { data: props } = await sb.from('properties').select('id,name').eq('landlord_id', user.id).eq('status', 'active')
     setInviteProps(props || [])
     if (props && props.length === 1) {
       setInvitePropId(props[0].id)
@@ -422,12 +425,12 @@ export default function TenantsPage() {
 
   // ── Drawer summary stats ───────────────────────────────────────────────────
   function historyStats(payments: RentPayment[], currency: string) {
-    const paid    = payments.filter(p => p.status === 'paid')
+    const paid = payments.filter(p => p.status === 'paid')
     const overdue = payments.filter(p => isOverdue(p))
     const pending = payments.filter(p => p.status === 'pending' && !isOverdue(p))
-    const totalPaid    = paid.reduce((s, p) => s + p.amount, 0)
+    const totalPaid = paid.reduce((s, p) => s + p.amount, 0)
     const totalPending = [...pending, ...overdue].reduce((s, p) => s + p.amount, 0)
-    const onTimeRate   = payments.length > 0 ? Math.round((paid.length / payments.length) * 100) : 0
+    const onTimeRate = payments.length > 0 ? Math.round((paid.length / payments.length) * 100) : 0
     return { paid: paid.length, overdue: overdue.length, pending: pending.length, totalPaid, totalPending, onTimeRate, currency }
   }
 
@@ -437,113 +440,113 @@ export default function TenantsPage() {
   function renderDetail(t: Tenant, inSheet = false) {
     const sc = SC[t.status]
     const idx = tenants.findIndex(x => x.id === t.id)
-    const bg  = AV[Math.max(0, idx) % AV.length]
+    const bg = AV[Math.max(0, idx) % AV.length]
     const hasLease = t.lease_start && t.lease_end && t.lease_start !== '—' && t.lease_end !== '—'
     const ls = hasLease ? new Date(t.lease_start).getTime() : 0
-    const le = hasLease ? new Date(t.lease_end).getTime()   : 0
+    const le = hasLease ? new Date(t.lease_end).getTime() : 0
     const now = Date.now()
     const total = hasLease ? le - ls : 0
-    const pct   = total > 0 ? Math.min(100, Math.max(0, Math.round(((now - ls) / total) * 100))) : 0
+    const pct = total > 0 ? Math.min(100, Math.max(0, Math.round(((now - ls) / total) * 100))) : 0
     const dLeft = hasLease ? Math.ceil((le - now) / 86400000) : null
     const lc = dLeft !== null && dLeft < 30 ? '#DC2626' : dLeft !== null && dLeft < 60 ? '#D97706' : '#3B82F6'
 
     return (
-      <div style={{display:'flex',flexDirection:'column',height:inSheet?'auto':'100%'}}>
-        <div style={{padding:'20px 20px 16px',borderBottom:'1px solid #E2E8F0',textAlign:'center'}}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: inSheet ? 'auto' : '100%' }}>
+        <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #E2E8F0', textAlign: 'center' }}>
           {t.avatar_url
-            ? <img src={t.avatar_url} alt={t.full_name} style={{width:64,height:64,borderRadius:18,objectFit:'cover',margin:'0 auto 10px',display:'block'}} />
-            : <div style={{width:64,height:64,borderRadius:18,background:bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,fontWeight:700,color:'#fff',margin:'0 auto 10px'}}>{initials(t.full_name)}</div>
+            ? <img src={t.avatar_url} alt={t.full_name} style={{ width: 64, height: 64, borderRadius: 18, objectFit: 'cover', margin: '0 auto 10px', display: 'block' }} />
+            : <div style={{ width: 64, height: 64, borderRadius: 18, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 700, color: '#fff', margin: '0 auto 10px' }}>{initials(t.full_name)}</div>
           }
-          <div style={{fontSize:16,fontWeight:700,color:'#0F172A',marginBottom:3}}>{t.full_name}</div>
-          <div style={{fontSize:12.5,color:'#94A3B8',marginBottom:6}}>{t.email}</div>
-          {t.phone && t.phone !== '—' && <div style={{fontSize:12,color:'#64748B',marginBottom:6}}>📞 {t.phone}</div>}
-          <span style={{display:'inline-flex',alignItems:'center',gap:3,fontSize:11,fontWeight:700,borderRadius:99,padding:'3px 9px',background:sc.bg,color:sc.color}}>● {sc.label}</span>
-          <div style={{fontSize:11,color:'#94A3B8',marginTop:6}}>Tenant since {fmtDate(t.created_at)}</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#0F172A', marginBottom: 3 }}>{t.full_name}</div>
+          <div style={{ fontSize: 12.5, color: '#94A3B8', marginBottom: 6 }}>{t.email}</div>
+          {t.phone && t.phone !== '—' && <div style={{ fontSize: 12, color: '#64748B', marginBottom: 6 }}>📞 {t.phone}</div>}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, fontWeight: 700, borderRadius: 99, padding: '3px 9px', background: sc.bg, color: sc.color }}>● {sc.label}</span>
+          <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 6 }}>Tenant since {fmtDate(t.created_at)}</div>
         </div>
 
-        <div style={{padding:'16px 18px',flex:1}}>
+        <div style={{ padding: '16px 18px', flex: 1 }}>
 
           {/* ── Lease not set banner ── */}
           {t.profile_id && (t.lease_start === '—' || !t.lease_start) && (
-            <div style={{background:'#FFFBEB',border:'1px solid #FCD34D',borderRadius:12,padding:'12px 14px',marginBottom:16,display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+            <div style={{ background: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: 12, padding: '12px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
               <div>
-                <div style={{fontSize:13,fontWeight:700,color:'#92400E',marginBottom:2}}>⚠️ Lease dates not set</div>
-                <div style={{fontSize:11.5,color:'#B45309'}}>Set the lease period to complete this tenant's setup</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#92400E', marginBottom: 2 }}>⚠️ Lease dates not set</div>
+                <div style={{ fontSize: 11.5, color: '#B45309' }}>Set the lease period to complete this tenant's setup</div>
               </div>
               <button
                 onClick={() => openLeaseModal(t)}
-                style={{padding:'7px 14px',borderRadius:9,border:'none',background:'#D97706',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Plus Jakarta Sans',sans-serif",whiteSpace:'nowrap',flexShrink:0}}>
+                style={{ padding: '7px 14px', borderRadius: 9, border: 'none', background: '#D97706', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif", whiteSpace: 'nowrap', flexShrink: 0 }}>
                 Set Lease →
               </button>
             </div>
           )}
 
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:16}}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
             {[
-              { label:'Property',     val: t.property },
-              { label:'Unit',         val: t.unit },
-              { label:'Monthly Rent', val: `$${t.rent_amount.toLocaleString()}`, blue: true },
-              { label:'Due Day',      val: `Day ${t.rent_due_day}` },
+              { label: 'Property', val: t.property },
+              { label: 'Unit', val: t.unit },
+              { label: 'Monthly Rent', val: `$${t.rent_amount.toLocaleString()}`, blue: true },
+              { label: 'Due Day', val: `Day ${t.rent_due_day}` },
             ].map(({ label, val, blue }) => (
-              <div key={label} style={{background:'#F8FAFC',borderRadius:10,padding:'10px 12px'}}>
-                <div style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'.6px',color:'#94A3B8',marginBottom:4}}>{label}</div>
-                <div style={{fontSize:13,fontWeight:700,color: blue ? '#2563EB' : '#0F172A',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{val}</div>
+              <div key={label} style={{ background: '#F8FAFC', borderRadius: 10, padding: '10px 12px' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: '#94A3B8', marginBottom: 4 }}>{label}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: blue ? '#2563EB' : '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{val}</div>
               </div>
             ))}
           </div>
 
-          <div style={{marginBottom:16}}>
-            <div style={{fontSize:10.5,fontWeight:700,textTransform:'uppercase',letterSpacing:'.7px',color:'#94A3B8',marginBottom:6}}>Lease Period</div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.7px', color: '#94A3B8', marginBottom: 6 }}>Lease Period</div>
             {hasLease ? (
               <>
-                <div style={{fontSize:13,color:'#0F172A',fontWeight:500}}>{fmtDate(t.lease_start)} → {fmtDate(t.lease_end)}</div>
-                <div style={{marginTop:8}}>
-                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-                    <span style={{fontSize:11,color:'#94A3B8'}}>{pct}% elapsed</span>
-                    <span style={{fontSize:11,fontWeight:600,color:lc}}>{dLeft !== null ? (dLeft > 0 ? `${dLeft}d left` : 'Ended') : ''}</span>
+                <div style={{ fontSize: 13, color: '#0F172A', fontWeight: 500 }}>{fmtDate(t.lease_start)} → {fmtDate(t.lease_end)}</div>
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontSize: 11, color: '#94A3B8' }}>{pct}% elapsed</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: lc }}>{dLeft !== null ? (dLeft > 0 ? `${dLeft}d left` : 'Ended') : ''}</span>
                   </div>
-                  <div style={{height:6,background:'#E2E8F0',borderRadius:99,overflow:'hidden'}}>
-                    <div style={{height:'100%',width:`${pct}%`,background:`linear-gradient(90deg,${lc},${lc})`,borderRadius:99}} />
+                  <div style={{ height: 6, background: '#E2E8F0', borderRadius: 99, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${pct}%`, background: `linear-gradient(90deg,${lc},${lc})`, borderRadius: 99 }} />
                   </div>
                 </div>
               </>
             ) : (
-              <div style={{fontSize:13,color:'#94A3B8',fontStyle:'italic'}}>No lease dates set</div>
+              <div style={{ fontSize: 13, color: '#94A3B8', fontStyle: 'italic' }}>No lease dates set</div>
             )}
           </div>
 
           <div>
-            <div style={{fontSize:10.5,fontWeight:700,textTransform:'uppercase',letterSpacing:'.7px',color:'#94A3B8',marginBottom:6}}>Contact</div>
-            <div style={{fontSize:13,color:'#0F172A',fontWeight:500}}>{t.email}</div>
-            {t.phone && t.phone !== '—' && <div style={{fontSize:13,color:'#0F172A',fontWeight:500,marginTop:3}}>{t.phone}</div>}
+            <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.7px', color: '#94A3B8', marginBottom: 6 }}>Contact</div>
+            <div style={{ fontSize: 13, color: '#0F172A', fontWeight: 500 }}>{t.email}</div>
+            {t.phone && t.phone !== '—' && <div style={{ fontSize: 13, color: '#0F172A', fontWeight: 500, marginTop: 3 }}>{t.phone}</div>}
           </div>
         </div>
 
-        <div style={{padding:'12px 18px',borderTop:'1px solid #E2E8F0',display:'flex',flexDirection:'column',gap:8}}>
+        <div style={{ padding: '12px 18px', borderTop: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {/* ── NEW: Rent History button at top of actions ── */}
           <button
             onClick={(e) => openHistory(t, e)}
-            style={{width:'100%',padding:'10px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#2563EB,#6366F1)',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:"'Plus Jakarta Sans',sans-serif",boxShadow:'0 2px 8px rgba(37,99,235,.25)',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+            style={{ width: '100%', padding: '10px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#2563EB,#6366F1)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif", boxShadow: '0 2px 8px rgba(37,99,235,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             🕐 View Rent History
           </button>
           <a href={`/landlord/messages?tenant=${t.profile_id}`}
-            style={{width:'100%',padding:'10px',borderRadius:10,border:'1.5px solid #E2E8F0',background:'#F8FAFC',color:'#475569',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:"'Plus Jakarta Sans',sans-serif",textDecoration:'none',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+            style={{ width: '100%', padding: '10px', borderRadius: 10, border: '1.5px solid #E2E8F0', background: '#F8FAFC', color: '#475569', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif", textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             💬 Send Message
           </a>
           <a href={`/landlord/documents?tenant=${t.profile_id}`}
-            style={{width:'100%',padding:'10px',borderRadius:10,border:'1.5px solid #E2E8F0',background:'#F8FAFC',color:'#475569',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:"'Plus Jakarta Sans',sans-serif",textDecoration:'none',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+            style={{ width: '100%', padding: '10px', borderRadius: 10, border: '1.5px solid #E2E8F0', background: '#F8FAFC', color: '#475569', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif", textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             📄 View Lease
           </a>
           <button onClick={() => openLeaseModal(t)}
-            style={{width:'100%',padding:'10px',borderRadius:10,border:'1.5px solid #E2E8F0',background: (t.lease_start === '—' || !t.lease_start) ? '#FFFBEB' : '#F8FAFC',color:(t.lease_start === '—' || !t.lease_start) ? '#D97706' : '#475569',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:"'Plus Jakarta Sans',sans-serif"}}>
+            style={{ width: '100%', padding: '10px', borderRadius: 10, border: '1.5px solid #E2E8F0', background: (t.lease_start === '—' || !t.lease_start) ? '#FFFBEB' : '#F8FAFC', color: (t.lease_start === '—' || !t.lease_start) ? '#D97706' : '#475569', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
             {(t.lease_start === '—' || !t.lease_start) ? '⚠️ Set Lease Dates' : '📅 Edit Lease Dates'}
           </button>
           <button onClick={openInvite}
-            style={{width:'100%',padding:'10px',borderRadius:10,border:'1.5px solid #E2E8F0',background:'#F8FAFC',color:'#475569',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:"'Plus Jakarta Sans',sans-serif"}}>
+            style={{ width: '100%', padding: '10px', borderRadius: 10, border: '1.5px solid #E2E8F0', background: '#F8FAFC', color: '#475569', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
             🔑 New Invite Code
           </button>
           <button onClick={() => setDelConfirm(t.id)}
-            style={{width:'100%',padding:'10px',borderRadius:10,border:'1.5px solid #FCA5A5',background:'#FEF2F2',color:'#DC2626',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:"'Plus Jakarta Sans',sans-serif"}}>
+            style={{ width: '100%', padding: '10px', borderRadius: 10, border: '1.5px solid #FCA5A5', background: '#FEF2F2', color: '#DC2626', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
             🗑️ Remove Tenant
           </button>
         </div>
@@ -751,73 +754,73 @@ export default function TenantsPage() {
       `}</style>
 
       {/* Overlays */}
-      <div className={`sb-overlay${sidebarOpen?' open':''}`} onClick={() => setSidebarOpen(false)} />
+      <div className={`sb-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
 
       {/* ── Lease Setup Modal ── */}
       {leaseModal && (
-        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:700,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
-          <div style={{background:'#fff',borderRadius:22,padding:32,width:'100%',maxWidth:420,boxShadow:'0 24px 60px rgba(15,23,42,.25)'}}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: '#fff', borderRadius: 22, padding: 32, width: '100%', maxWidth: 420, boxShadow: '0 24px 60px rgba(15,23,42,.25)' }}>
             {/* Header */}
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <div>
-                <div style={{fontFamily:'Fraunces,serif',fontSize:22,fontWeight:700,color:'#0F172A',marginBottom:4}}>
+                <div style={{ fontFamily: 'Fraunces,serif', fontSize: 22, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>
                   📅 Set Lease Dates
                 </div>
-                <div style={{fontSize:13,color:'#64748B'}}>
-                  Setting lease for <strong style={{color:'#0F172A'}}>{leaseTenantName}</strong>
+                <div style={{ fontSize: 13, color: '#64748B' }}>
+                  Setting lease for <strong style={{ color: '#0F172A' }}>{leaseTenantName}</strong>
                 </div>
               </div>
-              <button onClick={()=>setLeaseModal(false)}
-                style={{width:32,height:32,borderRadius:'50%',background:'#F1F5F9',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,color:'#475569'}}>
+              <button onClick={() => setLeaseModal(false)}
+                style={{ width: 32, height: 32, borderRadius: '50%', background: '#F1F5F9', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: '#475569' }}>
                 ✕
               </button>
             </div>
 
             {/* Lease dates */}
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14}}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
               <div>
-                <label style={{display:'block',fontSize:12,fontWeight:700,color:'#374151',marginBottom:6,textTransform:'uppercase',letterSpacing:'.05em'}}>Lease Start *</label>
-                <input type="date" value={leaseStart} onChange={e=>setLeaseStart(e.target.value)}
-                  style={{width:'100%',padding:'10px 12px',borderRadius:10,border:'1.5px solid #E2E8F0',fontSize:14,fontFamily:"'Plus Jakarta Sans',sans-serif",color:'#0F172A',outline:'none'}}
-                  onFocus={e=>{e.target.style.borderColor='#3B82F6'}}
-                  onBlur={e=>{e.target.style.borderColor='#E2E8F0'}}
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Lease Start *</label>
+                <input type="date" value={leaseStart} onChange={e => setLeaseStart(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #E2E8F0', fontSize: 14, fontFamily: "'Plus Jakarta Sans',sans-serif", color: '#0F172A', outline: 'none' }}
+                  onFocus={e => { e.target.style.borderColor = '#3B82F6' }}
+                  onBlur={e => { e.target.style.borderColor = '#E2E8F0' }}
                 />
               </div>
               <div>
-                <label style={{display:'block',fontSize:12,fontWeight:700,color:'#374151',marginBottom:6,textTransform:'uppercase',letterSpacing:'.05em'}}>Lease End *</label>
-                <input type="date" value={leaseEnd} onChange={e=>setLeaseEnd(e.target.value)}
-                  style={{width:'100%',padding:'10px 12px',borderRadius:10,border:'1.5px solid #E2E8F0',fontSize:14,fontFamily:"'Plus Jakarta Sans',sans-serif",color:'#0F172A',outline:'none'}}
-                  onFocus={e=>{e.target.style.borderColor='#3B82F6'}}
-                  onBlur={e=>{e.target.style.borderColor='#E2E8F0'}}
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Lease End *</label>
+                <input type="date" value={leaseEnd} onChange={e => setLeaseEnd(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #E2E8F0', fontSize: 14, fontFamily: "'Plus Jakarta Sans',sans-serif", color: '#0F172A', outline: 'none' }}
+                  onFocus={e => { e.target.style.borderColor = '#3B82F6' }}
+                  onBlur={e => { e.target.style.borderColor = '#E2E8F0' }}
                 />
               </div>
             </div>
 
             {/* Monthly rent */}
-            <div style={{marginBottom:18}}>
-              <label style={{display:'block',fontSize:12,fontWeight:700,color:'#374151',marginBottom:6,textTransform:'uppercase',letterSpacing:'.05em'}}>Monthly Rent (USD)</label>
-              <input type="number" min="0" value={leaseRent} onChange={e=>setLeaseRent(e.target.value)}
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Monthly Rent (USD)</label>
+              <input type="number" min="0" value={leaseRent} onChange={e => setLeaseRent(e.target.value)}
                 placeholder="e.g. 500"
-                style={{width:'100%',padding:'10px 12px',borderRadius:10,border:'1.5px solid #E2E8F0',fontSize:14,fontFamily:"'Plus Jakarta Sans',sans-serif",color:'#0F172A',outline:'none'}}
-                onFocus={e=>{e.target.style.borderColor='#3B82F6'}}
-                onBlur={e=>{e.target.style.borderColor='#E2E8F0'}}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #E2E8F0', fontSize: 14, fontFamily: "'Plus Jakarta Sans',sans-serif", color: '#0F172A', outline: 'none' }}
+                onFocus={e => { e.target.style.borderColor = '#3B82F6' }}
+                onBlur={e => { e.target.style.borderColor = '#E2E8F0' }}
               />
-              <div style={{fontSize:11,color:'#94A3B8',marginTop:4}}>Leave unchanged to keep the current unit rent</div>
+              <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 4 }}>Leave unchanged to keep the current unit rent</div>
             </div>
 
             {leaseError && (
-              <div style={{background:'#FEE2E2',border:'1px solid #FECACA',borderRadius:10,padding:'10px 12px',color:'#DC2626',fontSize:13,fontWeight:600,marginBottom:14}}>
+              <div style={{ background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: 10, padding: '10px 12px', color: '#DC2626', fontSize: 13, fontWeight: 600, marginBottom: 14 }}>
                 ⚠️ {leaseError}
               </div>
             )}
 
-            <div style={{display:'flex',gap:10}}>
-              <button onClick={()=>setLeaseModal(false)}
-                style={{flex:1,padding:11,borderRadius:10,border:'1.5px solid #E2E8F0',background:'#fff',color:'#475569',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:"'Plus Jakarta Sans',sans-serif"}}>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setLeaseModal(false)}
+                style={{ flex: 1, padding: 11, borderRadius: 10, border: '1.5px solid #E2E8F0', background: '#fff', color: '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
                 Skip for now
               </button>
               <button onClick={handleSaveLease} disabled={leaseSaving}
-                style={{flex:2,padding:11,borderRadius:10,border:'none',background:'linear-gradient(135deg,#2563EB,#6366F1)',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:"'Plus Jakarta Sans',sans-serif",opacity:leaseSaving?0.7:1}}>
+                style={{ flex: 2, padding: 11, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#2563EB,#6366F1)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif", opacity: leaseSaving ? 0.7 : 1 }}>
                 {leaseSaving ? 'Saving…' : '✓ Save Lease Details'}
               </button>
             </div>
@@ -826,8 +829,8 @@ export default function TenantsPage() {
       )}
 
       {/* Invite Modal — 2 step */}
-      <div className={`modal-overlay${inviteOpen?' open':''}`} onClick={() => setInviteOpen(false)}>
-        <div className="modal" style={{maxWidth:420}} onClick={e => e.stopPropagation()}>
+      <div className={`modal-overlay${inviteOpen ? ' open' : ''}`} onClick={() => setInviteOpen(false)}>
+        <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
 
           {/* ── STEP 1: Pick property + unit ── */}
           {inviteStep === 1 && (
@@ -835,10 +838,10 @@ export default function TenantsPage() {
               <div className="modal-title">Invite a Tenant 👥</div>
               <div className="modal-sub">Select the property and vacant unit you want to assign. We&apos;ll generate a unique invite code to send to your tenant.</div>
 
-              <div style={{marginBottom:14}}>
-                <label style={{display:'block',fontSize:12,fontWeight:700,color:'#64748B',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6}}>Property</label>
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Property</label>
                 <select
-                  style={{width:'100%',padding:'10px 12px',borderRadius:10,border:'1.5px solid #E2E8F0',fontSize:14,fontFamily:"'Plus Jakarta Sans',sans-serif",color:'#0F172A',background:'#F8FAFC',outline:'none'}}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #E2E8F0', fontSize: 14, fontFamily: "'Plus Jakarta Sans',sans-serif", color: '#0F172A', background: '#F8FAFC', outline: 'none' }}
                   value={invitePropId}
                   onChange={async e => { setInvitePropId(e.target.value); await loadInviteUnits(e.target.value) }}
                 >
@@ -847,13 +850,13 @@ export default function TenantsPage() {
                 </select>
               </div>
 
-              <div style={{marginBottom:14}}>
-                <label style={{display:'block',fontSize:12,fontWeight:700,color:'#64748B',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6}}>
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>
                   Vacant Unit
-                  {invitePropId && <span style={{fontWeight:400,textTransform:'none',letterSpacing:'normal',color:'#94A3B8',marginLeft:6}}>{inviteUnits.length} available</span>}
+                  {invitePropId && <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 'normal', color: '#94A3B8', marginLeft: 6 }}>{inviteUnits.length} available</span>}
                 </label>
                 <select
-                  style={{width:'100%',padding:'10px 12px',borderRadius:10,border:'1.5px solid #E2E8F0',fontSize:14,fontFamily:"'Plus Jakarta Sans',sans-serif",color:'#0F172A',background:'#F8FAFC',outline:'none'}}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #E2E8F0', fontSize: 14, fontFamily: "'Plus Jakarta Sans',sans-serif", color: '#0F172A', background: '#F8FAFC', outline: 'none' }}
                   value={inviteUnitId}
                   onChange={e => setInviteUnitId(e.target.value)}
                   disabled={!invitePropId || inviteUnits.length === 0}
@@ -866,17 +869,17 @@ export default function TenantsPage() {
                   ))}
                 </select>
                 {invitePropId && inviteUnits.length === 0 && (
-                  <div style={{fontSize:12,color:'#F59E0B',marginTop:5}}>⚠️ No vacant units in this property</div>
+                  <div style={{ fontSize: 12, color: '#F59E0B', marginTop: 5 }}>⚠️ No vacant units in this property</div>
                 )}
               </div>
 
               {inviteError && (
-                <div style={{background:'#FEF2F2',border:'1px solid #FECACA',borderRadius:10,padding:'10px 12px',color:'#DC2626',fontSize:13,marginBottom:14}}>
+                <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: '10px 12px', color: '#DC2626', fontSize: 13, marginBottom: 14 }}>
                   {inviteError}
                 </div>
               )}
 
-              <button className="copy-btn" onClick={handleCreateInvite} disabled={inviteLoading} style={{marginBottom:10}}>
+              <button className="copy-btn" onClick={handleCreateInvite} disabled={inviteLoading} style={{ marginBottom: 10 }}>
                 {inviteLoading ? 'Generating...' : 'Generate Invite Code →'}
               </button>
               <button className="modal-close" onClick={() => setInviteOpen(false)}>Cancel</button>
@@ -893,11 +896,11 @@ export default function TenantsPage() {
                 <div className="code-hint">Send this to your tenant via WhatsApp, SMS, or email</div>
               </div>
 
-              <div style={{background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:12,padding:'12px 14px',marginBottom:16,fontSize:13,color:'#166534',lineHeight:1.6}}>
+              <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 12, padding: '12px 14px', marginBottom: 16, fontSize: 13, color: '#166534', lineHeight: 1.6 }}>
                 <strong>How it works:</strong> Your tenant signs up at rentura.app → selects <em>Tenant</em> → enters this code → they&apos;re instantly linked to their unit.
               </div>
 
-              <button className={`copy-btn${copied?' ok':''}`} onClick={copyCode} style={{marginBottom:10}}>
+              <button className={`copy-btn${copied ? ' ok' : ''}`} onClick={copyCode} style={{ marginBottom: 10 }}>
                 {copied ? '✓ Copied to clipboard!' : '📋 Copy Code'}
               </button>
               <button className="modal-close" onClick={() => setInviteOpen(false)}>Done</button>
@@ -908,7 +911,7 @@ export default function TenantsPage() {
       </div>
 
       {/* Delete Confirm */}
-      <div className={`modal-overlay${delConfirm?' open':''}`}>
+      <div className={`modal-overlay${delConfirm ? ' open' : ''}`}>
         <div className="del-box">
           <div className="del-ico">🗑️</div>
           <div className="del-title">Remove Tenant?</div>
@@ -921,15 +924,15 @@ export default function TenantsPage() {
       </div>
 
       {/* Mobile Sheet */}
-      <div className={`sheet-bg${sheetOpen?' open':''}`} onClick={() => setSheetOpen(false)} />
-      <div className={`sheet${sheetOpen&&selected?' open':''}`}>
+      <div className={`sheet-bg${sheetOpen ? ' open' : ''}`} onClick={() => setSheetOpen(false)} />
+      <div className={`sheet${sheetOpen && selected ? ' open' : ''}`}>
         <div className="sheet-handle" />
         {selected && renderDetail(selected, true)}
       </div>
 
       {/* ─── Rent History Drawer ─── */}
-      <div className={`hist-backdrop${historyOpen?' open':''}`} onClick={closeHistory} />
-      <div className={`hist-drawer${historyOpen?' open':''}`}>
+      <div className={`hist-backdrop${historyOpen ? ' open' : ''}`} onClick={closeHistory} />
+      <div className={`hist-drawer${historyOpen ? ' open' : ''}`}>
         {historyTenant && (
           <>
             <div className="hd-header">
@@ -944,8 +947,8 @@ export default function TenantsPage() {
                 <div className="hd-spinner">Loading history...</div>
               ) : rentHistory.length === 0 ? (
                 <div className="hd-empty">
-                  <div style={{fontSize:36,marginBottom:10}}>📋</div>
-                  <div style={{fontSize:13}}>No payment records yet</div>
+                  <div style={{ fontSize: 36, marginBottom: 10 }}>📋</div>
+                  <div style={{ fontSize: 13 }}>No payment records yet</div>
                 </div>
               ) : (
                 <>
@@ -1003,9 +1006,16 @@ export default function TenantsPage() {
 
       <div className="shell">
         {/* SIDEBAR */}
-        <aside className={`sidebar${sidebarOpen?' open':''}`}>
+        <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="sb-logo">
-            <div className="sb-logo-icon">🏘️</div>
+            <div className="sb-logo-icon">
+              <Image
+                src="/icon.png"
+                alt="Rentura Logo"
+                width={24}
+                height={24}
+              />
+            </div>
             <span className="sb-logo-name">Rentura</span>
           </div>
           <nav className="sb-nav">
@@ -1051,20 +1061,20 @@ export default function TenantsPage() {
           </div>
 
           <div className="content">
-            <div style={{marginBottom:20}}>
+            <div style={{ marginBottom: 20 }}>
               <div className="page-title">Tenants</div>
               <div className="page-sub">{counts.all} total · {counts.active} active · {counts.late} late · {counts.expiring} expiring</div>
             </div>
 
             <div className="stat-strip">
               {[
-                { ico:'👥', bg:'#EFF6FF', num: counts.all,      lbl:'Total Tenants' },
-                { ico:'✅', bg:'#DCFCE7', num: counts.active,   lbl:'Active' },
-                { ico:'⚠️', bg:'#FEE2E2', num: counts.late,     lbl:'Late Payment' },
-                { ico:'⏳', bg:'#FEF3C7', num: counts.expiring, lbl:'Lease Expiring' },
+                { ico: '👥', bg: '#EFF6FF', num: counts.all, lbl: 'Total Tenants' },
+                { ico: '✅', bg: '#DCFCE7', num: counts.active, lbl: 'Active' },
+                { ico: '⚠️', bg: '#FEE2E2', num: counts.late, lbl: 'Late Payment' },
+                { ico: '⏳', bg: '#FEF3C7', num: counts.expiring, lbl: 'Lease Expiring' },
               ].map(s => (
                 <div key={s.lbl} className="sstat">
-                  <div className="sstat-ico" style={{background:s.bg}}>{s.ico}</div>
+                  <div className="sstat-ico" style={{ background: s.bg }}>{s.ico}</div>
                   <div>
                     <div className="sstat-num">{s.num}</div>
                     <div className="sstat-lbl">{s.lbl}</div>
@@ -1081,9 +1091,9 @@ export default function TenantsPage() {
               </div>
               <div className="filter-row-wrap">
                 <div className="filter-tabs">
-                  {(['all','active','late','expiring','ended'] as const).map(f => (
-                    <button key={f} className={`ftab${filter===f?' active':''}`} onClick={() => setFilter(f)}>
-                      {f.charAt(0).toUpperCase()+f.slice(1)}
+                  {(['all', 'active', 'late', 'expiring', 'ended'] as const).map(f => (
+                    <button key={f} className={`ftab${filter === f ? ' active' : ''}`} onClick={() => setFilter(f)}>
+                      {f.charAt(0).toUpperCase() + f.slice(1)}
                       <span className="fc">{counts[f]}</span>
                     </button>
                   ))}
@@ -1094,7 +1104,7 @@ export default function TenantsPage() {
             <div className="mlayout">
               <div className="tenant-list">
                 {loading ? (
-                  [1,2,3,4].map(i => (
+                  [1, 2, 3, 4].map(i => (
                     <div key={i} className="skel-card">
                       <div className="skeleton skel-av" />
                       <div className="skel-lines">
@@ -1109,16 +1119,16 @@ export default function TenantsPage() {
                     <div className="e-title">{search || filter !== 'all' ? 'No tenants match your search' : 'No tenants yet — invite your first!'}</div>
                   </div>
                 ) : filtered.map((t) => {
-                  const sc  = SC[t.status]
+                  const sc = SC[t.status]
                   const idx = tenants.findIndex(x => x.id === t.id)
-                  const bg  = AV[Math.max(0, idx) % AV.length]
+                  const bg = AV[Math.max(0, idx) % AV.length]
                   return (
                     <div key={t.id}
-                      className={`tenant-card${selected?.id===t.id?' sel':''}`}
+                      className={`tenant-card${selected?.id === t.id ? ' sel' : ''}`}
                       onClick={() => selectTenant(t)}>
                       {t.avatar_url
-                        ? <img src={t.avatar_url} alt={t.full_name} style={{width:44,height:44,borderRadius:13,objectFit:'cover',flexShrink:0}} />
-                        : <div style={{width:44,height:44,borderRadius:13,background:bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:700,color:'#fff',flexShrink:0}}>{initials(t.full_name)}</div>
+                        ? <img src={t.avatar_url} alt={t.full_name} style={{ width: 44, height: 44, borderRadius: 13, objectFit: 'cover', flexShrink: 0 }} />
+                        : <div style={{ width: 44, height: 44, borderRadius: 13, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{initials(t.full_name)}</div>
                       }
                       <div className="t-info">
                         <div className="t-name">{t.full_name}</div>
@@ -1130,10 +1140,10 @@ export default function TenantsPage() {
                       </div>
                       <div className="t-right">
                         <div className="t-rent">${t.rent_amount}/mo</div>
-                        <span className="badge" style={{background:sc.bg,color:sc.color}}>{sc.label}</span>
+                        <span className="badge" style={{ background: sc.bg, color: sc.color }}>{sc.label}</span>
                         {/* Lease not set warning */}
                         {t.profile_id && (t.lease_start === '—' || !t.lease_start) && (
-                          <span style={{display:'inline-flex',alignItems:'center',gap:3,fontSize:10,fontWeight:700,borderRadius:6,padding:'2px 7px',background:'#FEF3C7',color:'#D97706',border:'1px solid #FCD34D'}}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, borderRadius: 6, padding: '2px 7px', background: '#FEF3C7', color: '#D97706', border: '1px solid #FCD34D' }}>
                             ⚠️ No Lease
                           </span>
                         )}
@@ -1148,7 +1158,7 @@ export default function TenantsPage() {
 
               <div className="detail-panel">
                 {!selected
-                  ? <div className="no-sel"><div className="no-sel-ico">👤</div><div className="no-sel-txt">Select a tenant to<br/>view their details</div></div>
+                  ? <div className="no-sel"><div className="no-sel-ico">👤</div><div className="no-sel-txt">Select a tenant to<br />view their details</div></div>
                   : renderDetail(selected, false)
                 }
               </div>
