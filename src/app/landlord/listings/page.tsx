@@ -22,7 +22,7 @@ type Listing = {
   created_at: string
 }
 
-type PropertyOption = { id: string; name: string }
+type PropertyOption = { id: string; name: string; city?: string; type?: string }
 type UnitOption    = { id: string; unit_number: string; monthly_rent: number }
 
 const STATUS_CFG: Record<string,{label:string,bg:string,color:string}> = {
@@ -59,11 +59,16 @@ export default function ListingsPage() {
   const [shareId, setShareId]           = useState<string|null>(null)
   const [shareCopied, setShareCopied]   = useState(false)
 
-  // Photo upload state
-  const [photoFiles, setPhotoFiles]     = useState<File[]>([])
-  const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
+  // Photo state
+  const [photoFiles, setPhotoFiles]         = useState<File[]>([])
+  const [photoPreviews, setPhotoPreviews]   = useState<string[]>([])
   const [existingPhotos, setExistingPhotos] = useState<string[]>([])
   const [uploadingPhotos, setUploadingPhotos] = useState(false)
+
+  // AI writer state
+  const [aiLoading, setAiLoading]   = useState(false)
+  const [aiError, setAiError]       = useState('')
+  const [aiSuccess, setAiSuccess]   = useState(false)
 
   const [form, setForm] = useState({
     title: '', description: '', property_id: '', unit_id: '',
@@ -76,7 +81,7 @@ export default function ListingsPage() {
     setLoading(true)
     try {
       const sb = createClient()
-      const { data: props } = await sb.from('properties').select('id,name').eq('landlord_id', uid)
+      const { data: props } = await sb.from('properties').select('id,name,city,type').eq('landlord_id', uid)
       setProperties(props || [])
       const pm: Record<string,string> = {}
       ;(props||[]).forEach((p:any)=>{ pm[p.id]=p.name })
@@ -129,14 +134,84 @@ export default function ListingsPage() {
     setUnits(data||[])
   }
 
+  // ── AI LISTING WRITER ─────────────────────────────────────
+  async function handleAiWrite() {
+    if (!form.property_id) { setAiError('Select a property first.'); return }
+    setAiLoading(true); setAiError(''); setAiSuccess(false)
+
+    const prop = properties.find(p => p.id === form.property_id)
+    const unit = units.find(u => u.id === form.unit_id)
+    const propName = prop?.name || 'Property'
+    const propCity = prop?.city || ''
+    const propType = prop?.type || 'residential'
+    const unitNum  = unit?.unit_number || ''
+    const beds  = form.bedrooms || '1'
+    const baths = form.bathrooms || '1'
+    const rent  = form.rent_amount || '0'
+    const avail = form.available_from
+      ? new Date(form.available_from).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})
+      : 'immediately'
+
+    const prompt = `You are a professional real estate copywriter. Write a compelling rental listing for the following property.
+
+Property details:
+- Property name: ${propName}
+- City/Location: ${propCity || 'Sri Lanka'}
+- Property type: ${propType}
+- Unit: ${unitNum || 'N/A'}
+- Bedrooms: ${beds}
+- Bathrooms: ${baths}
+- Monthly rent: $${rent}
+- Available from: ${avail}
+
+Write ONLY a JSON object (no markdown, no backticks) with exactly two keys:
+- "title": A compelling listing title (max 60 characters). Make it specific and attractive.
+- "description": A professional 3-4 sentence description highlighting the key features, lifestyle, and value. Make it warm and inviting but factual.
+
+The tone should be professional yet approachable. Focus on the lifestyle and convenience.`
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1000,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      })
+      const data = await response.json()
+      const text = (data.content || [])
+        .filter((b: any) => b.type === 'text')
+        .map((b: any) => b.text)
+        .join('')
+        .trim()
+        .replace(/```json|```/g, '')
+        .trim()
+
+      const parsed = JSON.parse(text)
+      if (parsed.title && parsed.description) {
+        setForm(f => ({ ...f, title: parsed.title, description: parsed.description }))
+        setAiSuccess(true)
+        setTimeout(() => setAiSuccess(false), 3000)
+      } else {
+        setAiError('AI response was incomplete. Try again.')
+      }
+    } catch (err: any) {
+      setAiError('Failed to generate. Please try again.')
+      console.error('AI write error:', err)
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
   // ── PHOTO HANDLING ────────────────────────────────────────
   function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files||[])
     if (!files.length) return
-    const combined = [...photoFiles, ...files].slice(0, 8) // max 8
+    const combined = [...photoFiles, ...files].slice(0, 8)
     setPhotoFiles(combined)
-    const previews = combined.map(f => URL.createObjectURL(f))
-    setPhotoPreviews(previews)
+    setPhotoPreviews(combined.map(f => URL.createObjectURL(f)))
     e.target.value = ''
   }
 
@@ -207,28 +282,26 @@ export default function ListingsPage() {
     if (!deleteId) return
     try {
       const sb = createClient()
-      const { error } = await sb.from('listings').delete().eq('id', deleteId)
-      if (error) throw error
+      await sb.from('listings').delete().eq('id', deleteId)
       setListings(prev=>prev.filter(l=>l.id!==deleteId))
-    } catch(e:any) { alert('Error: '+e?.message) }
+    } catch(e:any) { console.error(e?.message) }
     finally { setDeleteId(null) }
   }
 
   async function toggleStatus(id: string, status: Listing['status']) {
-    try {
-      const sb = createClient()
-      const { error } = await sb.from('listings').update({status}).eq('id', id)
-      if (error) throw error
-      setListings(prev=>prev.map(l=>l.id===id?{...l,status}:l))
-    } catch(e:any) { alert('Error: '+e?.message) }
+    const sb = createClient()
+    await sb.from('listings').update({status}).eq('id', id)
+    setListings(prev=>prev.map(l=>l.id===id?{...l,status}:l))
   }
 
   function openAdd() {
     const activeCount = listings.filter(l=>l.status==='active').length
     if (activeCount >= 2) { setShowUpgradeModal(true); return }
-    setForm({title:'',description:'',property_id:properties[0]?.id||'',unit_id:'',bedrooms:'1',bathrooms:'1',rent_amount:'',available_from:'',status:'draft'})
+    setForm({title:'',description:'',property_id:properties[0]?.id||'',unit_id:'',
+      bedrooms:'1',bathrooms:'1',rent_amount:'',available_from:'',status:'draft'})
     if (properties[0]?.id) loadUnitsForProperty(properties[0].id)
     setPhotoFiles([]); setPhotoPreviews([]); setExistingPhotos([])
+    setAiError(''); setAiSuccess(false)
     setEditing(null); setDrawer('add')
   }
 
@@ -238,6 +311,7 @@ export default function ListingsPage() {
       rent_amount:String(l.rent_amount),available_from:l.available_from,status:l.status})
     loadUnitsForProperty(l.property_id)
     setPhotoFiles([]); setPhotoPreviews([]); setExistingPhotos(l.photos||[])
+    setAiError(''); setAiSuccess(false)
     setEditing(l); setDrawer('edit')
   }
 
@@ -247,9 +321,8 @@ export default function ListingsPage() {
   }
 
   async function copyShareUrl(id: string) {
-    const url = getShareUrl(id)
     try {
-      await navigator.clipboard.writeText(url)
+      await navigator.clipboard.writeText(getShareUrl(id))
       setShareCopied(true)
       setTimeout(()=>setShareCopied(false), 2500)
     } catch { }
@@ -270,10 +343,10 @@ export default function ListingsPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:wght@300;400;700&display=swap');
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-        html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;overflow-x:hidden;max-width:100vw}
-        .shell{display:flex;min-height:100vh;width:100%;position:relative}
+        html{overflow-x:hidden;width:100%}
+        html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;overflow-x:hidden;width:100%;max-width:100vw}
+        .shell{display:flex;min-height:100vh;width:100%;position:relative;overflow-x:hidden}
 
-        /* SIDEBAR */
         .sidebar{width:260px;flex-shrink:0;background:#0F172A;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:200;transition:transform .25s ease}
         .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:199}.sb-overlay.open{display:block}
         .sidebar.open{transform:translateX(0)!important}
@@ -296,7 +369,6 @@ export default function ListingsPage() {
         .sb-uname{font-size:13px;font-weight:700;color:#E2E8F0}
         .sb-uplan{display:inline-block;font-size:10px;font-weight:700;color:#60A5FA;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.25);border-radius:5px;padding:1px 6px;margin-top:2px}
 
-        /* MAIN */
         .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:hidden;width:calc(100% - 260px)}
         .topbar{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:#fff;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(15,23,42,.04);width:100%}
         .tb-left{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
@@ -307,14 +379,12 @@ export default function ListingsPage() {
         .btn-primary:disabled{opacity:.6;cursor:not-allowed}
         .content{padding:22px 20px;flex:1;width:100%;min-width:0}
 
-        /* STATS */
         .stat-strip{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:18px;width:100%}
         .sstat{background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:14px 12px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 4px rgba(15,23,42,.04);min-width:0}
         .sstat-ico{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
         .sstat-num{font-family:'Fraunces',serif;font-size:22px;font-weight:700;color:#0F172A;line-height:1}
         .sstat-lbl{font-size:11px;color:#94A3B8;font-weight:500;margin-top:2px}
 
-        /* FILTERS */
         .filter-row-wrap{overflow-x:auto;scrollbar-width:none;margin-bottom:18px;width:100%}
         .filter-row-wrap::-webkit-scrollbar{display:none}
         .filter-tabs{display:inline-flex;gap:4px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:4px;white-space:nowrap}
@@ -324,18 +394,14 @@ export default function ListingsPage() {
         .fc{font-size:10px;font-weight:700;border-radius:99px;padding:1px 6px;background:#F1F5F9;color:#64748B}
         .ftab.active .fc{background:rgba(255,255,255,.2);color:#fff}
 
-        /* LISTING GRID */
         .listing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;width:100%}
         .listing-card{background:#fff;border:1px solid #E2E8F0;border-radius:18px;overflow:hidden;box-shadow:0 1px 4px rgba(15,23,42,.04);display:flex;flex-direction:column;transition:box-shadow .18s,transform .18s}
         .listing-card:hover{box-shadow:0 6px 24px rgba(15,23,42,.10);transform:translateY(-2px)}
-
-        /* PHOTO BANNER */
         .lc-banner{height:160px;position:relative;background:#F1F5F9;overflow:hidden}
         .lc-banner-img{width:100%;height:100%;object-fit:cover;display:block}
         .lc-banner-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:44px;background:linear-gradient(135deg,#E2E8F0,#CBD5E1)}
         .lc-photo-count{position:absolute;bottom:10px;left:10px;background:rgba(15,23,42,.6);color:#fff;font-size:11px;font-weight:700;border-radius:99px;padding:3px 10px;backdrop-filter:blur(4px)}
         .lc-status{position:absolute;top:10px;right:10px;font-size:11px;font-weight:700;border-radius:99px;padding:3px 10px}
-
         .lc-body{padding:14px 16px;flex:1}
         .lc-title{font-size:14.5px;font-weight:700;color:#0F172A;margin-bottom:4px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .lc-sub{font-size:12px;color:#94A3B8;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -343,7 +409,6 @@ export default function ListingsPage() {
         .lc-facts{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
         .lc-fact{font-size:11px;color:#475569;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:3px 7px;font-weight:500}
         .lc-desc{font-size:12px;color:#64748B;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-
         .lc-footer{padding:10px 14px;border-top:1px solid #F1F5F9;display:flex;gap:5px;flex-wrap:wrap;align-items:center}
         .lf-btn{padding:5px 10px;border-radius:8px;font-size:11.5px;font-weight:600;cursor:pointer;border:1.5px solid #E2E8F0;background:#F8FAFC;color:#475569;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;white-space:nowrap}
         .lf-btn:hover{border-color:#3B82F6;color:#2563EB;background:#EFF6FF}
@@ -354,6 +419,16 @@ export default function ListingsPage() {
         .lf-btn-share{border-color:#BFDBFE;background:#EFF6FF;color:#2563EB}
         .lf-btn-share:hover{background:#DBEAFE!important;border-color:#93C5FD!important}
 
+        /* AI WRITER BUTTON */
+        .ai-btn{width:100%;padding:11px;border-radius:10px;border:none;background:linear-gradient(135deg,#7C3AED,#2563EB);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:14px;box-shadow:0 2px 12px rgba(124,58,237,.3);transition:all .18s;position:relative;overflow:hidden}
+        .ai-btn:hover{transform:translateY(-1px);box-shadow:0 4px 18px rgba(124,58,237,.4)}
+        .ai-btn:disabled{opacity:.7;cursor:not-allowed;transform:none}
+        .ai-btn-shimmer{position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent);animation:aiShimmer 1.4s infinite}
+        @keyframes aiShimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+        .ai-success{background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:10px 13px;font-size:13px;color:#16A34A;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:12px}
+        .ai-error{background:#FEE2E2;border:1px solid #FECACA;border-radius:10px;padding:10px 13px;font-size:13px;color:#DC2626;font-weight:600;margin-bottom:12px}
+        .ai-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;background:linear-gradient(135deg,#7C3AED,#2563EB);color:#fff;padding:2px 8px;border-radius:99px;margin-left:6px;vertical-align:middle}
+
         /* SHARE MODAL */
         .share-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;align-items:center;justify-content:center;padding:16px}
         .share-modal-bg.open{display:flex}
@@ -361,15 +436,14 @@ export default function ListingsPage() {
         .share-title{font-family:'Fraunces',serif;font-size:20px;font-weight:400;color:#0F172A;margin-bottom:6px}
         .share-sub{font-size:13px;color:#94A3B8;margin-bottom:20px}
         .share-url-box{display:flex;gap:8px;margin-bottom:18px}
-        .share-url-input{flex:1;padding:10px 13px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:12.5px;font-family:'Plus Jakarta Sans',sans-serif;color:#475569;background:#F8FAFC;outline:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .share-copy-btn{padding:10px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;white-space:nowrap;flex-shrink:0;transition:all .15s}
+        .share-url-input{flex:1;padding:10px 13px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:12.5px;font-family:'Plus Jakarta Sans',sans-serif;color:#475569;background:#F8FAFC;outline:none}
+        .share-copy-btn{padding:10px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;white-space:nowrap;flex-shrink:0}
         .share-copy-btn.copied{background:linear-gradient(135deg,#16A34A,#15803D)}
         .share-socials{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px}
-        .share-soc-btn{padding:10px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid #E2E8F0;background:#F8FAFC;color:#475569;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px}
-        .share-soc-btn:hover{background:#F1F5F9;border-color:#CBD5E1}
+        .share-soc-btn{padding:10px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid #E2E8F0;background:#F8FAFC;color:#475569;font-family:'Plus Jakarta Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px}
+        .share-soc-btn:hover{background:#F1F5F9}
         .share-close-btn{width:100%;padding:10px;border-radius:10px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
 
-        /* SKELETON / EMPTY */
         @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
         .skeleton{border-radius:8px;background:linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}
         .empty-state{text-align:center;padding:80px 20px;background:#fff;border:1px solid #E2E8F0;border-radius:16px}
@@ -377,7 +451,6 @@ export default function ListingsPage() {
         .e-title{font-size:17px;font-weight:700;color:#475569;margin-bottom:6px}
         .e-sub{font-size:13.5px;color:#94A3B8;margin-bottom:22px}
 
-        /* DRAWER */
         .drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300}.drawer-overlay.open{display:block}
         .drawer{position:fixed;top:0;right:0;bottom:0;width:500px;background:#fff;z-index:301;box-shadow:-8px 0 40px rgba(15,23,42,.14);transform:translateX(100%);transition:transform .28s ease;display:flex;flex-direction:column}
         .drawer.open{transform:translateX(0)}
@@ -387,29 +460,27 @@ export default function ListingsPage() {
         .dr-body{flex:1;overflow-y:auto;padding:20px 24px}
         .dr-body::-webkit-scrollbar{width:4px}.dr-body::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:99px}
         .dr-footer{padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;gap:10px;justify-content:flex-end;flex-shrink:0}
-        .field{margin-bottom:16px}
+        .field{margin-bottom:14px}
         .field label{display:block;font-size:11.5px;font-weight:700;color:#374151;margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px}
         .field input,.field select,.field textarea{width:100%;padding:10px 13px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:13.5px;font-family:'Plus Jakarta Sans',sans-serif;color:#0F172A;background:#fff;outline:none;transition:border .15s}
         .field input:focus,.field select:focus,.field textarea:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.08)}
-        .field textarea{resize:vertical;min-height:80px}
+        .field textarea{resize:vertical;min-height:90px;line-height:1.6}
         .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
         .dr-cancel{padding:9px 20px;border-radius:10px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:13px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
         .dr-save{padding:9px 22px;border-radius:10px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
         .dr-save:disabled{opacity:.6;cursor:not-allowed}
 
-        /* PHOTO UPLOAD IN DRAWER */
         .photo-section-label{font-size:11.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
         .photo-req{font-size:11px;color:#94A3B8;font-weight:500;text-transform:none;letter-spacing:0}
         .photo-req.ok{color:#16A34A;font-weight:600}
         .photo-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
         .photo-thumb{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:#F1F5F9}
         .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
-        .photo-thumb-del{position:absolute;top:4px;right:4px;background:rgba(15,23,42,.7);border:none;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:10px;line-height:1}
+        .photo-thumb-del{position:absolute;top:4px;right:4px;background:rgba(15,23,42,.7);border:none;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:10px}
         .photo-upload-zone{border:2px dashed #E2E8F0;border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:all .15s;font-size:12.5px;color:#94A3B8;line-height:1.6}
         .photo-upload-zone:hover{border-color:#3B82F6;background:#F0F9FF;color:#2563EB}
-        .photo-warn{font-size:12px;color:#DC2626;font-weight:600;margin-bottom:12px;padding:8px 12px;background:#FEE2E2;border-radius:8px}
+        .photo-warn{font-size:12px;color:#DC2626;font-weight:600;margin-top:8px;padding:8px 12px;background:#FEE2E2;border-radius:8px}
 
-        /* DELETE */
         .del-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:400;align-items:center;justify-content:center}.del-overlay.open{display:flex}
         .del-box{background:#fff;border-radius:18px;padding:32px;max-width:380px;width:90%;text-align:center}
         .del-ico{font-size:40px;margin-bottom:12px}
@@ -419,7 +490,6 @@ export default function ListingsPage() {
         .del-cancel{padding:9px 22px;border-radius:10px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:13px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
         .del-confirm{padding:9px 22px;border-radius:10px;border:none;background:#DC2626;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
 
-        /* UPGRADE MODAL */
         .umodal-overlay{display:flex;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:600;align-items:center;justify-content:center;padding:16px}
         .umodal{background:#fff;border-radius:22px;padding:32px;max-width:400px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(15,23,42,.2)}
         .umodal-icon{font-size:44px;margin-bottom:12px}
@@ -431,30 +501,16 @@ export default function ListingsPage() {
         .umodal-btn-pro{width:100%;padding:12px;border-radius:12px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;margin-bottom:8px}
         .umodal-btn-cancel{width:100%;padding:10px;border-radius:12px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
 
-        /* RESPONSIVE */
-        @media(min-width:1100px){
-          .stat-strip{grid-template-columns:repeat(4,1fr)}
-        }
-        @media(max-width:1099px) and (min-width:769px){
-          .listing-grid{grid-template-columns:repeat(2,1fr)}
-        }
+        @media(min-width:1100px){.stat-strip{grid-template-columns:repeat(4,1fr)}}
+        @media(max-width:1099px) and (min-width:769px){.listing-grid{grid-template-columns:repeat(2,1fr)}}
         @media(max-width:768px){
-          .sidebar{transform:translateX(-100%)}
-          .main{margin-left:0!important;width:100%!important}
-          .hamburger{display:block}
-          .topbar{padding:0 14px}
-          .content{padding:14px 14px}
-          .stat-strip{grid-template-columns:repeat(2,1fr)}
-          .listing-grid{grid-template-columns:1fr}
-          .drawer{width:100%;border-radius:0}
-          .field-row{grid-template-columns:1fr}
-          .share-modal{padding:22px 18px}
-          .share-socials{grid-template-columns:1fr}
+          .sidebar{transform:translateX(-100%)}.main{margin-left:0!important;width:100%!important}.hamburger{display:block}
+          .topbar{padding:0 14px}.content{padding:14px 14px}.stat-strip{grid-template-columns:repeat(2,1fr)}
+          .listing-grid{grid-template-columns:1fr}.drawer{width:100%;border-radius:0}
+          .field-row{grid-template-columns:1fr}.share-socials{grid-template-columns:1fr}
         }
         @media(max-width:480px){
-          .topbar{padding:0 12px}
-          .content{padding:12px 12px}
-          .photo-grid{grid-template-columns:repeat(3,1fr)}
+          .topbar{padding:0 12px}.content{padding:12px 12px}.photo-grid{grid-template-columns:repeat(3,1fr)}
         }
       `}</style>
 
@@ -470,43 +526,61 @@ export default function ListingsPage() {
             </button>
           </div>
           <div className="share-socials">
-            <button className="share-soc-btn" onClick={()=>{
-              if (shareId) window.open(`https://wa.me/?text=${encodeURIComponent('Check out this rental listing: '+getShareUrl(shareId))}`)
-            }}>💬 WhatsApp</button>
-            <button className="share-soc-btn" onClick={()=>{
-              if (shareId) window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getShareUrl(shareId))}`)
-            }}>📘 Facebook</button>
-            <button className="share-soc-btn" onClick={()=>{
-              if (shareId) window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent('🏠 Rental available! Check it out:')} &url=${encodeURIComponent(getShareUrl(shareId))}`)
-            }}>🐦 Twitter / X</button>
-            <button className="share-soc-btn" onClick={()=>{
-              if (shareId) window.open(`mailto:?subject=Rental Listing&body=${encodeURIComponent('Check out this rental listing: '+getShareUrl(shareId))}`)
-            }}>📧 Email</button>
+            <button className="share-soc-btn" onClick={()=>{if(shareId)window.open(`https://wa.me/?text=${encodeURIComponent('Check out this rental listing: '+getShareUrl(shareId))}`)}}>💬 WhatsApp</button>
+            <button className="share-soc-btn" onClick={()=>{if(shareId)window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getShareUrl(shareId))}`)}}>📘 Facebook</button>
+            <button className="share-soc-btn" onClick={()=>{if(shareId)window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent('🏠 Rental available!')}&url=${encodeURIComponent(getShareUrl(shareId))}`)}}>🐦 Twitter / X</button>
+            <button className="share-soc-btn" onClick={()=>{if(shareId)window.open(`mailto:?subject=Rental Listing&body=${encodeURIComponent('Check out this rental listing: '+getShareUrl(shareId))}`)}}>📧 Email</button>
           </div>
           <button className="share-close-btn" onClick={()=>setShareId(null)}>Close</button>
         </div>
       </div>
 
-      {/* Drawer overlay */}
+      {/* Drawer */}
       <div className={`drawer-overlay${drawer?' open':''}`} onClick={()=>setDrawer(null)} />
-
-      {/* Add/Edit Drawer */}
       <div className={`drawer${drawer?' open':''}`}>
         <div className="dr-head">
-          <span className="dr-title">{drawer==='add'?'New Listing':'Edit Listing'}</span>
+          <span className="dr-title">
+            {drawer==='add'?'New Listing':'Edit Listing'}
+            <span className="ai-badge">✨ AI</span>
+          </span>
           <button className="dr-close" onClick={()=>setDrawer(null)}>✕</button>
         </div>
         <div className="dr-body">
+
+          {/* ── AI WRITER ── */}
+          <div style={{background:'linear-gradient(135deg,rgba(124,58,237,.06),rgba(37,99,235,.06))',border:'1.5px solid rgba(124,58,237,.15)',borderRadius:14,padding:'14px 16px',marginBottom:18}}>
+            <div style={{fontSize:13,fontWeight:700,color:'#4C1D95',marginBottom:4,display:'flex',alignItems:'center',gap:6}}>
+              ✨ AI Listing Writer
+              <span style={{fontSize:10,fontWeight:600,color:'#7C3AED',background:'rgba(124,58,237,.1)',padding:'1px 7px',borderRadius:99}}>Beta</span>
+            </div>
+            <div style={{fontSize:12,color:'#64748B',marginBottom:10,lineHeight:1.5}}>
+              Fill in property, bedrooms, bathrooms & rent — then let AI generate a professional title and description instantly.
+            </div>
+            <button
+              className="ai-btn"
+              disabled={aiLoading || !form.property_id}
+              onClick={handleAiWrite}>
+              {aiLoading && <span className="ai-btn-shimmer"/>}
+              {aiLoading ? '✨ Writing your listing...' : '✨ Generate with AI'}
+            </button>
+            {aiSuccess && (
+              <div className="ai-success">✓ Title and description generated! Review and edit below.</div>
+            )}
+            {aiError && (
+              <div className="ai-error">⚠️ {aiError}</div>
+            )}
+          </div>
+
           {/* Photos */}
-          <div style={{marginBottom:18}}>
+          <div style={{marginBottom:16}}>
             <div className="photo-section-label">
               <span>Photos</span>
               <span className={`photo-req${totalPhotosInForm>=4?' ok':''}`}>
-                {totalPhotosInForm}/4 min required {totalPhotosInForm>=4?'✓':''}
+                {totalPhotosInForm}/4 min {totalPhotosInForm>=4?'✓':''}
               </span>
             </div>
             {totalPhotosInForm > 0 && (
-              <div className="photo-grid" style={{marginBottom:8}}>
+              <div className="photo-grid">
                 {existingPhotos.map((url,i)=>(
                   <div key={`ex-${i}`} className="photo-thumb">
                     <img src={url} alt="" />
@@ -527,17 +601,12 @@ export default function ListingsPage() {
                 <div style={{fontSize:11,marginTop:3,color:'#94A3B8'}}>{8-totalPhotosInForm} slot{8-totalPhotosInForm!==1?'s':''} remaining · JPG, PNG</div>
               </div>
             )}
-            <input ref={photoInputRef} type="file" accept="image/*" multiple style={{display:'none'}}
-              onChange={handlePhotoSelect} />
+            <input ref={photoInputRef} type="file" accept="image/*" multiple style={{display:'none'}} onChange={handlePhotoSelect} />
             {totalPhotosInForm > 0 && totalPhotosInForm < 4 && (
               <div className="photo-warn">⚠️ Add {4-totalPhotosInForm} more photo{4-totalPhotosInForm!==1?'s':''} to publish</div>
             )}
           </div>
 
-          <div className="field">
-            <label>Title *</label>
-            <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="e.g. Bright 2BR in Colombo 03" />
-          </div>
           <div className="field">
             <label>Property *</label>
             <select value={form.property_id} onChange={e=>{
@@ -551,9 +620,8 @@ export default function ListingsPage() {
           <div className="field">
             <label>Unit</label>
             <select value={form.unit_id} onChange={e=>{
-              setForm(f=>({...f,unit_id:e.target.value}))
               const u = units.find(u=>u.id===e.target.value)
-              if (u) setForm(f=>({...f,unit_id:e.target.value,rent_amount:String(u.monthly_rent)}))
+              setForm(f=>({...f,unit_id:e.target.value,rent_amount:u?String(u.monthly_rent):f.rent_amount}))
             }}>
               <option value="">Select unit (optional)</option>
               {units.map(u=><option key={u.id} value={u.id}>{u.unit_number} — ${u.monthly_rent}/mo</option>)}
@@ -588,10 +656,23 @@ export default function ListingsPage() {
               <option value="taken">Taken</option>
             </select>
           </div>
-          <div className="field">
-            <label>Description</label>
-            <textarea value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} placeholder="Describe the property..." />
+
+          {/* Title + Description AFTER AI can fill them */}
+          <div style={{borderTop:'1px solid #F1F5F9',paddingTop:14,marginTop:4}}>
+            <div style={{fontSize:11.5,fontWeight:700,color:'#374151',textTransform:'uppercase',letterSpacing:'.4px',marginBottom:12,display:'flex',alignItems:'center',gap:6}}>
+              Content
+              {aiSuccess && <span style={{fontSize:10,fontWeight:700,color:'#7C3AED',background:'rgba(124,58,237,.1)',padding:'1px 7px',borderRadius:99}}>✨ AI Generated</span>}
+            </div>
+            <div className="field">
+              <label>Title *</label>
+              <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="e.g. Bright 2BR in Colombo 03" />
+            </div>
+            <div className="field">
+              <label>Description</label>
+              <textarea value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} placeholder="Describe the property — or use AI to generate above..." style={{minHeight:110}} />
+            </div>
           </div>
+
         </div>
         <div className="dr-footer">
           <button className="dr-cancel" onClick={()=>setDrawer(null)}>Cancel</button>
@@ -638,8 +719,8 @@ export default function ListingsPage() {
           <div className="sb-footer">
             <div className="sb-upgrade">
               <div className="sb-up-title">⭐ Upgrade to Pro</div>
-              <div className="sb-up-sub">Featured listings & seeker matching.</div>
-              <button className="sb-up-btn">See Plans →</button>
+              <div className="sb-up-sub">Unlimited listings & AI features.</div>
+              <button className="sb-up-btn" onClick={()=>window.location.href='/landlord/upgrade'}>See Plans →</button>
             </div>
             <div className="sb-user">
               <div className="sb-av">{userInitials}</div>
@@ -659,8 +740,11 @@ export default function ListingsPage() {
 
           <div className="content">
             <div style={{marginBottom:16}}>
-              <div style={{fontFamily:"'Fraunces',serif",fontSize:26,fontWeight:400,color:'#0F172A',letterSpacing:'-.5px',marginBottom:3}}>Listings</div>
-              <div style={{fontSize:13,color:'#94A3B8'}}>{counts.all} listing{counts.all!==1?'s':''} · {counts.active} active</div>
+              <div style={{fontFamily:"'Fraunces',serif",fontSize:26,fontWeight:400,color:'#0F172A',letterSpacing:'-.5px',marginBottom:3}}>
+                Listings
+                <span className="ai-badge">✨ AI</span>
+              </div>
+              <div style={{fontSize:13,color:'#94A3B8'}}>{counts.all} listing{counts.all!==1?'s':''} · {counts.active} active · AI-powered descriptions available</div>
             </div>
 
             <div className="stat-strip">
@@ -694,7 +778,6 @@ export default function ListingsPage() {
                       <div className="skeleton" style={{height:14,width:'80%'}} />
                       <div className="skeleton" style={{height:11,width:'55%'}} />
                       <div className="skeleton" style={{height:20,width:'40%'}} />
-                      <div className="skeleton" style={{height:11,width:'60%'}} />
                     </div>
                   </div>
                 ))}
@@ -703,7 +786,7 @@ export default function ListingsPage() {
               <div className="empty-state">
                 <div className="e-ico">📋</div>
                 <div className="e-title">{filter==='all'?'No listings yet':`No ${filter} listings`}</div>
-                <div className="e-sub">Create your first listing to attract tenants.</div>
+                <div className="e-sub">Create your first listing — use AI to write the perfect description.</div>
                 {filter==='all'&&<button className="btn-primary" style={{margin:'0 auto'}} onClick={openAdd}>+ New Listing</button>}
               </div>
             ) : (
@@ -760,7 +843,7 @@ export default function ListingsPage() {
             <div className="umodal-sub">You've reached the Free plan limit of 2 active listings. Upgrade to Pro for unlimited.</div>
             <div className="umodal-limit">⚠️ Free plan: 2 active listings max</div>
             <div className="umodal-features">
-              {['Unlimited active listings','Featured listing placement','Advanced analytics & reports','Unlimited properties & units'].map(f=>(
+              {['Unlimited active listings','AI listing writer (unlimited use)','Featured listing placement','Advanced analytics & reports'].map(f=>(
                 <div key={f} className="umodal-feat"><span style={{color:'#16A34A'}}>✓</span>{f}</div>
               ))}
             </div>
