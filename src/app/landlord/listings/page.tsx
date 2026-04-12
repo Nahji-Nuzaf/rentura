@@ -180,15 +180,16 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
         }),
       })
       const data = await response.json()
-      const text = (data.content || [])
-        .filter((b: any) => b.type === 'text')
-        .map((b: any) => b.text)
-        .join('')
+      if (data.error) { setAiError(data.error); return }
+
+      const raw = (data.text || '')
         .trim()
         .replace(/```json|```/g, '')
         .trim()
 
-      const parsed = JSON.parse(text)
+      if (!raw) { setAiError('Empty response. Check your API key.'); return }
+
+      const parsed = JSON.parse(raw)
       if (parsed.title && parsed.description) {
         setForm(f => ({ ...f, title: parsed.title, description: parsed.description }))
         setAiSuccess(true)
