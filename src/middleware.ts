@@ -16,31 +16,38 @@ export async function middleware(request: NextRequest) {
         },
         set(name: string, value: string, options: CookieOptions) {
           request.cookies.set({ name, value, ...options })
-          response = NextResponse.next({ request: { headers: request.headers } })
+          response = NextResponse.next({
+            request: { headers: request.headers },
+          })
           response.cookies.set({ name, value, ...options })
         },
         remove(name: string, options: CookieOptions) {
           request.cookies.set({ name, value: '', ...options })
-          response = NextResponse.next({ request: { headers: request.headers } })
+          response = NextResponse.next({
+            request: { headers: request.headers },
+          })
           response.cookies.set({ name, value: '', ...options })
         },
       },
     }
   )
 
+  // Use getUser() instead of getSession() for better security
   const { data: { user } } = await supabase.auth.getUser()
   const { pathname } = request.nextUrl
 
-  // Protect landlord, tenant, seeker routes
+  // 1. Define protected and auth routes
   const protectedPrefixes = ['/landlord', '/tenant', '/seeker', '/onboarding']
   const isProtected = protectedPrefixes.some(p => pathname.startsWith(p))
+  const isAuthPage = pathname === '/login' || pathname === '/signup'
 
+  // 2. If user is NOT logged in and trying to access protected routes
   if (!user && isProtected) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Redirect logged-in users away from auth pages
-  if (user && (pathname === '/login' || pathname === '/signup')) {
+  // 3. If user IS logged in and trying to access login/signup
+  if (user && isAuthPage) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('active_role')
@@ -48,9 +55,14 @@ export async function middleware(request: NextRequest) {
       .maybeSingle()
 
     const role = profile?.active_role || 'landlord'
-    if (role === 'tenant') return NextResponse.redirect(new URL('/tenant', request.url))
-    if (role === 'seeker') return NextResponse.redirect(new URL('/seeker', request.url))
-    return NextResponse.redirect(new URL('/landlord', request.url))
+    
+    // Redirect to their specific dashboard
+    const url = request.nextUrl.clone()
+    if (role === 'tenant') url.pathname = '/tenant'
+    else if (role === 'seeker') url.pathname = '/seeker'
+    else url.pathname = '/landlord'
+    
+    return NextResponse.redirect(url)
   }
 
   return response
@@ -58,6 +70,13 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - auth/callback (important: exclude your callback route!)
+     */
     '/((?!_next/static|_next/image|favicon.ico|auth/callback|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
