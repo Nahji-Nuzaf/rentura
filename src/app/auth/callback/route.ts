@@ -13,9 +13,7 @@ export async function GET(request: Request) {
   const roleFromUrl = searchParams.get('role') // passed from signup OAuth redirect
 
   if (!code) {
-    // return NextResponse.redirect(`${origin}/login`)
-    return NextResponse.redirect(`${origin}/login?error=missing_code`)
-    
+    return NextResponse.redirect(`${origin}/login`)
   }
 
   const response = NextResponse.redirect(`${origin}/landlord`) // placeholder, overwritten below
@@ -42,7 +40,7 @@ export async function GET(request: Request) {
   const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error || !data?.user) {
-    return NextResponse.redirect(`${origin}/login?error=invalid_session`)
+    return NextResponse.redirect(`${origin}/login`)
   }
 
   const user = data.user
