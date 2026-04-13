@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Image from 'next/image'
 
 type Message = {
   id: string
@@ -58,22 +59,22 @@ function fmtTime(ts: string) {
 export default function MessagesPage() {
   const router = useRouter()
   const [userInitials, setUserInitials] = useState('NN')
-  const [fullName, setFullName]         = useState('User')
-  const [userId, setUserId]             = useState('')
-  const [sidebarOpen, setSidebarOpen]   = useState(false)
-  const [convos, setConvos]             = useState<Conversation[]>([])
-  const [activeId, setActiveId]         = useState<string | null>(null)
+  const [fullName, setFullName] = useState('User')
+  const [userId, setUserId] = useState('')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [convos, setConvos] = useState<Conversation[]>([])
+  const [activeId, setActiveId] = useState<string | null>(null)
   const [showMobileChat, setShowMobileChat] = useState(false)
-  const [input, setInput]               = useState('')
-  const [loading, setLoading]           = useState(true)
-  const [sending, setSending]           = useState(false)
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const [search, setSearch]             = useState('')
+  const [search, setSearch] = useState('')
 
   // AI template state
-  const [showAiPanel, setShowAiPanel]   = useState(false)
-  const [aiLoading, setAiLoading]       = useState(false)
-  const [aiError, setAiError]           = useState('')
+  const [showAiPanel, setShowAiPanel] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState('')
 
   const active = convos.find(c => c.tenantId === activeId) || null
   const filteredConvos = search
@@ -90,7 +91,7 @@ export default function MessagesPage() {
       if (!propIds.length) { setConvos([]); setLoading(false); return }
 
       const propNameMap: Record<string, string> = {}
-      ;(props || []).forEach((p: any) => { propNameMap[p.id] = p.name })
+        ; (props || []).forEach((p: any) => { propNameMap[p.id] = p.name })
 
       const { data: tenants } = await supabase
         .from('tenants').select('id,profile_id,unit_id,property_id')
@@ -101,12 +102,12 @@ export default function MessagesPage() {
       const unitIds = [...new Set(tenants.map((t: any) => t.unit_id).filter(Boolean))]
       const { data: unitsData } = await supabase.from('units').select('id,unit_number').in('id', unitIds)
       const unitMap: Record<string, string> = {}
-      ;(unitsData || []).forEach((u: any) => { unitMap[u.id] = u.unit_number })
+        ; (unitsData || []).forEach((u: any) => { unitMap[u.id] = u.unit_number })
 
       const profileIds = [...new Set(tenants.map((t: any) => t.profile_id).filter(Boolean))]
       const { data: profiles } = await supabase.from('profiles').select('id,full_name').in('id', profileIds)
       const profileMap: Record<string, string> = {}
-      ;(profiles || []).forEach((p: any) => { profileMap[p.id] = p.full_name })
+        ; (profiles || []).forEach((p: any) => { profileMap[p.id] = p.full_name })
 
       const { data: messages } = await supabase
         .from('messages').select('id,sender_id,receiver_id,content,read,created_at')
@@ -114,7 +115,7 @@ export default function MessagesPage() {
         .order('created_at', { ascending: true })
 
       const shaped: Conversation[] = tenants.map((t: any, i: number) => {
-        const pid  = t.profile_id
+        const pid = t.profile_id
         const name = profileMap[pid] || 'Unknown'
         const msgs = (messages || [])
           .filter((m: any) => (m.sender_id === pid && m.receiver_id === uid) || (m.sender_id === uid && m.receiver_id === pid))
@@ -124,23 +125,23 @@ export default function MessagesPage() {
             from: m.sender_id === uid ? 'me' : 'them',
           })) as Message[]
 
-        const last   = msgs[msgs.length - 1]
+        const last = msgs[msgs.length - 1]
         const unread = msgs.filter(m => m.from === 'them' && !m.read).length
         return {
           tenantId: pid, name,
-          initials: name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0,2),
-          color:    COLORS[i % COLORS.length],
+          initials: name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
+          color: COLORS[i % COLORS.length],
           property: propNameMap[t.property_id] || '—',
-          unit:     unitMap[t.unit_id] || '—',
-          lastMsg:  last?.content || 'No messages yet',
+          unit: unitMap[t.unit_id] || '—',
+          lastMsg: last?.content || 'No messages yet',
           lastTime: last ? fmtTime(last.created_at) : '',
           unread, messages: msgs,
         }
       })
 
-      shaped.sort((a,b) => {
-        const aL = a.messages[a.messages.length-1]?.created_at || ''
-        const bL = b.messages[b.messages.length-1]?.created_at || ''
+      shaped.sort((a, b) => {
+        const aL = a.messages[a.messages.length - 1]?.created_at || ''
+        const bL = b.messages[b.messages.length - 1]?.created_at || ''
         return bL.localeCompare(aL)
       })
 
@@ -160,7 +161,7 @@ export default function MessagesPage() {
       if (!user) { router.push('/login'); return }
       const name = user.user_metadata?.full_name || 'User'
       setFullName(name); setUserId(user.id)
-      setUserInitials(name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0,2))
+      setUserInitials(name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2))
       await loadConversations(user.id)
     }
     init()
@@ -356,11 +357,21 @@ export default function MessagesPage() {
         }
       `}</style>
 
-      <div className={`sb-overlay${sidebarOpen?' open':''}`} onClick={()=>setSidebarOpen(false)}/>
+      <div className={`sb-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
 
       <div className="shell">
-        <aside className={`sidebar${sidebarOpen?' open':''}`}>
-          <div className="sb-logo"><div className="sb-logo-icon">🏘️</div><span className="sb-logo-name">Rentura</span></div>
+        <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
+          <div className="sb-logo">
+            <div className="sb-logo-icon">
+              <Image
+                src="/icon.png"
+                alt="Rentura Logo"
+                width={24}
+                height={24}
+              />
+            </div>
+            <span className="sb-logo-name">Rentura</span>
+          </div>
           <nav className="sb-nav">
             <span className="sb-section">Overview</span>
             <a href="/landlord" className="sb-item"><span className="sb-ico">⊞</span>Dashboard</a>
@@ -374,7 +385,7 @@ export default function MessagesPage() {
             <a href="/landlord/documents" className="sb-item"><span className="sb-ico">📁</span>Documents</a>
             <a href="/landlord/messages" className="sb-item active">
               <span className="sb-ico">💬</span>Messages
-              {totalUnread>0&&<span className="sb-badge">{totalUnread}</span>}
+              {totalUnread > 0 && <span className="sb-badge">{totalUnread}</span>}
             </a>
             <a href="/landlord/listings" className="sb-item"><span className="sb-ico">📋</span>Listings</a>
             <span className="sb-section">Account</span>
@@ -384,7 +395,7 @@ export default function MessagesPage() {
             <div className="sb-upgrade">
               <div className="sb-up-title">⭐ Upgrade to Pro</div>
               <div className="sb-up-sub">Unlimited messages & AI templates.</div>
-              <button className="sb-up-btn" onClick={()=>window.location.href='/landlord/upgrade'}>See Plans →</button>
+              <button className="sb-up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
             </div>
             <div className="sb-user">
               <div className="sb-av">{userInitials}</div>
@@ -395,39 +406,39 @@ export default function MessagesPage() {
 
         <div className="main">
           <div className="topbar">
-            <button className="hamburger" onClick={()=>setSidebarOpen(true)}>☰</button>
+            <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
             <div className="breadcrumb">Rentura &nbsp;/&nbsp; <b>Messages</b></div>
           </div>
 
           <div className="msg-layout">
             {/* CONVO LIST */}
-            <div className={`convo-list${showMobileChat?' hidden':''}`}>
+            <div className={`convo-list${showMobileChat ? ' hidden' : ''}`}>
               <div className="cl-head">
                 <div className="cl-title">
                   Conversations
-                  {totalUnread>0&&<span className="unread-badge">{totalUnread}</span>}
+                  {totalUnread > 0 && <span className="unread-badge">{totalUnread}</span>}
                 </div>
-                <input className="cl-search" placeholder="Search tenants..." value={search} onChange={e=>setSearch(e.target.value)}/>
+                <input className="cl-search" placeholder="Search tenants..." value={search} onChange={e => setSearch(e.target.value)} />
               </div>
               <div className="cl-items">
-                {loading ? [1,2,3].map(i=>(
-                  <div key={i} style={{padding:'13px 16px',display:'flex',gap:11,borderBottom:'1px solid #F8FAFC'}}>
-                    <div className="skeleton" style={{width:40,height:40,borderRadius:12,flexShrink:0}}/>
-                    <div style={{flex:1}}><div className="skeleton" style={{height:12,width:'70%',marginBottom:7}}/><div className="skeleton" style={{height:10,width:'90%'}}/></div>
+                {loading ? [1, 2, 3].map(i => (
+                  <div key={i} style={{ padding: '13px 16px', display: 'flex', gap: 11, borderBottom: '1px solid #F8FAFC' }}>
+                    <div className="skeleton" style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}><div className="skeleton" style={{ height: 12, width: '70%', marginBottom: 7 }} /><div className="skeleton" style={{ height: 10, width: '90%' }} /></div>
                   </div>
-                )) : convos.length===0 ? (
-                  <div style={{padding:24,textAlign:'center',color:'#94A3B8',fontSize:13}}>No tenants found</div>
-                ) : filteredConvos.map(c=>(
-                  <div key={c.tenantId} className={`convo-item${activeId===c.tenantId?' active':''}`} onClick={()=>openConvo(c.tenantId)}>
-                    <div className="ci-av" style={{background:c.color}}>{c.initials}</div>
+                )) : convos.length === 0 ? (
+                  <div style={{ padding: 24, textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>No tenants found</div>
+                ) : filteredConvos.map(c => (
+                  <div key={c.tenantId} className={`convo-item${activeId === c.tenantId ? ' active' : ''}`} onClick={() => openConvo(c.tenantId)}>
+                    <div className="ci-av" style={{ background: c.color }}>{c.initials}</div>
                     <div className="ci-body">
                       <div className="ci-top">
                         <span className="ci-name">{c.name}</span>
                         <span className="ci-time">{c.lastTime}</span>
                       </div>
-                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <span className="ci-preview">{c.lastMsg}</span>
-                        {c.unread>0&&<span className="ci-unread">{c.unread}</span>}
+                        {c.unread > 0 && <span className="ci-unread">{c.unread}</span>}
                       </div>
                       <div className="ci-prop">{c.property} · {c.unit}</div>
                     </div>
@@ -437,40 +448,40 @@ export default function MessagesPage() {
             </div>
 
             {/* CHAT AREA */}
-            <div className={`chat-area${showMobileChat?' visible':''}`}>
+            <div className={`chat-area${showMobileChat ? ' visible' : ''}`}>
               {!active ? (
                 <div className="empty-chat">
-                  <div style={{fontSize:40}}>💬</div>
-                  <div style={{fontWeight:700,color:'#0F172A'}}>Select a conversation</div>
-                  <div style={{fontSize:13,color:'#94A3B8'}}>Choose a tenant to start messaging</div>
+                  <div style={{ fontSize: 40 }}>💬</div>
+                  <div style={{ fontWeight: 700, color: '#0F172A' }}>Select a conversation</div>
+                  <div style={{ fontSize: 13, color: '#94A3B8' }}>Choose a tenant to start messaging</div>
                 </div>
               ) : (
                 <>
                   {/* Chat header */}
                   <div className="chat-head">
-                    <button className="mobile-back" onClick={()=>setShowMobileChat(false)}>←</button>
-                    <div className="ch-av" style={{background:active.color}}>{active.initials}</div>
-                    <div style={{flex:1}}>
+                    <button className="mobile-back" onClick={() => setShowMobileChat(false)}>←</button>
+                    <div className="ch-av" style={{ background: active.color }}>{active.initials}</div>
+                    <div style={{ flex: 1 }}>
                       <div className="ch-name">{active.name}</div>
                       <div className="ch-sub">{active.property} · {active.unit}</div>
                     </div>
                     {/* AI badge in header */}
-                    <div style={{fontSize:11,fontWeight:700,background:'linear-gradient(135deg,#7C3AED,#2563EB)',color:'#fff',padding:'3px 10px',borderRadius:99,display:'flex',alignItems:'center',gap:4}}>
+                    <div style={{ fontSize: 11, fontWeight: 700, background: 'linear-gradient(135deg,#7C3AED,#2563EB)', color: '#fff', padding: '3px 10px', borderRadius: 99, display: 'flex', alignItems: 'center', gap: 4 }}>
                       ✨ AI
                     </div>
                   </div>
 
                   {/* Messages */}
                   <div className="chat-messages">
-                    {active.messages.length===0 ? (
-                      <div style={{textAlign:'center',color:'#94A3B8',marginTop:40,fontSize:13}}>No messages yet. Say hello! 👋</div>
-                    ) : active.messages.map(m=>(
+                    {active.messages.length === 0 ? (
+                      <div style={{ textAlign: 'center', color: '#94A3B8', marginTop: 40, fontSize: 13 }}>No messages yet. Say hello! 👋</div>
+                    ) : active.messages.map(m => (
                       <div key={m.id} className={`bubble-wrap ${m.from}`}>
                         <div className={`bubble ${m.from}`}>{m.content}</div>
                         <span className="bubble-time">{fmtTime(m.created_at)}</span>
                       </div>
                     ))}
-                    <div ref={bottomRef}/>
+                    <div ref={bottomRef} />
                   </div>
 
                   {/* AI Template Panel */}
@@ -479,22 +490,22 @@ export default function MessagesPage() {
                       <div className="ai-panel-head">
                         <div className="ai-panel-title">
                           ✨ AI Message Templates
-                          <span style={{fontSize:10,fontWeight:600,color:'#7C3AED',background:'rgba(124,58,237,.1)',padding:'1px 7px',borderRadius:99}}>Beta</span>
+                          <span style={{ fontSize: 10, fontWeight: 600, color: '#7C3AED', background: 'rgba(124,58,237,.1)', padding: '1px 7px', borderRadius: 99 }}>Beta</span>
                         </div>
-                        <button className="ai-panel-close" onClick={()=>{setShowAiPanel(false);setAiError('')}}>✕</button>
+                        <button className="ai-panel-close" onClick={() => { setShowAiPanel(false); setAiError('') }}>✕</button>
                       </div>
-                      <div style={{fontSize:12,color:'#64748B',marginBottom:10}}>
+                      <div style={{ fontSize: 12, color: '#64748B', marginBottom: 10 }}>
                         Click a template to generate a message for <strong>{active.name}</strong>
                       </div>
                       <div className="ai-templates">
-                        {AI_TEMPLATES.map((t,i)=>(
-                          <button key={i} className="ai-tmpl-btn" disabled={aiLoading} onClick={()=>generateTemplate(i)}>
+                        {AI_TEMPLATES.map((t, i) => (
+                          <button key={i} className="ai-tmpl-btn" disabled={aiLoading} onClick={() => generateTemplate(i)}>
                             {t.label}
                           </button>
                         ))}
                       </div>
-                      {aiLoading&&<div className="ai-loading-msg"><span>⏳</span> Generating message...</div>}
-                      {aiError&&<div className="ai-error-msg">⚠️ {aiError}</div>}
+                      {aiLoading && <div className="ai-loading-msg"><span>⏳</span> Generating message...</div>}
+                      {aiError && <div className="ai-error-msg">⚠️ {aiError}</div>}
                     </div>
                   )}
 
@@ -502,8 +513,8 @@ export default function MessagesPage() {
                   <div className="chat-input-area">
                     <div className="chat-input-row">
                       <button
-                        className={`ai-trigger-btn${showAiPanel?' active':''}`}
-                        onClick={()=>{setShowAiPanel(v=>!v);setAiError('')}}
+                        className={`ai-trigger-btn${showAiPanel ? ' active' : ''}`}
+                        onClick={() => { setShowAiPanel(v => !v); setAiError('') }}
                         title="AI Message Templates">
                         ✨
                       </button>
@@ -511,10 +522,10 @@ export default function MessagesPage() {
                         className="chat-input"
                         placeholder="Type a message... or use ✨ AI templates"
                         value={input}
-                        onChange={e=>setInput(e.target.value)}
-                        onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&sendMessage()}
+                        onChange={e => setInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                       />
-                      <button className="send-btn" disabled={sending||!input.trim()} onClick={sendMessage}>➤</button>
+                      <button className="send-btn" disabled={sending || !input.trim()} onClick={sendMessage}>➤</button>
                     </div>
                   </div>
                 </>
