@@ -7,7 +7,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 function roleToPath(role: string): string {
   if (role === 'tenant') return '/tenant'
   if (role === 'seeker') return '/seeker'
-  return '/landlord'
+  if (role === 'landlord') return '/landlord'
+  return '/login?error=no_role_found' // Catch the "shitty" bug here
 }
 
 export async function GET(request: NextRequest) {
