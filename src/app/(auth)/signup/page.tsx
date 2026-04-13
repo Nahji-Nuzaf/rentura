@@ -6,47 +6,47 @@ import { createClient } from '@/lib/supabase'
 
 const roles = [
   { id: 'landlord', label: 'Landlord', emoji: '🏠', desc: 'I own or manage properties' },
-  { id: 'tenant',   label: 'Tenant',   emoji: '🔑', desc: 'I rent a property' },
-  { id: 'seeker',   label: 'Seeker',   emoji: '🔍', desc: 'Looking for a rental' },
+  { id: 'tenant', label: 'Tenant', emoji: '🔑', desc: 'I rent a property' },
+  { id: 'seeker', label: 'Seeker', emoji: '🔍', desc: 'Looking for a rental' },
 ]
 
 function pwdStrength(pwd: string): { label: string; color: string; pct: number; level: number } {
   if (!pwd) return { label: '', color: '#E2E8F0', pct: 0, level: 0 }
   let score = 0
-  if (pwd.length >= 8)  score++
+  if (pwd.length >= 8) score++
   if (pwd.length >= 12) score++
   if (/[A-Z]/.test(pwd)) score++
   if (/[0-9]/.test(pwd)) score++
   if (/[^A-Za-z0-9]/.test(pwd)) score++
-  if (score <= 1) return { label: 'Weak',   color: '#EF4444', pct: 20,  level: 1 }
-  if (score === 2) return { label: 'Fair',   color: '#F97316', pct: 45,  level: 2 }
-  if (score === 3) return { label: 'Good',   color: '#EAB308', pct: 70,  level: 3 }
-  if (score === 4) return { label: 'Strong', color: '#22C55E', pct: 90,  level: 4 }
-  return               { label: 'Very Strong', color: '#10B981', pct: 100, level: 5 }
+  if (score <= 1) return { label: 'Weak', color: '#EF4444', pct: 20, level: 1 }
+  if (score === 2) return { label: 'Fair', color: '#F97316', pct: 45, level: 2 }
+  if (score === 3) return { label: 'Good', color: '#EAB308', pct: 70, level: 3 }
+  if (score === 4) return { label: 'Strong', color: '#22C55E', pct: 90, level: 4 }
+  return { label: 'Very Strong', color: '#10B981', pct: 100, level: 5 }
 }
 
 export default function SignupPage() {
   const router = useRouter()
 
-  const [role, setRole]           = useState('landlord')
-  const [fullName, setFullName]   = useState('')
-  const [email, setEmail]         = useState('')
-  const [password, setPassword]   = useState('')
-  const [confirm, setConfirm]     = useState('')
-  const [showPwd, setShowPwd]     = useState(false)
+  const [role, setRole] = useState('landlord')
+  const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [showPwd, setShowPwd] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
-  const [error, setError]         = useState('')
-  const [loading, setLoading]     = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
 
   const strength = pwdStrength(password)
 
   const validate = () => {
-    if (!fullName.trim())   { setError('Please enter your full name.'); return false }
-    if (!email.trim())      { setError('Please enter your email address.'); return false }
-    if (password.length < 8){ setError('Password must be at least 8 characters.'); return false }
+    if (!fullName.trim()) { setError('Please enter your full name.'); return false }
+    if (!email.trim()) { setError('Please enter your email address.'); return false }
+    if (password.length < 8) { setError('Password must be at least 8 characters.'); return false }
     if (strength.level < 2) { setError('Please choose a stronger password.'); return false }
-    if (password !== confirm){ setError('Passwords do not match.'); return false }
+    if (password !== confirm) { setError('Passwords do not match.'); return false }
     return true
   }
 
@@ -98,16 +98,27 @@ export default function SignupPage() {
   }
 
   const handleGoogle = async () => {
+    // If the user hasn't clicked a card yet, don't let them sign in
+    if (!role) {
+      setError("Please select whether you are a Landlord, Tenant, or Seeker first.")
+      return
+    }
+
     setGoogleLoading(true)
     const sb = createClient()
+
     await sb.auth.signInWithOAuth({
       provider: 'google',
       options: {
+        // Option A: Pass in URL
         redirectTo: `${window.location.origin}/auth/callback?role=${role}`,
-        queryParams: { prompt: 'select_account' },
+        // Option B: Pass in queryParams (Supabase saves this to user_metadata)
+        queryParams: {
+          prompt: 'select_account',
+          role: role
+        },
       },
     })
-    // Page will redirect — no need to reset loading
   }
 
   return (
@@ -194,46 +205,46 @@ export default function SignupPage() {
 
         {/* ══ LEFT ══ */}
         <div className="left">
-          <div className="orb"/><div className="orb2"/>
-          <div style={{ position:'relative', zIndex:1 }}>
+          <div className="orb" /><div className="orb2" />
+          <div style={{ position: 'relative', zIndex: 1 }}>
 
             {/* Logo */}
-            <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:60 }}>
-              <div style={{ width:42, height:42, borderRadius:12, background:'linear-gradient(135deg,#38BDF8,#6366F1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, boxShadow:'0 8px 24px rgba(56,189,248,.3)' }}>🏘️</div>
-              <span style={{ fontFamily:'Fraunces,serif', fontSize:22, fontWeight:700, color:'#fff', letterSpacing:'-.3px' }}>Rentura</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 60 }}>
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: 'linear-gradient(135deg,#38BDF8,#6366F1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, boxShadow: '0 8px 24px rgba(56,189,248,.3)' }}>🏘️</div>
+              <span style={{ fontFamily: 'Fraunces,serif', fontSize: 22, fontWeight: 700, color: '#fff', letterSpacing: '-.3px' }}>Rentura</span>
             </div>
 
-            <h1 className="headline" style={{ fontFamily:'Fraunces,serif', fontSize:52, fontWeight:300, color:'#fff', lineHeight:1.08, letterSpacing:'-1.5px', marginBottom:18 }}>
-              Property<br/>management,<br/>
-              <span style={{ fontStyle:'italic', background:'linear-gradient(90deg,#38BDF8,#818CF8)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>reimagined</span>
+            <h1 className="headline" style={{ fontFamily: 'Fraunces,serif', fontSize: 52, fontWeight: 300, color: '#fff', lineHeight: 1.08, letterSpacing: '-1.5px', marginBottom: 18 }}>
+              Property<br />management,<br />
+              <span style={{ fontStyle: 'italic', background: 'linear-gradient(90deg,#38BDF8,#818CF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>reimagined</span>
             </h1>
-            <p style={{ fontSize:16, color:'#64748B', lineHeight:1.75, maxWidth:360, marginBottom:44 }}>
+            <p style={{ fontSize: 16, color: '#64748B', lineHeight: 1.75, maxWidth: 360, marginBottom: 44 }}>
               Everything you need to manage your portfolio — rent, tenants, maintenance — beautifully unified.
             </p>
 
             {/* Stats */}
-            <div className="stats-row" style={{ display:'flex', gap:12, marginBottom:28 }}>
-              {[['2,400+','Landlords trust us'],['$0','To get started'],['10min','Setup time']].map(([v,l]) => (
+            <div className="stats-row" style={{ display: 'flex', gap: 12, marginBottom: 28 }}>
+              {[['2,400+', 'Landlords trust us'], ['$0', 'To get started'], ['10min', 'Setup time']].map(([v, l]) => (
                 <div className="stat" key={v}>
-                  <div style={{ fontFamily:'Fraunces,serif', fontSize:26, fontWeight:700, color:'#fff', marginBottom:4, letterSpacing:'-.5px' }}>{v}</div>
-                  <div style={{ fontSize:11, color:'#334155', lineHeight:1.4 }}>{l}</div>
+                  <div style={{ fontFamily: 'Fraunces,serif', fontSize: 26, fontWeight: 700, color: '#fff', marginBottom: 4, letterSpacing: '-.5px' }}>{v}</div>
+                  <div style={{ fontSize: 11, color: '#334155', lineHeight: 1.4 }}>{l}</div>
                 </div>
               ))}
             </div>
 
             {/* Testimonial */}
             <div className="testi">
-              <div style={{ display:'flex', gap:3, marginBottom:12 }}>
-                {[1,2,3,4,5].map(i => <span key={i} style={{ color:'#F59E0B', fontSize:14 }}>★</span>)}
+              <div style={{ display: 'flex', gap: 3, marginBottom: 12 }}>
+                {[1, 2, 3, 4, 5].map(i => <span key={i} style={{ color: '#F59E0B', fontSize: 14 }}>★</span>)}
               </div>
-              <p style={{ fontSize:14, color:'#94A3B8', lineHeight:1.75, marginBottom:16, fontStyle:'italic' }}>
+              <p style={{ fontSize: 14, color: '#94A3B8', lineHeight: 1.75, marginBottom: 16, fontStyle: 'italic' }}>
                 "Rentura eliminated my rent collection headaches. My tenants get automated reminders and I get paid on time — every single month."
               </p>
-              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                <div style={{ width:36, height:36, borderRadius:10, background:'linear-gradient(135deg,#38BDF8,#6366F1)', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:12, fontWeight:700 }}>AK</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#38BDF8,#6366F1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 700 }}>AK</div>
                 <div>
-                  <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>Amir Khalil</div>
-                  <div style={{ fontSize:11, color:'#475569', marginTop:1 }}>Landlord · 12 units · Dubai</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>Amir Khalil</div>
+                  <div style={{ fontSize: 11, color: '#475569', marginTop: 1 }}>Landlord · 12 units · Dubai</div>
                 </div>
               </div>
             </div>
@@ -242,27 +253,27 @@ export default function SignupPage() {
 
         {/* ══ RIGHT ══ */}
         <div className="right">
-          <div style={{ width:'100%', maxWidth:420, position:'relative', zIndex:1 }}>
+          <div style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 1 }}>
 
-            <div style={{ marginBottom:24 }}>
-              <div style={{ width:52, height:52, borderRadius:15, background:'linear-gradient(135deg,#38BDF8,#6366F1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, marginBottom:18, boxShadow:'0 12px 32px rgba(56,189,248,.25)' }}>🏘️</div>
-              <h1 style={{ fontFamily:'Fraunces,serif', fontSize:30, fontWeight:400, color:'#0A0A0A', letterSpacing:'-.8px', marginBottom:6 }}>Create your account</h1>
-              <p style={{ fontSize:14, color:'#94A3B8' }}>Get started free — no credit card required</p>
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ width: 52, height: 52, borderRadius: 15, background: 'linear-gradient(135deg,#38BDF8,#6366F1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, marginBottom: 18, boxShadow: '0 12px 32px rgba(56,189,248,.25)' }}>🏘️</div>
+              <h1 style={{ fontFamily: 'Fraunces,serif', fontSize: 30, fontWeight: 400, color: '#0A0A0A', letterSpacing: '-.8px', marginBottom: 6 }}>Create your account</h1>
+              <p style={{ fontSize: 14, color: '#94A3B8' }}>Get started free — no credit card required</p>
             </div>
 
-            <div className="form-card" style={{ background:'#fff', border:'1px solid #E8E6E0', borderRadius:24, padding:28, boxShadow:'0 4px 32px rgba(0,0,0,.06)' }}>
+            <div className="form-card" style={{ background: '#fff', border: '1px solid #E8E6E0', borderRadius: 24, padding: 28, boxShadow: '0 4px 32px rgba(0,0,0,.06)' }}>
 
               {/* Google OAuth */}
               <button className="google-btn" onClick={handleGoogle} disabled={googleLoading}>
                 {googleLoading ? (
-                  <span style={{ fontSize:13 }}>Redirecting...</span>
+                  <span style={{ fontSize: 13 }}>Redirecting...</span>
                 ) : (
                   <>
                     <svg width="18" height="18" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                     </svg>
                     Continue with Google
                   </>
@@ -272,34 +283,34 @@ export default function SignupPage() {
               <div className="or-divider"><span>or sign up with email</span></div>
 
               {/* Role selector */}
-              <p style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:1, color:'#C4C4BC', marginBottom:10 }}>I am a...</p>
-              <div style={{ display:'flex', gap:8, marginBottom:20 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#C4C4BC', marginBottom: 10 }}>I am a...</p>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
                 {roles.map(r => (
                   <button key={r.id} className={`role-btn${role === r.id ? ' active' : ''}`} onClick={() => setRole(r.id)}>
-                    <span style={{ fontSize:22, display:'block', marginBottom:5 }}>{r.emoji}</span>
-                    <div style={{ fontSize:12, fontWeight:700, color: role === r.id ? '#0EA5E9' : '#1E293B' }}>{r.label}</div>
-                    <div style={{ fontSize:10, color:'#94A3B8', marginTop:2, lineHeight:1.3 }}>{r.desc}</div>
+                    <span style={{ fontSize: 22, display: 'block', marginBottom: 5 }}>{r.emoji}</span>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: role === r.id ? '#0EA5E9' : '#1E293B' }}>{r.label}</div>
+                    <div style={{ fontSize: 10, color: '#94A3B8', marginTop: 2, lineHeight: 1.3 }}>{r.desc}</div>
                   </button>
                 ))}
               </div>
 
-              <div style={{ height:1, background:'#F0EEE8', marginBottom:18 }}/>
+              <div style={{ height: 1, background: '#F0EEE8', marginBottom: 18 }} />
 
               {/* Full name */}
-              <div style={{ marginBottom:14 }}>
-                <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#374151', marginBottom:6 }}>Full Name</label>
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Full Name</label>
                 <input className="inp" type="text" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Nahji Nuzaf" />
               </div>
 
               {/* Email */}
-              <div style={{ marginBottom:14 }}>
-                <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#374151', marginBottom:6 }}>Email Address</label>
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Email Address</label>
                 <input className="inp" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
               </div>
 
               {/* Password */}
-              <div style={{ marginBottom:14 }}>
-                <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#374151', marginBottom:6 }}>Password</label>
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Password</label>
                 <div className="pw-wrap">
                   <input
                     className="inp"
@@ -315,7 +326,7 @@ export default function SignupPage() {
                 {password && (
                   <>
                     <div className="str-bg">
-                      <div className="str-fill" style={{ width:`${strength.pct}%`, background: strength.color }} />
+                      <div className="str-fill" style={{ width: `${strength.pct}%`, background: strength.color }} />
                     </div>
                     <div className="str-row">
                       <div className="str-hints">
@@ -324,15 +335,15 @@ export default function SignupPage() {
                         <span className="str-hint" style={{ color: /[0-9]/.test(password) ? '#22C55E' : '#94A3B8', background: /[0-9]/.test(password) ? '#F0FDF4' : '#F1F5F9' }}>Number</span>
                         <span className="str-hint" style={{ color: /[^A-Za-z0-9]/.test(password) ? '#22C55E' : '#94A3B8', background: /[^A-Za-z0-9]/.test(password) ? '#F0FDF4' : '#F1F5F9' }}>Symbol</span>
                       </div>
-                      <span style={{ fontSize:12, fontWeight:700, color: strength.color, flexShrink:0, marginLeft:8 }}>{strength.label}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: strength.color, flexShrink: 0, marginLeft: 8 }}>{strength.label}</span>
                     </div>
                   </>
                 )}
               </div>
 
               {/* Confirm password */}
-              <div style={{ marginBottom:18 }}>
-                <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#374151', marginBottom:6 }}>Confirm Password</label>
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Confirm Password</label>
                 <div className="pw-wrap">
                   <input
                     className={`inp${confirm && confirm !== password ? ' err' : ''}`}
@@ -351,7 +362,7 @@ export default function SignupPage() {
 
               {/* Error */}
               {error && (
-                <div style={{ background:'#FFF1F2', border:'1px solid #FECDD3', borderRadius:10, padding:'10px 14px', color:'#E11D48', fontSize:13, marginBottom:14, display:'flex', gap:8, alignItems:'center' }}>
+                <div style={{ background: '#FFF1F2', border: '1px solid #FECDD3', borderRadius: 10, padding: '10px 14px', color: '#E11D48', fontSize: 13, marginBottom: 14, display: 'flex', gap: 8, alignItems: 'center' }}>
                   ⚠️ {error}
                 </div>
               )}
@@ -360,16 +371,16 @@ export default function SignupPage() {
                 {loading ? 'Creating account...' : 'Create Account →'}
               </button>
 
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:16, marginTop:14, fontSize:11.5, color:'#C4C4BC' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 14, fontSize: 11.5, color: '#C4C4BC' }}>
                 <span>🔒 Secure & encrypted</span>
                 <span>·</span>
                 <span>✨ Free forever</span>
               </div>
             </div>
 
-            <p style={{ textAlign:'center', color:'#94A3B8', fontSize:14, marginTop:20 }}>
+            <p style={{ textAlign: 'center', color: '#94A3B8', fontSize: 14, marginTop: 20 }}>
               Already have an account?{' '}
-              <a href="/login" style={{ color:'#0EA5E9', fontWeight:700, textDecoration:'none' }}>Log in</a>
+              <a href="/login" style={{ color: '#0EA5E9', fontWeight: 700, textDecoration: 'none' }}>Log in</a>
             </p>
           </div>
         </div>
