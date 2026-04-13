@@ -16,16 +16,12 @@ export async function middleware(request: NextRequest) {
         },
         set(name: string, value: string, options: CookieOptions) {
           request.cookies.set({ name, value, ...options })
-          response = NextResponse.next({
-            request: { headers: request.headers },
-          })
+          response = NextResponse.next({ request: { headers: request.headers } })
           response.cookies.set({ name, value, ...options })
         },
         remove(name: string, options: CookieOptions) {
           request.cookies.set({ name, value: '', ...options })
-          response = NextResponse.next({
-            request: { headers: request.headers },
-          })
+          response = NextResponse.next({ request: { headers: request.headers } })
           response.cookies.set({ name, value: '', ...options })
         },
       },
@@ -33,10 +29,28 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
+  const { pathname } = request.nextUrl
 
-  // 🔒 Protect dashboard routes
-  if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
+  // Protect landlord, tenant, seeker routes
+  const protectedPrefixes = ['/landlord', '/tenant', '/seeker', '/onboarding']
+  const isProtected = protectedPrefixes.some(p => pathname.startsWith(p))
+
+  if (!user && isProtected) {
     return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  // Redirect logged-in users away from auth pages
+  if (user && (pathname === '/login' || pathname === '/signup')) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('active_role')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    const role = profile?.active_role || 'landlord'
+    if (role === 'tenant') return NextResponse.redirect(new URL('/tenant', request.url))
+    if (role === 'seeker') return NextResponse.redirect(new URL('/seeker', request.url))
+    return NextResponse.redirect(new URL('/landlord', request.url))
   }
 
   return response

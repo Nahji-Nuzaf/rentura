@@ -1,19 +1,22 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+
+function roleToPath(role: string): string {
+  if (role === 'tenant') return '/tenant'
+  if (role === 'seeker') return '/seeker'
+  return '/landlord'
+}
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
-  // const cookieStore = cookies()
-
-  const code = searchParams.get('code')
-  const roleFromUrl = searchParams.get('role')
+  const code        = searchParams.get('code')
+  const roleFromUrl = searchParams.get('role') // passed from signup OAuth redirect
 
   if (!code) {
     return NextResponse.redirect(`${origin}/login`)
   }
 
-  const response = NextResponse.redirect(`${origin}`)
+  const response = NextResponse.redirect(`${origin}/landlord`) // placeholder, overwritten below
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,17 +26,17 @@ export async function GET(request: Request) {
         get(name: string) {
           return response.cookies.get(name)?.value
         },
-        set(name: string, value: string, options) {
+        set(name: string, value: string, options: any) {
           response.cookies.set(name, value, options)
         },
-        remove(name: string, options) {
+        remove(name: string, options: any) {
           response.cookies.set(name, '', options)
         },
       },
     }
   )
 
-  // 🔑 Exchange code for session
+  // Exchange code for session
   const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error || !data?.user) {
@@ -42,33 +45,29 @@ export async function GET(request: Request) {
 
   const user = data.user
 
-  // 🔍 Check profile
+  // Check if profile exists
   const { data: profile } = await supabase
     .from('profiles')
-    .select('*')
+    .select('active_role, roles')
     .eq('id', user.id)
     .maybeSingle()
 
-  // 🆕 NEW USER
   if (!profile) {
-    const role = roleFromUrl || 'tenant'
+    // NEW USER — use role from URL param (selected in signup modal)
+    const role = roleFromUrl || 'landlord'
 
-    await supabase.from('profiles').upsert(
-      {
-        id: user.id,
-        email: user.email,
-        full_name: user.user_metadata?.full_name || '',
-        active_role: role,
-        roles: [role],
-      },
-      { onConflict: 'id' }
-    )
+    await supabase.from('profiles').upsert({
+      id: user.id,
+      email: user.email,
+      full_name: user.user_metadata?.full_name || '',
+      active_role: role,
+      roles: [role],
+    }, { onConflict: 'id' })
 
-    return NextResponse.redirect(`${origin}/dashboard/${role}`)
+    return NextResponse.redirect(`${origin}${roleToPath(role)}`)
   }
 
-  // 🔁 EXISTING USER
-  return NextResponse.redirect(
-    `${origin}/dashboard/${profile.active_role}`
-  )
+  // EXISTING USER — use their saved role, ignore URL param
+  const role = profile.active_role || 'landlord'
+  return NextResponse.redirect(`${origin}${roleToPath(role)}`)
 }
