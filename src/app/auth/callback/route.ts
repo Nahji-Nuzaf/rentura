@@ -5,7 +5,7 @@ import { createServerClient } from '@supabase/ssr'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const roleFromUrl = searchParams.get('role') 
+  const roleFromUrl = searchParams.get('role')
 
   if (!code) return NextResponse.redirect(`${origin}/login?error=missing_code`)
 
@@ -26,8 +26,9 @@ export async function GET(request: Request) {
   if (error || !data.user) return NextResponse.redirect(`${origin}/login?error=auth_failed`)
 
   const user = data.user
-  // PRIORITY: 1. URL Param, 2. Google Metadata, 3. Hard check later
-  const resolvedRole = roleFromUrl || user.user_metadata?.role
+
+  // PRIORITY: 1. URL param (set by modal), 2. Google OAuth metadata
+  const resolvedRole = roleFromUrl || user.user_metadata?.role || null
 
   const { data: existing } = await supabase
     .from('profiles')
@@ -36,8 +37,11 @@ export async function GET(request: Request) {
     .single()
 
   if (!existing) {
-    // If no role found at all, we MUST NOT default to landlord
-    if (!resolvedRole) return NextResponse.redirect(`${origin}/onboarding`)
+    // Brand-new user — no profile yet
+    if (!resolvedRole) {
+      // No role info at all — send to onboarding to pick one
+      return NextResponse.redirect(`${origin}/onboarding`)
+    }
 
     await supabase.from('profiles').insert({
       id: user.id,
@@ -47,13 +51,19 @@ export async function GET(request: Request) {
       active_role: resolvedRole,
       roles: [resolvedRole],
     })
+
+    // Redirect to the role-specific dashboard
+    return NextResponse.redirect(`${origin}/${resolvedRole}`)
+  }
+
+  // Returning user — use their stored role (or fall back to resolved if somehow missing)
+  const finalRole = existing.active_role || resolvedRole
+
+  if (!finalRole) {
+    // Edge case: profile exists but has no role — send to onboarding
     return NextResponse.redirect(`${origin}/onboarding`)
   }
 
-  // If they are logging in and we have a new role intent, update it
-  const finalRole = existing.active_role || resolvedRole
-
-  if (!finalRole) return NextResponse.redirect(`${origin}/onboarding`)
-
+  // Redirect to the role-specific dashboard
   return NextResponse.redirect(`${origin}/${finalRole}`)
 }

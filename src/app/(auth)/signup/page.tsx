@@ -39,6 +39,11 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
 
+  // Google role-selection modal state
+  const [showGoogleModal, setShowGoogleModal] = useState(false)
+  const [googleRole, setGoogleRole] = useState('')
+  const [googleRoleError, setGoogleRoleError] = useState('')
+
   const strength = pwdStrength(password)
 
   const validate = () => {
@@ -72,8 +77,6 @@ export default function SignupPage() {
       return
     }
 
-    // If user row exists (Supabase may auto-create it), upsert the profiles row
-    // so active_role and roles are set immediately — the onboarding page depends on this
     if (data.user) {
       await sb.from('profiles').upsert({
         id: data.user.id,
@@ -86,36 +89,40 @@ export default function SignupPage() {
 
     setLoading(false)
 
-    // Check if session was created immediately (email confirmation OFF)
-    // vs needing email verification (email confirmation ON)
     if (data.session) {
-      // Confirmed immediately — go straight to onboarding
       router.push('/onboarding')
     } else {
-      // Email confirmation ON — send to verify page
       router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`)
     }
   }
 
-  const handleGoogle = async () => {
-    // If the user hasn't clicked a card yet, don't let them sign in
-    if (!role) {
-      setError("Please select whether you are a Landlord, Tenant, or Seeker first.")
+  // Step 1: open modal instead of immediately triggering OAuth
+  const handleGoogleButtonClick = () => {
+    setGoogleRole('')
+    setGoogleRoleError('')
+    setShowGoogleModal(true)
+  }
+
+  // Step 2: after role selected in modal, trigger OAuth
+  const handleGoogleContinue = async () => {
+    if (!googleRole) {
+      setGoogleRoleError('Please select a role to continue.')
       return
     }
 
+    setGoogleRoleError('')
+    setShowGoogleModal(false)
     setGoogleLoading(true)
+
     const sb = createClient()
 
     await sb.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        // Option A: Pass in URL
-        redirectTo: `${window.location.origin}/auth/callback?role=${role}`,
-        // Option B: Pass in queryParams (Supabase saves this to user_metadata)
+        redirectTo: `${window.location.origin}/auth/callback?role=${googleRole}`,
         queryParams: {
           prompt: 'select_account',
-          role: role
+          role: googleRole,
         },
       },
     })
@@ -183,6 +190,16 @@ export default function SignupPage() {
         .match-ok{font-size:12px;color:#22C55E;margin-top:4px;font-weight:600}
         .match-err{font-size:12px;color:#EF4444;margin-top:4px;font-weight:600}
 
+        /* ── Google Role Modal ── */
+        .modal-backdrop{position:fixed;inset:0;background:rgba(5,10,20,.7);backdrop-filter:blur(6px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeIn .18s ease}
+        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+        .modal{background:#fff;border-radius:24px;padding:32px 28px;width:100%;max-width:400px;box-shadow:0 32px 80px rgba(0,0,0,.25);animation:slideUp .22s ease}
+        @keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+        .modal-role-btn{width:100%;padding:14px 16px;border-radius:14px;border:1.5px solid #EFEFEC;background:#FAFAF9;cursor:pointer;transition:all .2s;text-align:left;font-family:'Plus Jakarta Sans',sans-serif;display:flex;align-items:center;gap:14px;margin-bottom:10px}
+        .modal-role-btn:hover{border-color:#CBD5E1;background:#F3F4F6}
+        .modal-role-btn.active{border-color:#38BDF8;background:#F0F9FF;box-shadow:0 0 0 3px rgba(56,189,248,.12)}
+        .modal-role-btn:last-of-type{margin-bottom:0}
+
         @media(max-width:900px){
           .page{flex-direction:column}
           .left{flex:none;padding:36px 28px 40px;min-height:auto}
@@ -200,6 +217,70 @@ export default function SignupPage() {
           .form-card{padding:20px 16px!important}
         }
       `}</style>
+
+      {/* ══ Google Role Selection Modal ══ */}
+      {showGoogleModal && (
+        <div className="modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setShowGoogleModal(false) }}>
+          <div className="modal">
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div>
+                <h2 style={{ fontFamily: 'Fraunces,serif', fontSize: 22, fontWeight: 400, color: '#0A0A0A', letterSpacing: '-.5px', marginBottom: 4 }}>
+                  One quick step
+                </h2>
+                <p style={{ fontSize: 13, color: '#94A3B8' }}>Select your role to continue with Google</p>
+              </div>
+              <button
+                onClick={() => setShowGoogleModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: '#CBD5E1', padding: '4px', lineHeight: 1, borderRadius: 8 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Role options */}
+            {roles.map(r => (
+              <button
+                key={r.id}
+                className={`modal-role-btn${googleRole === r.id ? ' active' : ''}`}
+                onClick={() => { setGoogleRole(r.id); setGoogleRoleError('') }}
+              >
+                <span style={{ fontSize: 26, flexShrink: 0 }}>{r.emoji}</span>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: googleRole === r.id ? '#0EA5E9' : '#1E293B' }}>{r.label}</div>
+                  <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>{r.desc}</div>
+                </div>
+                {googleRole === r.id && (
+                  <div style={{ marginLeft: 'auto', width: 20, height: 20, borderRadius: '50%', background: 'linear-gradient(135deg,#38BDF8,#6366F1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>✓</span>
+                  </div>
+                )}
+              </button>
+            ))}
+
+            {/* Error */}
+            {googleRoleError && (
+              <div style={{ background: '#FFF1F2', border: '1px solid #FECDD3', borderRadius: 10, padding: '10px 14px', color: '#E11D48', fontSize: 13, marginTop: 14, display: 'flex', gap: 8, alignItems: 'center' }}>
+                ⚠️ {googleRoleError}
+              </div>
+            )}
+
+            {/* Continue button */}
+            <button
+              className="submit"
+              style={{ marginTop: 20 }}
+              onClick={handleGoogleContinue}
+              disabled={googleLoading}
+            >
+              {googleLoading ? 'Redirecting to Google...' : 'Continue with Google →'}
+            </button>
+
+            <p style={{ textAlign: 'center', fontSize: 12, color: '#C4C4BC', marginTop: 14 }}>
+              You can change your role later in settings
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="page">
 
@@ -263,10 +344,10 @@ export default function SignupPage() {
 
             <div className="form-card" style={{ background: '#fff', border: '1px solid #E8E6E0', borderRadius: 24, padding: 28, boxShadow: '0 4px 32px rgba(0,0,0,.06)' }}>
 
-              {/* Google OAuth */}
-              <button className="google-btn" onClick={handleGoogle} disabled={googleLoading}>
+              {/* Google OAuth — now opens modal */}
+              <button className="google-btn" onClick={handleGoogleButtonClick} disabled={googleLoading}>
                 {googleLoading ? (
-                  <span style={{ fontSize: 13 }}>Redirecting...</span>
+                  <span style={{ fontSize: 13 }}>Redirecting to Google...</span>
                 ) : (
                   <>
                     <svg width="18" height="18" viewBox="0 0 24 24">
