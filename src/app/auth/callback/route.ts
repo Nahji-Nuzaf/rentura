@@ -1,24 +1,30 @@
 import { createServerClient } from '@supabase/ssr'
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 
+/**
+ * Utility to map roles to their respective dashboard paths
+ */
 function roleToPath(role: string): string {
   if (role === 'tenant') return '/tenant'
   if (role === 'seeker') return '/seeker'
   return '/landlord'
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
-  const code        = searchParams.get('code')
-  const roleFromUrl = searchParams.get('role') // passed from signup OAuth redirect
+  const code = searchParams.get('code')
+  const roleFromUrl = searchParams.get('role') // Passed from signup OAuth redirect
 
+  // 1. If no code from Google, redirect to login
   if (!code) {
-    // return NextResponse.redirect(`${origin}/login`)
-    return NextResponse.redirect(`${origin}/login?error=missing_code`)
-    
+    return NextResponse.redirect(`${origin}/login`)
   }
 
-  const response = NextResponse.redirect(`${origin}/landlord`) // placeholder, overwritten below
+  /**
+   * 2. We create a "base" response object.
+   * This object will catch the cookies set by Supabase during the code exchange.
+   */
+  let response = NextResponse.redirect(`${origin}/onboarding`)
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,50 +32,68 @@ export async function GET(request: Request) {
     {
       cookies: {
         get(name: string) {
-          return response.cookies.get(name)?.value
+          return request.cookies.get(name)?.value
         },
         set(name: string, value: string, options: any) {
-          response.cookies.set(name, value, options)
+          // Writing cookies to our base response object
+          response.cookies.set({ name, value, ...options })
         },
         remove(name: string, options: any) {
-          response.cookies.set(name, '', options)
+          // Removing cookies from our base response object
+          response.cookies.set({ name, value: '', ...options })
         },
       },
     }
   )
 
-  // Exchange code for session
+  // 3. Exchange the auth code for a session
   const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error || !data?.user) {
+    console.error('Auth exchange failed:', error?.message)
     return NextResponse.redirect(`${origin}/login?error=invalid_session`)
   }
 
   const user = data.user
 
-  // Check if profile exists
+  // 4. Check if profile exists in the database
   const { data: profile } = await supabase
     .from('profiles')
     .select('active_role, roles')
     .eq('id', user.id)
     .maybeSingle()
 
-  if (!profile) {
-    // NEW USER — use role from URL param (selected in signup modal)
-    const role = roleFromUrl || 'landlord'
+  let finalRole = 'landlord'
 
-    await supabase.from('profiles').upsert({
+  if (!profile) {
+    // NEW USER logic — Create the profile using the role from the URL param
+    finalRole = roleFromUrl || 'landlord'
+    
+    const { error: upsertError } = await supabase.from('profiles').upsert({
       id: user.id,
       email: user.email,
       full_name: user.user_metadata?.full_name || '',
-      active_role: role,
-      roles: [role],
+      active_role: finalRole,
+      roles: [finalRole],
     }, { onConflict: 'id' })
 
-    return NextResponse.redirect(`${origin}${roleToPath(role)}`)
+    if (upsertError) console.error('Profile creation failed:', upsertError.message)
+  } else {
+    // EXISTING USER logic — Use the role already saved in your DB
+    finalRole = profile.active_role || 'landlord'
   }
 
-  // EXISTING USER — use their saved role, ignore URL param
-  const role = profile.active_role || 'landlord'
-  return NextResponse.redirect(`${origin}${roleToPath(role)}`)
+  /**
+   * 5. FINAL REDIRECT & COOKIE SYNC
+   * Next.js requires us to return a response that actually contains the cookies.
+   * We create the final redirect and copy all cookies from our 'base' response.
+   */
+  const targetPath = roleToPath(finalRole)
+  const finalResponse = NextResponse.redirect(`${origin}${targetPath}`)
+
+  response.cookies.getAll().forEach((cookie) => {
+    finalResponse.cookies.set(cookie.name, cookie.value)
+  })
+
+  return finalResponse
 }
