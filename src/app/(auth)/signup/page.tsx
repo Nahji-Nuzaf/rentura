@@ -105,28 +105,27 @@ export default function SignupPage() {
 
   // Step 2: after role selected in modal, trigger OAuth
   const handleGoogleContinue = async () => {
-    if (!googleRole) {
-      setGoogleRoleError('Please select a role to continue.')
-      return
-    }
-
-    setGoogleRoleError('')
-    setShowGoogleModal(false)
-    setGoogleLoading(true)
-
-    const sb = createClient()
-
-    await sb.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?role=${googleRole}`,
-        queryParams: {
-          prompt: 'select_account',
-          role: googleRole,
-        },
-      },
-    })
+  if (!googleRole) {
+    setGoogleRoleError('Please select a role to continue.')
+    return
   }
+
+  setGoogleRoleError('')
+  setShowGoogleModal(false)
+  setGoogleLoading(true)
+
+  const sb = createClient()
+
+  await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback?role=${googleRole}`,
+      queryParams: {
+        prompt: 'select_account', // ✅ keep only this
+      },
+    },
+  })
+}
 
   return (
     <>

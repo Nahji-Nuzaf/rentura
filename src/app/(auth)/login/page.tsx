@@ -53,16 +53,38 @@ export default function LoginPage() {
   }
 
   const handleGoogle = async () => {
-    setGoogleLoading(true)
-    const sb = createClient()
-    await sb.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: { prompt: 'select_account' },
-      },
-    })
+  setGoogleLoading(true)
+
+  const sb = createClient()
+
+  // Check if user already has a session (edge case safety)
+  const { data: { session } } = await sb.auth.getSession()
+
+  let roleParam = ''
+
+  if (session?.user) {
+    // Existing user → get role from DB
+    const { data: profile } = await sb
+      .from('profiles')
+      .select('active_role')
+      .eq('id', session.user.id)
+      .maybeSingle()
+
+    if (profile?.active_role) {
+      roleParam = `?role=${profile.active_role}`
+    }
   }
+
+  await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback${roleParam}`,
+      queryParams: {
+        prompt: 'select_account',
+      },
+    },
+  })
+}
 
   const handleKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleLogin()
