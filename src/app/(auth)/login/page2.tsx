@@ -3,26 +3,19 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
 
-// Added role selection to login to prevent default-to-landlord behavior
-const roles = [
-  { id: 'landlord', emoji: '🏠' },
-  { id: 'tenant', emoji: '🔑' },
-  { id: 'seeker', emoji: '🔍' },
-]
-
 const features = [
-  { icon: '🔒', title: 'Secure & Encrypted', desc: 'Your data is protected with enterprise-grade security' },
-  { icon: '⚡', title: 'Lightning Fast', desc: 'Real-time updates and instant notifications' },
-  { icon: '📊', title: 'Smart Analytics', desc: 'Detailed insights into your property performance' },
+  { icon:'💰', title:'Automated rent reminders', desc:'Never chase a payment again' },
+  { icon:'🔧', title:'Maintenance tracking',     desc:'Resolve issues faster' },
+  { icon:'📁', title:'Document vault',           desc:'Leases & files in one place' },
+  { icon:'💬', title:'Tenant messaging',         desc:'In-app chat with all tenants' },
 ]
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
+  const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
-  const [selectedRole, setSelectedRole] = useState('landlord') // Default for UI, but passed to OAuth
-  const [showPwd, setShowPwd] = useState(false)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [showPwd, setShowPwd]   = useState(false)
+  const [error, setError]       = useState('')
+  const [loading, setLoading]   = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
 
   const handleLogin = async () => {
@@ -39,6 +32,7 @@ export default function LoginPage() {
       return
     }
 
+    // Read role from profiles table — this is the source of truth
     const { data: prof } = await sb
       .from('profiles')
       .select('active_role')
@@ -47,12 +41,15 @@ export default function LoginPage() {
 
     const role = prof?.active_role || data.user.user_metadata?.role || null
 
+    // If no role set yet, they haven't completed onboarding
     if (!role) {
       window.location.href = '/onboarding'
       return
     }
 
-    window.location.href = `/${role}`
+    if (role === 'tenant')        window.location.href = '/tenant'
+    else if (role === 'seeker')   window.location.href = '/seeker'
+    else                          window.location.href = '/landlord'
   }
 
   const handleGoogle = async () => {
@@ -61,12 +58,8 @@ export default function LoginPage() {
     await sb.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        // Pass the selectedRole here!
-        redirectTo: `${window.location.origin}/auth/callback?role=${selectedRole}`,
-        queryParams: { 
-          prompt: 'select_account',
-          role: selectedRole 
-        },
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { prompt: 'select_account' },
       },
     })
   }
