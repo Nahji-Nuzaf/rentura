@@ -78,8 +78,8 @@ export default function UpgradePage() {
   const [showPayModal, setShowPayModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState('')
 
-  const monthlyPrice = 12
-  const annualPrice = Math.round(monthlyPrice * 10 / 12)
+  const monthlyPrice = 20
+  const annualPrice = Math.round(monthlyPrice * 10 / 15)
 
   useEffect(() => {
     const load = async () => {
@@ -374,7 +374,7 @@ export default function UpgradePage() {
                 <button className={`bt-opt${billing === 'monthly' ? ' active' : ''}`} onClick={() => setBilling('monthly')}>Monthly</button>
                 <button className={`bt-opt${billing === 'annual' ? ' active' : ''}`} onClick={() => setBilling('annual')}>
                   Annual
-                  <span className="save-chip">Save 17%</span>
+                  <span className="save-chip">Save 15%</span>
                 </button>
               </div>
             </div>
