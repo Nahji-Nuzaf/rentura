@@ -58,8 +58,8 @@ export async function GET(request: NextRequest) {
   let finalRole: string
 
   if (!profile) {
-    // NEW USER: Use the role from URL, or default to landlord if URL was empty
-    finalRole = roleFromUrl || 'landlord'
+    // NEW USER: Use the role from URL, or default to seeker if URL was empty
+    finalRole = roleFromUrl || 'seeker'
     
     // CRITICAL: Await the database creation completely
     const { error: upsertError } = await supabase.from('profiles').upsert({
