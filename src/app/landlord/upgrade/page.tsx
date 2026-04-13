@@ -338,9 +338,14 @@ export default function UpgradePage() {
             <a href="/landlord/listings" className="sb-item"><span className="sb-ico">📋</span>Listings</a>
             <span className="sb-section">Account</span>
             <a href="/landlord/settings" className="sb-item"><span className="sb-ico">⚙️</span>Settings</a>
-            <a href="/landlord/upgrade" className="sb-item active"><span className="sb-ico">⭐</span>Upgrade to Pro</a>
+            {/* <a href="/landlord/upgrade" className="sb-item active"><span className="sb-ico">⭐</span>Upgrade to Pro</a> */}
           </nav>
           <div className="sb-footer">
+            <div className="sb-upgrade">
+              <div className="sb-up-title">⭐ Upgrade to Pro</div>
+              <div className="sb-up-sub">Unlimited properties & priority support.</div>
+              <button className="sb-up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
+            </div>
             <div className="sb-user">
               <div className="sb-av">{initials}</div>
               <div><div className="sb-uname">{fullName}</div><span className="sb-uplan">FREE</span></div>
