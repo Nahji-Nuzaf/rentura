@@ -92,6 +92,16 @@ export default function LoginPage() {
         .submit{width:100%;padding:15px;border-radius:13px;border:none;background:linear-gradient(135deg,#0EA5E9,#6366F1);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 6px 24px rgba(14,165,233,.35);transition:all .25s;letter-spacing:.2px}
         .submit:hover{transform:translateY(-2px);box-shadow:0 10px 32px rgba(14,165,233,.45)}
         .submit:disabled{opacity:.6;cursor:not-allowed;transform:none}
+        .sb-logo-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 11px;
+            background: rgba(255, 255, 255, 0.05); /* Very subtle white */
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
         .google-btn{width:100%;padding:13px;border-radius:13px;border:1.5px solid #E8E6E0;background:#fff;color:#374151;font-size:14.5px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:10px;transition:all .2s;box-shadow:0 2px 8px rgba(0,0,0,.06)}
         .google-btn:hover{border-color:#CBD5E1;box-shadow:0 4px 16px rgba(0,0,0,.1);transform:translateY(-1px)}
         .google-btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
@@ -113,7 +123,7 @@ export default function LoginPage() {
           <div className="orb" /><div className="orb2" />
           <div style={{ position: 'relative', zIndex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 60 }}>
-              <div style={{ width: 42, height: 42, borderRadius: 12, background: 'linear-gradient(135deg,#38BDF8,#6366F1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, boxShadow: '0 8px 24px rgba(56,189,248,.3)' }}>
+              <div className="sb-logo-icon" >
                 <Image
                   src="/icon.png"
                   alt="Rentura Logo"
@@ -156,7 +166,7 @@ export default function LoginPage() {
         <div className="right">
           <div style={{ width: '100%', maxWidth: 400, position: 'relative', zIndex: 1 }}>
             <div style={{ marginBottom: 28 }}>
-              <div style={{ width: 52, height: 52, borderRadius: 15, background: 'linear-gradient(135deg,#38BDF8,#6366F1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, marginBottom: 20, boxShadow: '0 12px 32px rgba(56,189,248,.25)' }}>
+              <div className="sb-logo-icon" >
                 <Image
                   src="/icon.png"
                   alt="Rentura Logo"
