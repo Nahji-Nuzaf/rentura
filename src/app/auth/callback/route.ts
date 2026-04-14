@@ -10,42 +10,58 @@ function roleToPath(role: string): string {
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code        = searchParams.get('code')
-  const roleFromUrl = searchParams.get('role') // only present on signup
+  const roleFromUrl = searchParams.get('role')
 
   if (!code) {
     return NextResponse.redirect(`${origin}/login`)
   }
 
-  const response = NextResponse.redirect(`${origin}/landlord`) // placeholder
+  // Start with a temporary response to collect cookies
+  const tempResponse = new NextResponse()
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) { return response.cookies.get(name)?.value },
-        set(name: string, value: string, options: any) { response.cookies.set(name, value, options) },
-        remove(name: string, options: any) { response.cookies.set(name, '', options) },
+        get(name: string) {
+          // Read from request cookies
+          return request.headers.get('cookie')
+            ?.split(';')
+            .find(c => c.trim().startsWith(`${name}=`))
+            ?.split('=').slice(1).join('=')
+            .trim()
+        },
+        set(name: string, value: string, options: any) {
+          tempResponse.cookies.set(name, value, options)
+        },
+        remove(name: string, options: any) {
+          tempResponse.cookies.set(name, '', { ...options, maxAge: 0 })
+        },
       },
     }
   )
 
   const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+
   if (error || !data?.user) {
+    console.error('Auth callback error:', error?.message)
     return NextResponse.redirect(`${origin}/login`)
   }
 
   const user = data.user
 
-  // Check if profile exists
+  // Check profile
   const { data: profile } = await supabase
     .from('profiles')
     .select('active_role')
     .eq('id', user.id)
     .maybeSingle()
 
-  // ── NEW USER (Google signup) — no profile yet ──
+  let redirectTo: string
+
   if (!profile) {
+    // NEW USER — create profile with selected role, send to onboarding
     const role = roleFromUrl || 'landlord'
     await supabase.from('profiles').upsert({
       id: user.id,
@@ -54,18 +70,18 @@ export async function GET(request: Request) {
       active_role: role,
       roles: [role],
     }, { onConflict: 'id' })
-    // New users always go to onboarding
-    return NextResponse.redirect(`${origin}/onboarding`)
+    redirectTo = `${origin}/onboarding`
+  } else {
+    // EXISTING USER — send to their dashboard
+    const role = profile.active_role
+    redirectTo = role ? `${origin}${roleToPath(role)}` : `${origin}/onboarding`
   }
 
-  // ── EXISTING USER (Google login) — has profile ──
-  const role = profile.active_role
+  // Build final redirect response and copy all cookies from tempResponse
+  const finalResponse = NextResponse.redirect(redirectTo)
+  tempResponse.cookies.getAll().forEach(cookie => {
+    finalResponse.cookies.set(cookie.name, cookie.value, cookie)
+  })
 
-  // Profile exists but no role set — send to onboarding to complete setup
-  if (!role) {
-    return NextResponse.redirect(`${origin}/onboarding`)
-  }
-
-  // Has role — send to their dashboard
-  return NextResponse.redirect(`${origin}${roleToPath(role)}`)
+  return finalResponse
 }
