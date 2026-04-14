@@ -88,13 +88,13 @@ export default function SignupPage() {
         active_role: role,
         roles: [role],
       }, { onConflict: 'id' })
-      
+
       router.push('/onboarding')
     } else {
       // 3. If email confirmation is required
       router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`)
     }
-    
+
     setLoading(false)
   }
 
@@ -109,21 +109,19 @@ export default function SignupPage() {
       setGoogleRoleError('Please select a role to continue.')
       return
     }
-
     setGoogleRoleError('')
     setShowGoogleModal(false)
     setGoogleLoading(true)
 
-    const sb = createClient()
+    // Store role in cookie before redirecting to Google
+    document.cookie = `pending_role=${googleRole};path=/;max-age=300`
 
-    // redirectTo must exactly match what we expect in route.ts
+    const sb = createClient()
     await sb.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?role=${googleRole}`,
-        queryParams: {
-          prompt: 'select_account',
-        },
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { prompt: 'select_account' },
       },
     })
   }

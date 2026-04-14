@@ -7,19 +7,28 @@ function roleToPath(role: string): string {
   return '/landlord'
 }
 
+function getCookieValue(cookieHeader: string | null, name: string): string | null {
+  if (!cookieHeader) return null
+  const match = cookieHeader
+    .split(';')
+    .find(c => c.trim().startsWith(`${name}=`))
+  return match ? match.split('=').slice(1).join('=').trim() : null
+}
+
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
-  const code        = requestUrl.searchParams.get('code')
-  const roleFromUrl = requestUrl.searchParams.get('role')
-
-  console.log('=== AUTH CALLBACK ===')
-  console.log('Full URL:', request.url)
-  console.log('code:', code ? 'present' : 'missing')
-  console.log('role from URL:', roleFromUrl)
+  const code = requestUrl.searchParams.get('code')
 
   if (!code) {
     return NextResponse.redirect(`${requestUrl.origin}/login`)
   }
+
+  // Read role from cookie (set before Google OAuth redirect)
+  const cookieHeader = request.headers.get('cookie')
+  const roleFromCookie = getCookieValue(cookieHeader, 'pending_role')
+
+  console.log('=== AUTH CALLBACK ===')
+  console.log('role from cookie:', roleFromCookie)
 
   const tempResponse = new NextResponse()
 
@@ -29,11 +38,7 @@ export async function GET(request: Request) {
     {
       cookies: {
         get(name: string) {
-          return request.headers.get('cookie')
-            ?.split(';')
-            .find(c => c.trim().startsWith(`${name}=`))
-            ?.split('=').slice(1).join('=')
-            .trim()
+          return getCookieValue(cookieHeader, name) ?? undefined
         },
         set(name: string, value: string, options: any) {
           tempResponse.cookies.set(name, value, options)
@@ -53,10 +58,9 @@ export async function GET(request: Request) {
   }
 
   const user = data.user
-  console.log('User ID:', user.id)
-  console.log('User email:', user.email)
+  console.log('User:', user.email)
 
-  // Check profile
+  // Check existing profile
   const { data: profile } = await supabase
     .from('profiles')
     .select('active_role')
@@ -64,34 +68,50 @@ export async function GET(request: Request) {
     .maybeSingle()
 
   console.log('Existing profile:', profile)
+  console.log('Role from cookie:', roleFromCookie)
 
   let redirectTo: string
 
-  if (!profile) {
-    const role = roleFromUrl || 'landlord'
-    console.log('NEW USER - creating profile with role:', role)
-
+  if (roleFromCookie) {
+    // ── SIGNUP flow: role cookie present — update/create profile with new role ──
+    console.log('SIGNUP FLOW - setting role:', roleFromCookie)
     await supabase.from('profiles').upsert({
       id: user.id,
       email: user.email,
       full_name: user.user_metadata?.full_name || '',
-      active_role: role,
-      roles: [role],
+      active_role: roleFromCookie,
+      roles: [roleFromCookie],
     }, { onConflict: 'id' })
-
+    redirectTo = `${requestUrl.origin}/onboarding`
+  } else if (!profile) {
+    // ── No profile, no cookie — new user, default to landlord ──
+    console.log('NEW USER no cookie - defaulting to landlord')
+    await supabase.from('profiles').upsert({
+      id: user.id,
+      email: user.email,
+      full_name: user.user_metadata?.full_name || '',
+      active_role: 'landlord',
+      roles: ['landlord'],
+    }, { onConflict: 'id' })
     redirectTo = `${requestUrl.origin}/onboarding`
   } else {
-    const role = profile.active_role
-    console.log('EXISTING USER - profile role:', role)
-    redirectTo = role ? `${requestUrl.origin}${roleToPath(role)}` : `${requestUrl.origin}/onboarding`
+    // ── LOGIN flow: existing profile, no cookie — go to dashboard ──
+    const role = profile.active_role || 'landlord'
+    console.log('LOGIN FLOW - going to dashboard:', role)
+    redirectTo = `${requestUrl.origin}${roleToPath(role)}`
   }
 
   console.log('Redirecting to:', redirectTo)
 
   const finalResponse = NextResponse.redirect(redirectTo)
+
+  // Copy session cookies
   tempResponse.cookies.getAll().forEach(cookie => {
     finalResponse.cookies.set(cookie.name, cookie.value, cookie)
   })
+
+  // Clear the pending_role cookie
+  finalResponse.cookies.set('pending_role', '', { maxAge: 0, path: '/' })
 
   return finalResponse
 }
