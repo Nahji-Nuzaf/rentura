@@ -170,8 +170,8 @@ export default function LoginPage() {
                 <Image
                   src="/icon.png"
                   alt="Rentura Logo"
-                  width={24}
-                  height={24}
+                  width={28}
+                  height={28}
                 />
               </div>
               <h1 style={{ fontFamily: 'Fraunces,serif', fontSize: 32, fontWeight: 400, color: '#0A0A0A', letterSpacing: '-.8px', marginBottom: 6 }}>Welcome back</h1>
