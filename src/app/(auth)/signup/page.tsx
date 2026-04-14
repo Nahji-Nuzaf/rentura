@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Image from 'next/image'
 
 const roles = [
   { id: 'landlord', label: 'Landlord', emoji: '🏠', desc: 'I own or manage properties' },
@@ -169,6 +170,16 @@ export default function SignupPage() {
         .testi{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:24px;margin-top:40px}
         .match-ok{font-size:12px;color:#22C55E;margin-top:4px;font-weight:600}
         .match-err{font-size:12px;color:#EF4444;margin-top:4px;font-weight:600}
+        .sb-logo-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 11px;
+            background: rgba(255, 255, 255, 0.05); /* Very subtle white */
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
         .modal-backdrop{position:fixed;inset:0;background:rgba(5,10,20,.7);backdrop-filter:blur(6px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeIn .18s ease}
         @keyframes fadeIn{from{opacity:0}to{opacity:1}}
         .modal{background:#fff;border-radius:24px;padding:32px 28px;width:100%;max-width:400px;box-shadow:0 32px 80px rgba(0,0,0,.25);animation:slideUp .22s ease}
@@ -259,16 +270,23 @@ export default function SignupPage() {
           <div className="orb" /><div className="orb2" />
           <div style={{ position: 'relative', zIndex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 60 }}>
-              <div style={{ width: 42, height: 42, borderRadius: 12, background: 'linear-gradient(135deg,#38BDF8,#6366F1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, boxShadow: '0 8px 24px rgba(56,189,248,.3)' }}>🏘️</div>
+              <div className="sb-logo-icon" >
+                <Image
+                  src="/icon.png"
+                  alt="Rentura Logo"
+                  width={24}
+                  height={24}
+                />
+              </div>
               <span style={{ fontFamily: 'Fraunces,serif', fontSize: 22, fontWeight: 700, color: '#fff', letterSpacing: '-.3px' }}>Rentura</span>
             </div>
 
             <h1 className="headline" style={{ fontFamily: 'Fraunces,serif', fontSize: 52, fontWeight: 300, color: '#fff', lineHeight: 1.08, letterSpacing: '-1.5px', marginBottom: 18 }}>
-              Property<br />management,<br />
+              Property<br />management,&nbsp;
               <span style={{ fontStyle: 'italic', background: 'linear-gradient(90deg,#38BDF8,#818CF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>reimagined</span>
             </h1>
             <p style={{ fontSize: 16, color: '#64748B', lineHeight: 1.75, maxWidth: 360, marginBottom: 44 }}>
-              Everything you need to manage your portfolio — rent, tenants, maintenance — beautifully unified.
+              Everything you need to manage your portfolio rent, tenants, maintenance. beautifully unified.
             </p>
 
             <div className="stats-row" style={{ display: 'flex', gap: 12, marginBottom: 28 }}>
@@ -285,7 +303,7 @@ export default function SignupPage() {
                 {[1, 2, 3, 4, 5].map(i => <span key={i} style={{ color: '#F59E0B', fontSize: 14 }}>★</span>)}
               </div>
               <p style={{ fontSize: 14, color: '#94A3B8', lineHeight: 1.75, marginBottom: 16, fontStyle: 'italic' }}>
-                "Rentura eliminated my rent collection headaches. My tenants get automated reminders and I get paid on time — every single month."
+                "Rentura eliminated my rent collection headaches. My tenants get automated reminders and I get paid on time, every single month."
               </p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#38BDF8,#6366F1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 700 }}>AK</div>
@@ -301,9 +319,8 @@ export default function SignupPage() {
         <div className="right">
           <div style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 1 }}>
             <div style={{ marginBottom: 24 }}>
-              <div style={{ width: 52, height: 52, borderRadius: 15, background: 'linear-gradient(135deg,#38BDF8,#6366F1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, marginBottom: 18, boxShadow: '0 12px 32px rgba(56,189,248,.25)' }}>🏘️</div>
               <h1 style={{ fontFamily: 'Fraunces,serif', fontSize: 30, fontWeight: 400, color: '#0A0A0A', letterSpacing: '-.8px', marginBottom: 6 }}>Create your account</h1>
-              <p style={{ fontSize: 14, color: '#94A3B8' }}>Get started free — no credit card required</p>
+              <p style={{ fontSize: 14, color: '#94A3B8' }}>Get started free, no credit card required</p>
             </div>
 
             <div className="form-card" style={{ background: '#fff', border: '1px solid #E8E6E0', borderRadius: 24, padding: 28, boxShadow: '0 4px 32px rgba(0,0,0,.06)' }}>
