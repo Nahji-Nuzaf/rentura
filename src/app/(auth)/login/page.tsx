@@ -172,8 +172,8 @@ export default function LoginPage() {
                   alt="Rentura Logo"
                   width={28}
                   height={28}
-                /> */}
-              </div>
+                />
+              </div> */}
               <h1 style={{ fontFamily: 'Fraunces,serif', fontSize: 32, fontWeight: 400, color: '#0A0A0A', letterSpacing: '-.8px', marginBottom: 6 }}>Welcome back</h1>
               <p style={{ fontSize: 15, color: '#94A3B8' }}>Sign in to your Rentura account</p>
             </div>
