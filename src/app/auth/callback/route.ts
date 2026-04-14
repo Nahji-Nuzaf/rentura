@@ -8,15 +8,19 @@ function roleToPath(role: string): string {
 }
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
-  const code        = searchParams.get('code')
-  const roleFromUrl = searchParams.get('role')
+  const requestUrl = new URL(request.url)
+  const code        = requestUrl.searchParams.get('code')
+  const roleFromUrl = requestUrl.searchParams.get('role')
+
+  console.log('=== AUTH CALLBACK ===')
+  console.log('Full URL:', request.url)
+  console.log('code:', code ? 'present' : 'missing')
+  console.log('role from URL:', roleFromUrl)
 
   if (!code) {
-    return NextResponse.redirect(`${origin}/login`)
+    return NextResponse.redirect(`${requestUrl.origin}/login`)
   }
 
-  // Start with a temporary response to collect cookies
   const tempResponse = new NextResponse()
 
   const supabase = createServerClient(
@@ -25,7 +29,6 @@ export async function GET(request: Request) {
     {
       cookies: {
         get(name: string) {
-          // Read from request cookies
           return request.headers.get('cookie')
             ?.split(';')
             .find(c => c.trim().startsWith(`${name}=`))
@@ -45,11 +48,13 @@ export async function GET(request: Request) {
   const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error || !data?.user) {
-    console.error('Auth callback error:', error?.message)
-    return NextResponse.redirect(`${origin}/login`)
+    console.error('Session exchange error:', error?.message)
+    return NextResponse.redirect(`${requestUrl.origin}/login`)
   }
 
   const user = data.user
+  console.log('User ID:', user.id)
+  console.log('User email:', user.email)
 
   // Check profile
   const { data: profile } = await supabase
@@ -58,11 +63,14 @@ export async function GET(request: Request) {
     .eq('id', user.id)
     .maybeSingle()
 
+  console.log('Existing profile:', profile)
+
   let redirectTo: string
 
   if (!profile) {
-    // NEW USER — create profile with selected role, send to onboarding
     const role = roleFromUrl || 'landlord'
+    console.log('NEW USER - creating profile with role:', role)
+
     await supabase.from('profiles').upsert({
       id: user.id,
       email: user.email,
@@ -70,14 +78,16 @@ export async function GET(request: Request) {
       active_role: role,
       roles: [role],
     }, { onConflict: 'id' })
-    redirectTo = `${origin}/onboarding`
+
+    redirectTo = `${requestUrl.origin}/onboarding`
   } else {
-    // EXISTING USER — send to their dashboard
     const role = profile.active_role
-    redirectTo = role ? `${origin}${roleToPath(role)}` : `${origin}/onboarding`
+    console.log('EXISTING USER - profile role:', role)
+    redirectTo = role ? `${requestUrl.origin}${roleToPath(role)}` : `${requestUrl.origin}/onboarding`
   }
 
-  // Build final redirect response and copy all cookies from tempResponse
+  console.log('Redirecting to:', redirectTo)
+
   const finalResponse = NextResponse.redirect(redirectTo)
   tempResponse.cookies.getAll().forEach(cookie => {
     finalResponse.cookies.set(cookie.name, cookie.value, cookie)
