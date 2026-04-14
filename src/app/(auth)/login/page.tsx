@@ -134,11 +134,11 @@ export default function LoginPage() {
               <span style={{ fontFamily: 'Fraunces,serif', fontSize: 22, fontWeight: 700, color: '#fff', letterSpacing: '-.3px' }}>Rentura</span>
             </div>
             <h1 className="headline" style={{ fontFamily: 'Fraunces,serif', fontSize: 52, fontWeight: 300, color: '#fff', lineHeight: 1.08, letterSpacing: '-1.5px', marginBottom: 18 }}>
-              Welcome<br />back to your<br />
+              Welcome<br />back to your
               <span style={{ fontStyle: 'italic', background: 'linear-gradient(90deg,#38BDF8,#818CF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>portfolio</span>
             </h1>
             <p style={{ fontSize: 16, color: '#64748B', lineHeight: 1.75, maxWidth: 360, marginBottom: 40 }}>
-              Everything you left is exactly where you left it. Your properties, tenants, and finances — all waiting.
+              Everything you left is exactly where you left it. Your properties, tenants, and finances; all waiting.
             </p>
             <div>
               {features.map(f => (
