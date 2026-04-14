@@ -166,13 +166,13 @@ export default function LoginPage() {
         <div className="right">
           <div style={{ width: '100%', maxWidth: 400, position: 'relative', zIndex: 1 }}>
             <div style={{ marginBottom: 28 }}>
-              <div className="sb-logo-icon" >
+              {/* <div className="sb-logo-icon" >
                 <Image
                   src="/icon.png"
                   alt="Rentura Logo"
                   width={28}
                   height={28}
-                />
+                /> */}
               </div>
               <h1 style={{ fontFamily: 'Fraunces,serif', fontSize: 32, fontWeight: 400, color: '#0A0A0A', letterSpacing: '-.8px', marginBottom: 6 }}>Welcome back</h1>
               <p style={{ fontSize: 15, color: '#94A3B8' }}>Sign in to your Rentura account</p>
