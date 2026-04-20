@@ -1,10 +1,17 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
+import { createClient } from '@supabase/supabase-js'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-03-25.dahlia',
 })
+
+// Service role to write subscription immediately on checkout
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export async function POST(request: Request) {
   try {
@@ -42,19 +49,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get profile info
+    // Get profile
     const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name, email')
-      .eq('id', user.id)
-      .single()
+      .from('profiles').select('full_name, email').eq('id', user.id).single()
 
-    // Check if stripe customer already exists
-    const { data: existingSub } = await supabase
-      .from('subscriptions')
-      .select('stripe_customer_id')
-      .eq('profile_id', user.id)
-      .maybeSingle()
+    // Get or create Stripe customer
+    const { data: existingSub } = await supabaseAdmin
+      .from('subscriptions').select('stripe_customer_id')
+      .eq('profile_id', user.id).maybeSingle()
 
     let customerId = existingSub?.stripe_customer_id
 
@@ -74,7 +76,7 @@ export async function POST(request: Request) {
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
-      success_url: `${origin}/landlord/upgrade?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${origin}/landlord/upgrade?success=true&session_id={CHECKOUT_SESSION_ID}&user_id=${user.id}&plan=${plan || 'pro'}`,
       cancel_url: `${origin}/landlord/upgrade?cancelled=true`,
       metadata: {
         supabase_user_id: user.id,

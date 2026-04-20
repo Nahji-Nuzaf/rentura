@@ -7,25 +7,10 @@ export type PlanStatus = {
   loading: boolean
 }
 
-// FREE TIER LIMITS
 export const FREE_LIMITS = {
   properties: 3,
   listings:   2,
   units:      10,
-}
-
-// PRO LIMITS
-export const PRO_LIMITS = {
-  properties: Infinity,
-  listings:   Infinity,
-  units:      Infinity,
-}
-
-export function usePlanLimits(count: number, resource: keyof typeof FREE_LIMITS) {
-  const limit = FREE_LIMITS[resource]
-  const isAtLimit = count >= limit
-  const remaining = Math.max(0, limit - count)
-  return { isAtLimit, remaining, limit }
 }
 
 export async function getProStatus(userId: string): Promise<PlanStatus> {
@@ -36,19 +21,21 @@ export async function getProStatus(userId: string): Promise<PlanStatus> {
       .select('plan, status')
       .eq('profile_id', userId)
       .eq('status', 'active')
-      .single()
+      .maybeSingle()
 
     if (data && (data.plan === 'pro' || data.plan === 'business')) {
       return { isPro: true, plan: data.plan, loading: false }
     }
   } catch {
-    // No subscription found = free plan
+    // No subscription = free
   }
   return { isPro: false, plan: 'free', loading: false }
 }
 
 export function useProStatus(): PlanStatus {
-  const [status, setStatus] = useState<PlanStatus>({ isPro: false, plan: 'free', loading: true })
+  const [status, setStatus] = useState<PlanStatus>({
+    isPro: false, plan: 'free', loading: true
+  })
 
   useEffect(() => {
     const check = async () => {
