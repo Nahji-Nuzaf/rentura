@@ -2,32 +2,65 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2026-03-25.dahlia',
-})
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 export async function POST(request: Request) {
   try {
     const { sessionId, userId, plan } = await request.json()
 
+    console.log('=== ACTIVATE SUBSCRIPTION ===')
+    console.log('sessionId:', sessionId ? 'present' : 'MISSING')
+    console.log('userId:', userId ? 'present' : 'MISSING')
+    console.log('plan:', plan)
+    console.log('STRIPE_SECRET_KEY:', process.env.STRIPE_SECRET_KEY ? 'present' : 'MISSING')
+    console.log('SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'present' : 'MISSING')
+    console.log('NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'present' : 'MISSING')
+
     if (!sessionId || !userId) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+      return NextResponse.json({ error: 'Missing sessionId or userId' }, { status: 400 })
     }
 
-    // Verify the session with Stripe to make sure it's real
-    const session = await stripe.checkout.sessions.retrieve(sessionId)
-
-    if (session.payment_status !== 'paid' && session.status !== 'complete') {
-      return NextResponse.json({ error: 'Payment not completed' }, { status: 400 })
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return NextResponse.json({ error: 'STRIPE_SECRET_KEY not configured' }, { status: 500 })
     }
 
-    // Verify the session belongs to this user
-    if (session.metadata?.supabase_user_id !== userId) {
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY not configured' }, { status: 500 })
+    }
+
+    // Init clients inside function so env vars are always fresh
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2024-06-20',
+    })
+
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    )
+
+    // Verify with Stripe
+    let session
+    try {
+      session = await stripe.checkout.sessions.retrieve(sessionId)
+    } catch (stripeErr: any) {
+      console.error('Stripe session retrieve error:', stripeErr.message)
+      return NextResponse.json({ error: 'Invalid Stripe session: ' + stripeErr.message }, { status: 400 })
+    }
+
+    console.log('Stripe session status:', session.status)
+    console.log('Stripe payment_status:', session.payment_status)
+    console.log('Session metadata:', session.metadata)
+
+    // Accept both paid and complete statuses
+    const isComplete = session.status === 'complete' || session.payment_status === 'paid'
+    if (!isComplete) {
+      return NextResponse.json({
+        error: `Payment not completed. Status: ${session.status}, payment: ${session.payment_status}`
+      }, { status: 400 })
+    }
+
+    // Verify session belongs to this user
+    const sessionUserId = session.metadata?.supabase_user_id
+    if (sessionUserId && sessionUserId !== userId) {
+      console.error(`User mismatch: session=${sessionUserId}, request=${userId}`)
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -35,25 +68,29 @@ export async function POST(request: Request) {
     const customerId   = session.customer as string
     const subId        = session.subscription as string
 
-    // Upsert subscription record
-    const { error } = await supabaseAdmin.from('subscriptions').upsert({
-      profile_id:             userId,
-      role:                   'landlord',
-      plan:                   resolvedPlan,
-      status:                 'active',
-      stripe_customer_id:     customerId,
-      stripe_subscription_id: subId,
-    }, { onConflict: 'profile_id' })
+    console.log('Upserting subscription:', { userId, resolvedPlan, customerId, subId })
 
-    if (error) {
-      console.error('Supabase upsert error:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    const { error: upsertError } = await supabaseAdmin
+      .from('subscriptions')
+      .upsert({
+        profile_id:             userId,
+        role:                   'landlord',
+        plan:                   resolvedPlan,
+        status:                 'active',
+        stripe_customer_id:     customerId,
+        stripe_subscription_id: subId,
+      }, { onConflict: 'profile_id' })
+
+    if (upsertError) {
+      console.error('Supabase upsert error:', upsertError)
+      return NextResponse.json({ error: 'DB error: ' + upsertError.message }, { status: 500 })
     }
 
-    console.log(`✅ Subscription activated: user=${userId}, plan=${resolvedPlan}`)
+    console.log(`✅ SUCCESS: user=${userId}, plan=${resolvedPlan}`)
     return NextResponse.json({ success: true, plan: resolvedPlan })
+
   } catch (err: any) {
-    console.error('Activate subscription error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error('Activate route error:', err)
+    return NextResponse.json({ error: err.message || 'Unknown error' }, { status: 500 })
   }
 }
