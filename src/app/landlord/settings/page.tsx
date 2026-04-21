@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
+import { usePro } from '@/components/ProProvider'
+const { isPro, plan } = usePro()
 import { profile } from 'console'
 
 type NotifSettings = { rent_due: boolean; maintenance: boolean; messages: boolean; lease_expiry: boolean }

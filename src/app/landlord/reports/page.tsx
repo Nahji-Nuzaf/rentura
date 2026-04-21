@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
+import { usePro } from '@/components/ProProvider'
+const { isPro, plan } = usePro()
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 const NOW = new Date()
@@ -513,8 +515,8 @@ export default function ReportsPage() {
               </div>
             </div>
 
-            <div className="pro-wrap">
-              <div className="card pro-blur">
+            {!isPro && <div className="pro-wrap">
+              {isPro && <div className="card pro-blur">
                 <div className="card-head"><div className="card-title">Annual Revenue Trend</div></div>
                 <div style={{display:'flex',alignItems:'flex-end',gap:4,height:110,marginBottom:8}}>
                   {proRevenue.map((v,i)=>(
@@ -524,7 +526,7 @@ export default function ReportsPage() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </div>}
               <div className="pro-overlay">
                 <div className="pro-icon">📈</div>
                 <span className="pro-tag">⭐ PRO FEATURE</span>
@@ -532,10 +534,10 @@ export default function ReportsPage() {
                 <div className="pro-desc">Full year breakdown, forecasts & CSV/PDF export</div>
                 <a href="/landlord/upgrade" className="pro-btn">Unlock with Pro →</a>
               </div>
-            </div>
+            </div>}
 
-            <div className="pro-wrap" style={{marginBottom:0}}>
-              <div className="card pro-blur">
+            {!isPro && <div className="pro-wrap" style={{marginBottom:0}}>
+              {isPro && <div className="card pro-blur">
                 <div className="card-head"><div className="card-title">Property Performance Comparison</div></div>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
                   {['Rush Towers','Ocean View','Green Valley'].map((name,i)=>(
@@ -550,7 +552,7 @@ export default function ReportsPage() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </div>}
               <div className="pro-overlay">
                 <div className="pro-icon">🏆</div>
                 <span className="pro-tag">⭐ PRO FEATURE</span>
@@ -558,7 +560,7 @@ export default function ReportsPage() {
                 <div className="pro-desc">Compare revenue & occupancy across all properties</div>
                 <a href="/landlord/upgrade" className="pro-btn">Unlock with Pro →</a>
               </div>
-            </div>
+            </div>}
           </div>
         </div>
       </div>

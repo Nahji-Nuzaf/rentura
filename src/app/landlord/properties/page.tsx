@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
+import { usePro } from '@/components/ProProvider'
+const { isPro, plan } = usePro()
 
 type Property = {
   id: string
@@ -168,7 +170,7 @@ export default function PropertiesPage() {
   }
 
   function openAdd() {
-    if (properties.length >= FREE_PLAN_LIMIT) { setShowUpgradeModal(true); return }
+    if (!isPro && properties.length >= FREE_PLAN_LIMIT) { setShowUpgradeModal(true); return }
     setForm({ name: '', address: '', city: '', country: 'Sri Lanka', type: 'apartment', status: 'active', total_units: '', default_rent: '' })
     setEditing(null)
     setSaveError(null)

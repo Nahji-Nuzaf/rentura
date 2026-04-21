@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
+import { usePro } from '@/components/ProProvider'
+const { isPro, plan } = usePro()
 
 type Doc = {
   id: string

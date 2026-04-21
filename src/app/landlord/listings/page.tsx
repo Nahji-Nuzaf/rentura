@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
+import { usePro } from '@/components/ProProvider'
+const { isPro, plan } = usePro()
 
 type Listing = {
   id: string
@@ -296,7 +298,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
 
   function openAdd() {
     const activeCount = listings.filter(l => l.status === 'active').length
-    if (activeCount >= 2) { setShowUpgradeModal(true); return }
+    if (!isPro && activeCount >= 2) { setShowUpgradeModal(true); return }
     setForm({
       title: '', description: '', property_id: properties[0]?.id || '', unit_id: '',
       bedrooms: '1', bathrooms: '1', rent_amount: '', available_from: '', status: 'draft'
