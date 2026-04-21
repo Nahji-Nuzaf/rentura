@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
 import { usePro } from '@/components/ProProvider'
-const { isPro, plan } = usePro()
 
 type RentRecord = {
   id: string
@@ -55,6 +54,7 @@ function exportCSV(filename: string, headers: string[], rows: (string|number)[][
 
 export default function RentTrackerPage() {
   const router = useRouter()
+const { isPro, plan } = usePro()
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName]         = useState('User')
   const [userId, setUserId]             = useState('')
@@ -67,7 +67,7 @@ export default function RentTrackerPage() {
   const [selectedYear] = useState(NOW.getFullYear())
   const [filter, setFilter]             = useState<'all'|'paid'|'overdue'|'pending'>('all')
   const [toast, setToast]               = useState<{msg:string;type:'success'|'error'}|null>(null)
-  const [isPro, setIsPro]               = useState(false)
+  // const [isPro, setIsPro]               = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   function showToast(msg: string, type: 'success'|'error' = 'success') {
@@ -156,7 +156,7 @@ export default function RentTrackerPage() {
       // Check pro status
       const { data: sub } = await supabase.from('subscriptions').select('plan,status')
         .eq('profile_id', user.id).eq('status','active').single()
-      if (sub && (sub.plan==='pro'||sub.plan==='business')) setIsPro(true)
+      // if (sub && (sub.plan==='pro'||sub.plan==='business')) setIsPro(true)
 
       await loadRecords(user.id, MONTHS[NOW.getMonth()], NOW.getFullYear())
     }

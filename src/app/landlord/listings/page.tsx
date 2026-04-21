@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
 import { usePro } from '@/components/ProProvider'
-const { isPro, plan } = usePro()
 
 type Listing = {
   id: string
@@ -42,6 +41,8 @@ function fmtDate(s: string) {
 
 export default function ListingsPage() {
   const router = useRouter()
+
+  const { isPro, plan } = usePro()
   const photoInputRef = useRef<HTMLInputElement>(null)
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName] = useState('User')

@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
 import { usePro } from '@/components/ProProvider'
-const { isPro, plan } = usePro()
 
 type Message = {
   id: string
@@ -60,6 +59,7 @@ function fmtTime(ts: string) {
 
 export default function MessagesPage() {
   const router = useRouter()
+const { isPro, plan } = usePro()
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName] = useState('User')
   const [userId, setUserId] = useState('')

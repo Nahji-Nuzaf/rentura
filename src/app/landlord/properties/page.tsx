@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
 import { usePro } from '@/components/ProProvider'
-const { isPro, plan } = usePro()
 
 type Property = {
   id: string
@@ -36,6 +35,7 @@ const FREE_PLAN_LIMIT = 3
 
 export default function PropertiesPage() {
   const router = useRouter()
+const { isPro, plan } = usePro()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [userId, setUserId] = useState('')

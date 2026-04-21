@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
-import { usePro } from '@/components/ProProvider'
-const { isPro, plan } = usePro()
 
 const FREE_FEATURES = [
   { text: '3 properties',             included: true  },

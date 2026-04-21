@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
 import { usePro } from '@/components/ProProvider'
-const { isPro, plan } = usePro()
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 const NOW = new Date()
@@ -29,11 +28,13 @@ function exportCSV(filename: string, headers: string[], rows: (string|number)[][
 
 export default function ReportsPage() {
   const router = useRouter()
+  
+const { isPro, plan } = usePro()
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName]         = useState('User')
   const [sidebarOpen, setSidebarOpen]   = useState(false)
   const [loading, setLoading]           = useState(true)
-  const [isPro, setIsPro]               = useState(false)
+  // const [isPro, setIsPro]               = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [monthStats, setMonthStats]     = useState<MonthStat[]>([])
   const [occStats, setOccStats]         = useState<OccStat[]>([])
@@ -54,7 +55,7 @@ export default function ReportsPage() {
       setUserInitials(name.split(' ').map((n:string)=>n[0]).join('').toUpperCase().slice(0,2))
       const { data: sub } = await supabase.from('subscriptions').select('plan,status')
         .eq('profile_id',user.id).eq('status','active').single()
-      if (sub&&(sub.plan==='pro'||sub.plan==='business')) setIsPro(true)
+      // if (sub&&(sub.plan==='pro'||sub.plan==='business')) setIsPro(true)
       await loadReports(user.id)
     }
     init()

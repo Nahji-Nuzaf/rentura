@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
 import { usePro } from '@/components/ProProvider'
-const { isPro, plan } = usePro()
 
 type MRequest = {
   id: string
@@ -48,6 +47,8 @@ function timeAgo(d: string) {
 
 export default function MaintenancePage() {
   const router = useRouter()
+  
+const { isPro, plan } = usePro()
   const [userId, setUserId] = useState('')
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName] = useState('User')

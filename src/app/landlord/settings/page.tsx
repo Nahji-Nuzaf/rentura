@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
 import { usePro } from '@/components/ProProvider'
-const { isPro, plan } = usePro()
+
 import { profile } from 'console'
 
 type NotifSettings = { rent_due: boolean; maintenance: boolean; messages: boolean; lease_expiry: boolean }
 
 export default function SettingsPage() {
   const router = useRouter()
+  const { isPro, plan } = usePro()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'billing' | 'security'>('profile')
   const [userId, setUserId] = useState('')
