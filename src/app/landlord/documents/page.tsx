@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
 import { usePro } from '@/components/ProProvider'
-const { isPro, plan } = usePro()
+
 
 type Doc = {
   id: string
@@ -42,6 +42,8 @@ function fmtDate(str: string) {
 
 export default function DocumentsPage() {
   const router = useRouter()
+  // ── FIX: Use ONLY the isPro value from usePro() — do NOT redeclare as useState below
+  const { isPro } = usePro()
   const fileRef = useRef<HTMLInputElement>(null)
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName] = useState('User')
@@ -59,7 +61,7 @@ export default function DocumentsPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [properties, setProperties] = useState<{ id: string, name: string }[]>([])
   const [tenants, setTenants] = useState<{ id: string, name: string }[]>([])
-  const [isPro, setIsPro] = useState(false)
+  // ── REMOVED: const [isPro, setIsPro] = useState(false) — was shadowing usePro() above
   const FREE_DOC_LIMIT = 5
   const [form, setForm] = useState({
     name: '', type: 'lease' as Doc['type'],
@@ -79,10 +81,8 @@ export default function DocumentsPage() {
         setUserId(user.id)
         setUserInitials(name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2))
 
-        // Check subscription plan
-        const { data: sub } = await supabase
-          .from('subscriptions').select('plan,status').eq('profile_id', user.id).single()
-        setIsPro(sub?.plan === 'pro' && sub?.status === 'active')
+        // ── REMOVED: redundant local subscription check that was overwriting usePro()
+        // isPro is now exclusively managed by the usePro() hook above
 
         // Load properties for upload form
         const { data: props } = await supabase
@@ -559,7 +559,11 @@ export default function DocumentsPage() {
             </div>
             <div className="sb-user">
               <div className="sb-av">{userInitials}</div>
-              <div><div className="sb-uname">{fullName}</div><span className="sb-uplan">FREE</span></div>
+              <div>
+                <div className="sb-uname">{fullName}</div>
+                {/* ── FIX: Display correct plan label based on usePro() */}
+                <span className="sb-uplan">{isPro ? 'PRO' : 'FREE'}</span>
+              </div>
             </div>
           </div>
         </aside>
