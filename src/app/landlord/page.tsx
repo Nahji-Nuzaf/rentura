@@ -6,7 +6,6 @@ import { createClient } from '@/lib/supabase'
 import Image from 'next/image';
 
 import { usePro } from '@/components/ProProvider'
-const { isPro, plan } = usePro()
 
 type Stats = {
   totalProperties: number
@@ -86,6 +85,7 @@ function timeAgo(str: string) {
 
 export default function LandlordDashboard() {
   const router = useRouter()
+  const { isPro, plan } = usePro()
   const [firstName, setFirstName]     = useState('there')
   const [initials, setInitials]       = useState('NN')
   const [fullName, setFullName]       = useState('User')
@@ -369,7 +369,7 @@ export default function LandlordDashboard() {
             width: 38px;
             height: 38px;
             border-radius: 11px;
-            background: rgba(255, 255, 255, 0.05); /* Very subtle white */
+            background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
             display: flex;
             align-items: center;
@@ -393,6 +393,7 @@ export default function LandlordDashboard() {
         .sb-av { width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,#3B82F6,#6366F1); display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:700; flex-shrink:0; }
         .sb-uname { font-size:13px; font-weight:700; color:#E2E8F0; }
         .sb-uplan { display:inline-block; font-size:10px; font-weight:700; color:#60A5FA; background:rgba(59,130,246,0.14); border:1px solid rgba(59,130,246,0.25); border-radius:5px; padding:1px 6px; margin-top:2px; }
+        .sb-uplan-pro { display:inline-block; font-size:10px; font-weight:700; color:#A78BFA; background:rgba(139,92,246,0.18); border:1px solid rgba(139,92,246,0.3); border-radius:5px; padding:1px 6px; margin-top:2px; }
 
         /* MAIN */
         .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:hidden;width:calc(100% - 260px)}
@@ -513,19 +514,6 @@ export default function LandlordDashboard() {
         .lr-days-num{font-size:13px;font-weight:700}
         .lr-days-lbl{font-size:10.5px;color:#94A3B8;margin-top:1px}
 
-        /* BLURRED ANALYTICS */
-        .analytics-wrap{position:relative;border-radius:12px;overflow:hidden}
-        .analytics-blur{filter:blur(4px);pointer-events:none;user-select:none}
-        .analytics-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(255,255,255,0.5);backdrop-filter:blur(2px)}
-        .ao-badge{background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:11.5px;font-weight:700;padding:4px 12px;border-radius:99px}
-        .ao-title{font-size:14px;font-weight:700;color:#0F172A}
-        .ao-sub{font-size:12px;color:#64748B;text-align:center;max-width:200px;line-height:1.4}
-        .ao-btn{padding:8px 18px;border-radius:9px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;margin-top:4px}
-        .chart-bar-wrap{display:flex;align-items:flex-end;gap:6px;height:80px;padding:8px 0}
-        .chart-bar{flex:1;border-radius:4px 4px 0 0;min-width:0}
-        .chart-labels{display:flex;gap:6px;margin-top:6px}
-        .chart-label{flex:1;text-align:center;font-size:10px;color:#94A3B8}
-
         /* RESPONSIVE */
         @media(min-width:1100px){
           .stats{grid-template-columns:repeat(4,1fr)}
@@ -568,16 +556,13 @@ export default function LandlordDashboard() {
         <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="sb-logo">
             <div className="sb-logo-icon">
-              <Image 
-                src="/icon.png" 
-                alt="Rentura Logo" 
-                width={24} 
-                height={24} 
+              <Image
+                src="/icon.png"
+                alt="Rentura Logo"
+                width={24}
+                height={24}
               />
             </div>
-            {/* <div className="sb-logo-icon">
-              <img src="/icon.png" alt="Rentura Logo" style={{ width: '24px', height: '24px' }} />
-            </div> */}
             <span className="sb-logo-name">Rentura</span>
           </div>
           <nav className="sb-nav">
@@ -599,16 +584,23 @@ export default function LandlordDashboard() {
             <a href="/landlord/settings" className="sb-item"><span className="sb-ico">⚙️</span>Settings</a>
           </nav>
           <div className="sb-footer">
-            <div className="sb-upgrade">
-              <div className="sb-up-title">⭐ Upgrade to Pro</div>
-              <div className="sb-up-sub">Unlimited properties, reports & priority support.</div>
-              <button className="sb-up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
-            </div>
+            {/* Only show upgrade prompt for free users */}
+            {!isPro && (
+              <div className="sb-upgrade">
+                <div className="sb-up-title">⭐ Upgrade to Pro</div>
+                <div className="sb-up-sub">Unlimited properties, reports & priority support.</div>
+                <button className="sb-up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
+              </div>
+            )}
             <div className="sb-user">
               <div className="sb-av">{initials}</div>
               <div>
                 <div className="sb-uname">{fullName}</div>
-                <span className="sb-uplan">FREE</span>
+                {/* Show plan badge — PRO styling for pro users, FREE for others */}
+                {isPro
+                  ? <span className="sb-uplan-pro">⭐ {plan?.toUpperCase() || 'PRO'}</span>
+                  : <span className="sb-uplan">FREE</span>
+                }
               </div>
             </div>
           </div>
@@ -865,14 +857,16 @@ export default function LandlordDashboard() {
                   })}
                 </div>
 
-                {/* Blurred Analytics — Pro Teaser */}
+                {/* Analytics — unlocked for Pro, blurred teaser for free */}
                 <div style={{background:'#fff',border:'1px solid #E2E8F0',borderRadius:18,padding:20,boxShadow:'0 1px 4px rgba(15,23,42,0.04)',position:'relative',overflow:'hidden'}}>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
                     <span style={{fontSize:15,fontWeight:700,color:'#0F172A'}}>Year-over-Year Growth</span>
-                    <span style={{fontSize:10.5,fontWeight:800,background:'linear-gradient(135deg,#2563EB,#6366F1)',color:'#fff',padding:'2px 8px',borderRadius:99}}>PRO</span>
+                    {!isPro && (
+                      <span style={{fontSize:10.5,fontWeight:800,background:'linear-gradient(135deg,#2563EB,#6366F1)',color:'#fff',padding:'2px 8px',borderRadius:99}}>PRO</span>
+                    )}
                   </div>
-                  {/* Blurred chart underneath */}
-                  <div style={{filter:'blur(5px)',pointerEvents:'none',userSelect:'none',opacity:0.6}}>
+                  {/* Chart — always rendered, blurred only for free users */}
+                  <div style={!isPro ? {filter:'blur(5px)',pointerEvents:'none',userSelect:'none',opacity:0.6} : {}}>
                     <div style={{display:'flex',alignItems:'flex-end',gap:5,height:90,marginBottom:6}}>
                       {[35,50,42,58,54,68,62,78,72,85,79,92].map((h,i) => (
                         <div key={i} style={{flex:1,height:`${h}%`,borderRadius:'4px 4px 0 0',background: i>=9 ? 'linear-gradient(180deg,#3B82F6,#6366F1)' : '#CBD5E1'}} />
@@ -888,14 +882,21 @@ export default function LandlordDashboard() {
                       <span style={{fontSize:11.5,color:'#16A34A',fontWeight:700}}>↑ +24% YoY</span>
                     </div>
                   </div>
-                  {/* Overlay */}
-                  <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:8,background:'rgba(255,255,255,0.82)',backdropFilter:'blur(3px)'}}>
-                    <div style={{fontSize:22}}>📊</div>
-                    <span style={{fontSize:11,fontWeight:800,background:'linear-gradient(135deg,#2563EB,#6366F1)',color:'#fff',padding:'3px 12px',borderRadius:99,letterSpacing:0.5}}>⭐ PRO FEATURE</span>
-                    <div style={{fontSize:14,fontWeight:700,color:'#0F172A',marginTop:2}}>Advanced Analytics</div>
-                    <div style={{fontSize:12,color:'#64748B',textAlign:'center',maxWidth:190,lineHeight:1.5}}>Year-over-year trends, forecasts & portfolio insights</div>
-                    <button style={{marginTop:6,padding:'9px 20px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#2563EB,#6366F1)',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:"'Plus Jakarta Sans',sans-serif",boxShadow:'0 2px 10px rgba(37,99,235,0.3)'}}>Unlock with Pro →</button>
-                  </div>
+                  {/* Overlay — only shown for free users */}
+                  {!isPro && (
+                    <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:8,background:'rgba(255,255,255,0.82)',backdropFilter:'blur(3px)'}}>
+                      <div style={{fontSize:22}}>📊</div>
+                      <span style={{fontSize:11,fontWeight:800,background:'linear-gradient(135deg,#2563EB,#6366F1)',color:'#fff',padding:'3px 12px',borderRadius:99,letterSpacing:0.5}}>⭐ PRO FEATURE</span>
+                      <div style={{fontSize:14,fontWeight:700,color:'#0F172A',marginTop:2}}>Advanced Analytics</div>
+                      <div style={{fontSize:12,color:'#64748B',textAlign:'center',maxWidth:190,lineHeight:1.5}}>Year-over-year trends, forecasts & portfolio insights</div>
+                      <button
+                        onClick={() => window.location.href = '/landlord/upgrade'}
+                        style={{marginTop:6,padding:'9px 20px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#2563EB,#6366F1)',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:"'Plus Jakarta Sans',sans-serif",boxShadow:'0 2px 10px rgba(37,99,235,0.3)'}}
+                      >
+                        Unlock with Pro →
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Quick Actions */}
@@ -913,14 +914,16 @@ export default function LandlordDashboard() {
                   </div>
                 </div>
 
-                {/* Upgrade */}
-                <div className="up-card">
-                  <div className="up-inner">
-                    <div className="up-title">⭐ Upgrade to Pro</div>
-                    <div className="up-sub">Unlock unlimited properties, advanced analytics & priority support.</div>
-                    <button className="up-btn">See Plans →</button>
+                {/* Upgrade card — only shown for free users */}
+                {!isPro && (
+                  <div className="up-card">
+                    <div className="up-inner">
+                      <div className="up-title">⭐ Upgrade to Pro</div>
+                      <div className="up-sub">Unlock unlimited properties, advanced analytics & priority support.</div>
+                      <button className="up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
+                    </div>
                   </div>
-                </div>
+                )}
 
               </div>
             </div>
