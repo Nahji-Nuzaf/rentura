@@ -29,12 +29,12 @@ function exportCSV(filename: string, headers: string[], rows: (string|number)[][
 export default function ReportsPage() {
   const router = useRouter()
   
-const { isPro, plan } = usePro()
+// const { isPro, plan } = usePro()
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName]         = useState('User')
   const [sidebarOpen, setSidebarOpen]   = useState(false)
   const [loading, setLoading]           = useState(true)
-  // const [isPro, setIsPro]               = useState(false)
+  const [isPro, setIsPro]               = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [monthStats, setMonthStats]     = useState<MonthStat[]>([])
   const [occStats, setOccStats]         = useState<OccStat[]>([])
