@@ -42,7 +42,8 @@ function fmtDate(s: string) {
 export default function ListingsPage() {
   const router = useRouter()
 
-  const { isPro, plan } = usePro()
+  // ── FIX: Use ONLY isPro from usePro() — do not redeclare
+  const { isPro } = usePro()
   const photoInputRef = useRef<HTMLInputElement>(null)
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName] = useState('User')
@@ -264,7 +265,10 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
         bathrooms: parseInt(form.bathrooms) || 1,
         rent_amount: parseFloat(form.rent_amount) || 0,
         currency: 'USD',
-        available_from: form.available_from || null,
+        // ── FIX: available_from — only include if user actually set a date.
+        // If empty string, omit the key entirely so DB uses its own default,
+        // preventing the NOT NULL constraint violation.
+        ...(form.available_from ? { available_from: form.available_from } : {}),
         status: form.status,
         photos: allPhotos,
       }
@@ -298,6 +302,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
   }
 
   function openAdd() {
+    // ── Pro check: free users limited to 2 active listings
     const activeCount = listings.filter(l => l.status === 'active').length
     if (!isPro && activeCount >= 2) { setShowUpgradeModal(true); return }
     setForm({
@@ -362,7 +367,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
             width: 38px;
             height: 38px;
             border-radius: 11px;
-            background: rgba(255, 255, 255, 0.05); /* Very subtle white */
+            background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
             display: flex;
             align-items: center;
@@ -659,7 +664,8 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
               <input type="number" value={form.rent_amount} onChange={e => setForm(f => ({ ...f, rent_amount: e.target.value }))} placeholder="0" />
             </div>
             <div className="field">
-              <label>Available From</label>
+              {/* ── FIX: label clarifies field is optional to guide users */}
+              <label>Available From <span style={{ fontWeight: 400, color: '#94A3B8', textTransform: 'none', letterSpacing: 0 }}>(optional)</span></label>
               <input type="date" value={form.available_from} onChange={e => setForm(f => ({ ...f, available_from: e.target.value }))} />
             </div>
           </div>
@@ -743,14 +749,18 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
             <a href="/landlord/settings" className="sb-item"><span className="sb-ico">⚙️</span>Settings</a>
           </nav>
           <div className="sb-footer">
-            <div className="sb-upgrade">
-              <div className="sb-up-title">⭐ Upgrade to Pro</div>
-              <div className="sb-up-sub">Unlimited listings & AI features.</div>
-              <button className="sb-up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
-            </div>
+            {/* ── Pro users don't need the upgrade nudge */}
+            {!isPro && (
+              <div className="sb-upgrade">
+                <div className="sb-up-title">⭐ Upgrade to Pro</div>
+                <div className="sb-up-sub">Unlimited listings & AI features.</div>
+                <button className="sb-up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
+              </div>
+            )}
             <div className="sb-user">
               <div className="sb-av">{userInitials}</div>
-              <div><div className="sb-uname">{fullName}</div><span className="sb-uplan">FREE</span></div>
+              {/* ── FIX: show real plan from usePro() */}
+              <div><div className="sb-uname">{fullName}</div><span className="sb-uplan">{isPro ? 'PRO' : 'FREE'}</span></div>
             </div>
           </div>
         </aside>
