@@ -43,7 +43,7 @@ export default function ListingsPage() {
   const router = useRouter()
 
   // ── FIX: Use ONLY isPro from usePro() — do not redeclare
-  const { isPro } = usePro()
+  const { isPro , plan} = usePro()
   const photoInputRef = useRef<HTMLInputElement>(null)
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName] = useState('User')
@@ -74,6 +74,11 @@ export default function ListingsPage() {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
   const [aiSuccess, setAiSuccess] = useState(false)
+
+  const planLabel = isPro ? plan.toUpperCase() : 'FREE'
+  const planColor = isPro
+    ? { color: '#FCD34D', bg: 'rgba(251,191,36,.14)', border: 'rgba(251,191,36,.3)' }
+    : { color: '#60A5FA', bg: 'rgba(59,130,246,.14)', border: 'rgba(59,130,246,.25)' }
 
   const [form, setForm] = useState({
     title: '', description: '', property_id: '', unit_id: '',
@@ -747,6 +752,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
             <a href="/landlord/listings" className="sb-item active"><span className="sb-ico">📋</span>Listings</a>
             <span className="sb-section">Account</span>
             <a href="/landlord/settings" className="sb-item"><span className="sb-ico">⚙️</span>Settings</a>
+            <a href="/landlord/upgrade" className="sb-item"><span className="sb-ico">⭐</span>Upgrade</a>
           </nav>
           <div className="sb-footer">
             {/* ── Pro users don't need the upgrade nudge */}
@@ -759,9 +765,18 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
             )}
             <div className="sb-user">
               <div className="sb-av">{userInitials}</div>
-              {/* ── FIX: show real plan from usePro() */}
-              <div><div className="sb-uname">{fullName}</div><span className="sb-uplan">{isPro ? 'PRO' : 'FREE'}</span></div>
+              <div>
+                <div className="sb-uname">{fullName}</div>
+                <span className="sb-uplan" style={{ color: planColor.color, background: planColor.bg, border: `1px solid ${planColor.border}` }}>
+                  {planLabel}
+                </span>
+              </div>
             </div>
+            {/* <div className="sb-user">
+              <div className="sb-av">{userInitials}</div>
+              ── FIX: show real plan from usePro()
+              <div><div className="sb-uname">{fullName}</div><span className="sb-uplan">{isPro ? 'PRO' : 'FREE'}</span></div>
+            </div> */}
           </div>
         </aside>
 

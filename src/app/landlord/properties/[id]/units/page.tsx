@@ -50,7 +50,7 @@ export default function UnitsPage() {
   const propertyId = params?.id as string
 
   // ── FIX: Only destructure isPro — plan is unused
-  const { isPro } = usePro()
+  const { isPro, plan } = usePro()
 
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName] = useState('User')
@@ -77,6 +77,11 @@ export default function UnitsPage() {
   const [bulkRent, setBulkRent] = useState('')
   const [bulkStatus, setBulkStatus] = useState('')
   const [bulkSaving, setBulkSaving] = useState(false)
+
+  const planLabel = isPro ? plan.toUpperCase() : 'FREE'
+  const planColor = isPro
+    ? { color: '#FCD34D', bg: 'rgba(251,191,36,.14)', border: 'rgba(251,191,36,.3)' }
+    : { color: '#60A5FA', bg: 'rgba(59,130,246,.14)', border: 'rgba(59,130,246,.25)' }
 
   // ── LOAD ─────────────────────────────────────────────────
   async function loadUnits(supabase: any) {
@@ -615,8 +620,12 @@ export default function UnitsPage() {
             )}
             <div className="sb-user">
               <div className="sb-av">{userInitials}</div>
-              {/* ── FIX: Show real plan label from usePro() */}
-              <div><div className="sb-uname">{fullName}</div><span className="sb-uplan">{isPro ? 'PRO' : 'FREE'}</span></div>
+              <div>
+                <div className="sb-uname">{fullName}</div>
+                <span className="sb-uplan" style={{ color: planColor.color, background: planColor.bg, border: `1px solid ${planColor.border}` }}>
+                  {planLabel}
+                </span>
+              </div>
             </div>
           </div>
         </aside>

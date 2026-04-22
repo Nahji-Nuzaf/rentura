@@ -95,7 +95,7 @@ function generateToken() {
 export default function TenantsPage() {
   const router = useRouter()
   // ── FIX: Only destructure isPro — plan is unused
-  const { isPro } = usePro()
+  const { isPro, plan } = usePro()
 
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName] = useState('User')
@@ -139,6 +139,11 @@ export default function TenantsPage() {
   const [leaseRent, setLeaseRent] = useState('')
   const [leaseSaving, setLeaseSaving] = useState(false)
   const [leaseError, setLeaseError] = useState('')
+
+    const planLabel = isPro ? plan.toUpperCase() : 'FREE'
+  const planColor = isPro
+    ? { color: '#FCD34D', bg: 'rgba(251,191,36,.14)', border: 'rgba(251,191,36,.3)' }
+    : { color: '#60A5FA', bg: 'rgba(59,130,246,.14)', border: 'rgba(59,130,246,.25)' }
 
   // Rent history drawer
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -1086,10 +1091,19 @@ export default function TenantsPage() {
               <div className="sb-av">{userInitials}</div>
               <div>
                 <div className="sb-uname">{fullName}</div>
-                {/* ── FIX: Show real plan from usePro() */}
-                <span className="sb-uplan">{isPro ? 'PRO' : 'FREE'}</span>
+                <span className="sb-uplan" style={{ color: planColor.color, background: planColor.bg, border: `1px solid ${planColor.border}` }}>
+                  {planLabel}
+                </span>
               </div>
             </div>
+            {/* <div className="sb-user">
+              <div className="sb-av">{userInitials}</div>
+              <div>
+                <div className="sb-uname">{fullName}</div>
+                ── FIX: Show real plan from usePro()
+                <span className="sb-uplan">{isPro ? 'PRO' : 'FREE'}</span>
+              </div>
+            </div> */}
           </div>
         </aside>
 
