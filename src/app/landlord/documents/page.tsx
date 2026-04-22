@@ -43,7 +43,7 @@ function fmtDate(str: string) {
 export default function DocumentsPage() {
   const router = useRouter()
   // ── FIX: Use ONLY the isPro value from usePro() — do NOT redeclare as useState below
-  const { isPro } = usePro()
+  const { isPro, plan } = usePro()
   const fileRef = useRef<HTMLInputElement>(null)
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName] = useState('User')
@@ -61,8 +61,13 @@ export default function DocumentsPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [properties, setProperties] = useState<{ id: string, name: string }[]>([])
   const [tenants, setTenants] = useState<{ id: string, name: string }[]>([])
+  const planLabel = isPro ? plan.toUpperCase() : 'FREE'
+  const planColor = isPro
+    ? { color: '#FCD34D', bg: 'rgba(251,191,36,.14)', border: 'rgba(251,191,36,.3)' }
+    : { color: '#60A5FA', bg: 'rgba(59,130,246,.14)', border: 'rgba(59,130,246,.25)' }
+
   // ── REMOVED: const [isPro, setIsPro] = useState(false) — was shadowing usePro() above
-  const FREE_DOC_LIMIT = 5
+  const FREE_DOC_LIMIT = 3
   const [form, setForm] = useState({
     name: '', type: 'lease' as Doc['type'],
     property_id: '', tenant_id: '',
@@ -550,21 +555,31 @@ export default function DocumentsPage() {
             <a href="/landlord/listings" className="sb-item"><span className="sb-ico">📋</span>Listings</a>
             <span className="sb-section">Account</span>
             <a href="/landlord/settings" className="sb-item"><span className="sb-ico">⚙️</span>Settings</a>
+            <a href="/landlord/upgrade" className="sb-item"><span className="sb-ico">⭐</span>Upgrade</a>
           </nav>
           <div className="sb-footer">
-            <div className="sb-upgrade">
-              <div className="sb-up-title">⭐ Upgrade to Pro</div>
-              <div className="sb-up-sub">Unlimited storage & e-signature support.</div>
-              <button className="sb-up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
-            </div>
+            {/* ── Pro users don't need the upgrade nudge */}
+            {!isPro && (
+              <div className="sb-upgrade">
+                <div className="sb-up-title">⭐ Upgrade to Pro</div>
+                <div className="sb-up-sub">Unlimited listings & AI features.</div>
+                <button className="sb-up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
+              </div>
+            )}
             <div className="sb-user">
               <div className="sb-av">{userInitials}</div>
               <div>
                 <div className="sb-uname">{fullName}</div>
-                {/* ── FIX: Display correct plan label based on usePro() */}
-                <span className="sb-uplan">{isPro ? 'PRO' : 'FREE'}</span>
+                <span className="sb-uplan" style={{ color: planColor.color, background: planColor.bg, border: `1px solid ${planColor.border}` }}>
+                  {planLabel}
+                </span>
               </div>
             </div>
+            {/* <div className="sb-user">
+              <div className="sb-av">{userInitials}</div>
+              ── FIX: show real plan from usePro()
+              <div><div className="sb-uname">{fullName}</div><span className="sb-uplan">{isPro ? 'PRO' : 'FREE'}</span></div>
+            </div> */}
           </div>
         </aside>
 
