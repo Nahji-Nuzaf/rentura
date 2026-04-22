@@ -48,7 +48,10 @@ export default function UnitsPage() {
   const router = useRouter()
   const params = useParams()
   const propertyId = params?.id as string
-  const { isPro, plan } = usePro()
+
+  // ── FIX: Only destructure isPro — plan is unused
+  const { isPro } = usePro()
+
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName] = useState('User')
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -57,6 +60,9 @@ export default function UnitsPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'occupied' | 'vacant' | 'maintenance'>('all')
   const [search, setSearch] = useState('')
+
+  // ── Pro upgrade modal state
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   const [editUnit, setEditUnit] = useState<Unit | null>(null)
   const [saving, setSaving] = useState(false)
@@ -89,13 +95,11 @@ export default function UnitsPage() {
     let tenantMap: Record<string, { name: string; email: string; tenant_id: string }> = {}
 
     if (unitIds.length > 0) {
-      // Load all tenants for these units
       const { data: tenantsData } = await supabase
         .from('tenants')
         .select('id,unit_id,profile_id,invite_accepted')
         .in('unit_id', unitIds)
 
-      // Get profiles for tenants that have a profile_id
       const profileIds = (tenantsData || [])
         .map((t: any) => t.profile_id)
         .filter(Boolean)
@@ -109,7 +113,6 @@ export default function UnitsPage() {
           ; (profilesData || []).forEach((p: any) => { profileMap[p.id] = p })
       }
 
-      // Build tenant map — include any tenant linked to a unit
       ; (tenantsData || []).forEach((t: any) => {
         if (t.unit_id && t.profile_id) {
           const profile = profileMap[t.profile_id]
@@ -123,7 +126,6 @@ export default function UnitsPage() {
         }
       })
 
-      // Auto-fix units that have a linked tenant but wrong status
       const unitIdsToFix = Object.keys(tenantMap).filter(uid => {
         const u = (unitsData || []).find((u: any) => u.id === uid)
         return u && u.status !== 'occupied'
@@ -217,9 +219,10 @@ export default function UnitsPage() {
         monthly_rent: rent,
         rent_due_day: dueDay,
         status: editUnit.tenant_id ? editUnit.status : editForm.status,
+        // ── FIX: Only include lease dates if actually set, prevents NOT NULL violations
+        ...(editForm.lease_start ? { lease_start: editForm.lease_start } : {}),
+        ...(editForm.lease_end ? { lease_end: editForm.lease_end } : {}),
       }
-      if (editForm.lease_start) payload.lease_start = editForm.lease_start
-      if (editForm.lease_end) payload.lease_end = editForm.lease_end
       const { error } = await supabase.from('units').update(payload).eq('id', editUnit.id)
       if (error) throw new Error(error.message)
       setUnits(prev => prev.map(u => u.id === editUnit.id ? { ...u, ...payload } : u))
@@ -229,7 +232,14 @@ export default function UnitsPage() {
     } finally { setSaving(false) }
   }
 
-  // ── BULK ─────────────────────────────────────────────────
+  // ── BULK (Pro only) ───────────────────────────────────────
+  function handleBulkModeToggle() {
+    // ── Pro gate: Bulk edit is a Pro feature
+    if (!isPro) { setShowUpgradeModal(true); return }
+    setBulkMode(true)
+    setSelected(new Set())
+  }
+
   function toggleSelect(id: string) {
     setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
@@ -261,6 +271,9 @@ export default function UnitsPage() {
 
   const isOccupied = (u: Unit) => !!u.tenant_id || u.status === 'occupied'
 
+  // ── Pro: occupancy rate for the pro insight bar
+  const occupancyRate = counts.all > 0 ? Math.round((counts.occupied / counts.all) * 100) : 0
+
   return (
     <>
       <style>{`
@@ -274,16 +287,7 @@ export default function UnitsPage() {
         .sidebar.open{transform:translateX(0)!important}
         .main{margin-left:260px;flex:1;min-height:100vh;display:flex;flex-direction:column;min-width:0;overflow-x:hidden;width:calc(100% - 260px)}
         .sb-logo{display:flex;align-items:center;gap:12px;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.07)}
-        .sb-logo-icon {
-            width: 38px;
-            height: 38px;
-            border-radius: 11px;
-            background: rgba(255, 255, 255, 0.05); /* Very subtle white */
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+        .sb-logo-icon{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center}
         .sb-logo-name{font-family:'Fraunces',serif;font-size:19px;font-weight:700;color:#F8FAFC}
         .sb-nav{flex:1;padding:14px 12px;overflow-y:auto}.sb-nav::-webkit-scrollbar{width:0}
         .sb-section{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#4B6587;padding:16px 10px 7px;display:block}
@@ -309,11 +313,31 @@ export default function UnitsPage() {
         .tb-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
         .btn-outline{padding:7px 14px;border-radius:10px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
         .btn-outline:hover{border-color:#3B82F6;color:#2563EB;background:#EFF6FF}
+        .btn-outline-pro{padding:7px 14px;border-radius:10px;border:1.5px solid rgba(124,58,237,.3);background:linear-gradient(135deg,rgba(124,58,237,.07),rgba(37,99,235,.07));color:#7C3AED;font-size:13px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+        .btn-outline-pro:hover{background:linear-gradient(135deg,rgba(124,58,237,.14),rgba(37,99,235,.14));border-color:rgba(124,58,237,.5)}
         .content{padding:22px 20px;flex:1;width:100%;min-width:0;overflow-x:hidden}
         .page-header{margin-bottom:20px}
         .prop-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:99px;font-size:12px;font-weight:600;color:#2563EB;margin-bottom:10px}
         .page-title{font-family:'Fraunces',serif;font-size:26px;font-weight:400;color:#0F172A;letter-spacing:-.5px}
         .page-sub{font-size:13px;color:#94A3B8;margin-top:3px}
+
+        /* ── Pro insight bar */
+        .pro-insight{background:linear-gradient(135deg,#0F172A,#1E3A5F);border-radius:14px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+        .pi-item{display:flex;flex-direction:column;gap:2px;min-width:80px}
+        .pi-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#4B6587}
+        .pi-val{font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:#F8FAFC}
+        .pi-sub{font-size:11px;color:#64748B}
+        .pi-divider{width:1px;height:36px;background:rgba(255,255,255,.07);flex-shrink:0}
+        .pi-occ-wrap{flex:1;min-width:140px}
+        .pi-occ-bar{height:6px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden;margin-top:6px}
+        .pi-occ-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#3B82F6,#6366F1);transition:width .4s}
+        .pi-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;background:linear-gradient(135deg,#7C3AED,#2563EB);color:#fff;padding:2px 8px;border-radius:99px;margin-left:6px;vertical-align:middle;flex-shrink:0}
+
+        /* Free bulk teaser banner */
+        .bulk-teaser{background:linear-gradient(135deg,rgba(124,58,237,.07),rgba(37,99,235,.07));border:1.5px dashed rgba(124,58,237,.25);border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+        .bulk-teaser-text{font-size:13px;font-weight:600;color:#4C1D95;flex:1}
+        .bulk-teaser-btn{padding:7px 14px;border-radius:9px;border:none;background:linear-gradient(135deg,#7C3AED,#2563EB);color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;white-space:nowrap;flex-shrink:0}
+
         .stat-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;width:100%}
         .sstat{background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:14px 12px;box-shadow:0 1px 4px rgba(15,23,42,.04);display:flex;align-items:center;gap:10px;min-width:0}
         .sstat-ico{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
@@ -417,6 +441,19 @@ export default function UnitsPage() {
         .uc-tname{font-size:13px;font-weight:600;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .uc-temail{font-size:11px;color:#94A3B8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .uc-no-tenant{font-size:13px;color:#94A3B8;font-style:italic;flex:1}
+
+        /* Upgrade modal */
+        .umodal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:600;display:flex;align-items:center;justify-content:center;padding:20px}
+        .umodal{background:#fff;border-radius:22px;padding:32px;max-width:400px;width:100%;text-align:center;box-shadow:0 24px 60px rgba(15,23,42,.2);animation:popIn .2s ease}
+        @keyframes popIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
+        .umodal-icon{font-size:40px;margin-bottom:12px}
+        .umodal-title{font-family:'Fraunces',serif;font-size:22px;font-weight:700;color:#0F172A;margin-bottom:8px}
+        .umodal-sub{font-size:13.5px;color:#64748B;line-height:1.6;margin-bottom:16px}
+        .umodal-features{text-align:left;background:#F8FAFC;border-radius:12px;padding:14px 18px;margin-bottom:22px;display:flex;flex-direction:column;gap:8px}
+        .umodal-feat{display:flex;align-items:center;gap:8px;font-size:13px;color:#475569;font-weight:500}
+        .umodal-btn-pro{width:100%;padding:13px;border-radius:11px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 3px 12px rgba(37,99,235,.35);margin-bottom:10px}
+        .umodal-btn-cancel{background:none;border:none;color:#94A3B8;font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;padding:4px}
+
         @media(max-width:1024px){.stat-strip{grid-template-columns:repeat(2,1fr)}}
         @media(max-width:768px){
           .sidebar{transform:translateX(-100%)}.main{margin-left:0!important;width:100%!important}.hamburger{display:block}
@@ -428,6 +465,7 @@ export default function UnitsPage() {
           .field-row{grid-template-columns:1fr!important}
           .units-table-wrap{display:none!important}.unit-cards{display:flex!important}
           .bulk-bar{flex-direction:column;align-items:stretch}.bulk-field{width:100%}
+          .pro-insight{flex-direction:column;gap:10px}.pi-divider{display:none}
         }
         @media(max-width:480px){
           .topbar{padding:0 12px}.content{padding:12px 12px}.page-title{font-size:22px}
@@ -438,6 +476,25 @@ export default function UnitsPage() {
 
       <div className={`sb-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
       <div className={`drawer-overlay${editUnit ? ' open' : ''}`} onClick={() => setEditUnit(null)} />
+
+      {/* ── Pro Upgrade Modal */}
+      {showUpgradeModal && (
+        <div className="umodal-overlay" onClick={() => setShowUpgradeModal(false)}>
+          <div className="umodal" onClick={e => e.stopPropagation()}>
+            <div className="umodal-icon">✏️</div>
+            <div className="umodal-title">Bulk Edit is Pro</div>
+            <div className="umodal-sub">Update rents and statuses across multiple units at once — save hours of manual edits.</div>
+            <div className="umodal-features">
+              <div className="umodal-feat"><span style={{ color: '#16A34A' }}>✓</span> Bulk rent updates across all units</div>
+              <div className="umodal-feat"><span style={{ color: '#16A34A' }}>✓</span> Bulk status changes in one click</div>
+              <div className="umodal-feat"><span style={{ color: '#16A34A' }}>✓</span> Portfolio occupancy insights</div>
+              <div className="umodal-feat"><span style={{ color: '#16A34A' }}>✓</span> Unlimited properties & units</div>
+            </div>
+            <button className="umodal-btn-pro" onClick={() => { setShowUpgradeModal(false); window.location.href = '/landlord/upgrade' }}>⭐ Upgrade to Pro →</button>
+            <button className="umodal-btn-cancel" onClick={() => setShowUpgradeModal(false)}>Maybe later</button>
+          </div>
+        </div>
+      )}
 
       {/* Edit Drawer */}
       <div className={`drawer${editUnit ? ' open' : ''}`}>
@@ -502,12 +559,12 @@ export default function UnitsPage() {
           </div>
           <div className="field-row">
             <div className="field">
-              <label>Lease Start</label>
+              <label>Lease Start <span style={{ fontWeight: 400, color: '#94A3B8' }}>(optional)</span></label>
               <input type="date" value={editForm.lease_start}
                 onChange={e => setEditForm(f => ({ ...f, lease_start: e.target.value }))} />
             </div>
             <div className="field">
-              <label>Lease End</label>
+              <label>Lease End <span style={{ fontWeight: 400, color: '#94A3B8' }}>(optional)</span></label>
               <input type="date" value={editForm.lease_end}
                 onChange={e => setEditForm(f => ({ ...f, lease_end: e.target.value }))} />
             </div>
@@ -526,12 +583,7 @@ export default function UnitsPage() {
         <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="sb-logo">
             <div className="sb-logo-icon">
-              <Image
-                src="/icon.png"
-                alt="Rentura Logo"
-                width={24}
-                height={24}
-              />
+              <Image src="/icon.png" alt="Rentura Logo" width={24} height={24} />
             </div>
             <span className="sb-logo-name">Rentura</span>
           </div>
@@ -552,14 +604,18 @@ export default function UnitsPage() {
             <a href="/landlord/settings" className="sb-item"><span className="sb-ico">⚙️</span>Settings</a>
           </nav>
           <div className="sb-footer">
-            <div className="sb-upgrade">
-              <div className="sb-up-title">⭐ Upgrade to Pro</div>
-              <div className="sb-up-sub">Unlimited properties, reports & priority support.</div>
-              <button className="sb-up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
-            </div>
+            {/* ── FIX: Hide upgrade nudge for Pro users */}
+            {!isPro && (
+              <div className="sb-upgrade">
+                <div className="sb-up-title">⭐ Upgrade to Pro</div>
+                <div className="sb-up-sub">Bulk edits, insights & unlimited units.</div>
+                <button className="sb-up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
+              </div>
+            )}
             <div className="sb-user">
               <div className="sb-av">{userInitials}</div>
-              <div><div className="sb-uname">{fullName}</div><span className="sb-uplan">FREE</span></div>
+              {/* ── FIX: Show real plan label from usePro() */}
+              <div><div className="sb-uname">{fullName}</div><span className="sb-uplan">{isPro ? 'PRO' : 'FREE'}</span></div>
             </div>
           </div>
         </aside>
@@ -577,8 +633,13 @@ export default function UnitsPage() {
               </div>
             </div>
             <div className="tb-actions">
+              {/* ── Pro gate on Bulk Edit button */}
               {!bulkMode
-                ? <button className="btn-outline" onClick={() => { setBulkMode(true); setSelected(new Set()) }}>✏️ <span className="tb-label">Bulk Edit</span></button>
+                ? (
+                  isPro
+                    ? <button className="btn-outline-pro" onClick={() => { setBulkMode(true); setSelected(new Set()) }}>✏️ <span className="tb-label">Bulk Edit</span></button>
+                    : <button className="btn-outline-pro" onClick={handleBulkModeToggle}>✨ <span className="tb-label">Bulk Edit</span> <span style={{ fontSize: 9, fontWeight: 700, background: 'linear-gradient(135deg,#7C3AED,#2563EB)', color: '#fff', padding: '1px 5px', borderRadius: 99, marginLeft: 2 }}>PRO</span></button>
+                )
                 : <button className="btn-outline" onClick={() => { setBulkMode(false); setSelected(new Set()) }}>✕ <span className="tb-label">Cancel</span></button>
               }
               <a href="/landlord/properties" className="btn-outline">← <span className="tb-label">Back</span></a>
@@ -588,9 +649,54 @@ export default function UnitsPage() {
           <div className="content">
             <div className="page-header">
               {property && <div className="prop-badge">🏢 {property.name} · {property.city}</div>}
-              <div className="page-title">Manage Units</div>
+              <div className="page-title">
+                Manage Units
+                {isPro && <span className="pi-badge">⭐ Pro</span>}
+              </div>
               <div className="page-sub">Set individual rents, statuses, and lease dates for each unit</div>
             </div>
+
+            {/* ── Pro: occupancy insight bar (only for Pro users) */}
+            {isPro && !loading && counts.all > 0 && (
+              <div className="pro-insight">
+                <div className="pi-item">
+                  <div className="pi-label">Total Units</div>
+                  <div className="pi-val">{counts.all}</div>
+                </div>
+                <div className="pi-divider" />
+                <div className="pi-item">
+                  <div className="pi-label">Occupied</div>
+                  <div className="pi-val" style={{ color: '#4ADE80' }}>{counts.occupied}</div>
+                </div>
+                <div className="pi-divider" />
+                <div className="pi-item">
+                  <div className="pi-label">Vacant</div>
+                  <div className="pi-val" style={{ color: '#FCD34D' }}>{counts.vacant}</div>
+                </div>
+                <div className="pi-divider" />
+                <div className="pi-item">
+                  <div className="pi-label">Monthly Revenue</div>
+                  <div className="pi-val">${totalRevenue.toLocaleString()}</div>
+                  <div className="pi-sub">from occupied units</div>
+                </div>
+                <div className="pi-divider" />
+                <div className="pi-occ-wrap">
+                  <div className="pi-label">Occupancy Rate</div>
+                  <div className="pi-val">{occupancyRate}%</div>
+                  <div className="pi-occ-bar">
+                    <div className="pi-occ-fill" style={{ width: `${occupancyRate}%` }} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Free users: teaser for bulk edit */}
+            {!isPro && !loading && counts.all >= 3 && (
+              <div className="bulk-teaser">
+                <div className="bulk-teaser-text">✨ <strong>Pro tip:</strong> Update rents across all {counts.all} units at once with Bulk Edit.</div>
+                <button className="bulk-teaser-btn" onClick={() => setShowUpgradeModal(true)}>Unlock Bulk Edit →</button>
+              </div>
+            )}
 
             <div className="stat-strip">
               <div className="sstat"><div className="sstat-ico" style={{ background: '#EFF6FF' }}>🏗️</div><div><div className="sstat-num">{counts.all}</div><div className="sstat-lbl">Total Units</div></div></div>
