@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
 import { usePro } from '@/components/ProProvider'
-const { isPro, plan } = usePro()
+
 
 type Unit = {
   id: string
@@ -48,7 +48,7 @@ export default function UnitsPage() {
   const router = useRouter()
   const params = useParams()
   const propertyId = params?.id as string
-
+  const { isPro, plan } = usePro()
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName] = useState('User')
   const [sidebarOpen, setSidebarOpen] = useState(false)
