@@ -35,7 +35,8 @@ const FREE_PLAN_LIMIT = 3
 
 export default function PropertiesPage() {
   const router = useRouter()
-const { isPro, plan } = usePro()
+  // ── FIX: Only destructure isPro — plan is unused
+  const { isPro } = usePro()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [userId, setUserId] = useState('')
@@ -170,6 +171,7 @@ const { isPro, plan } = usePro()
   }
 
   function openAdd() {
+    // ── FIX: Pro users bypass the property limit entirely
     if (!isPro && properties.length >= FREE_PLAN_LIMIT) { setShowUpgradeModal(true); return }
     setForm({ name: '', address: '', city: '', country: 'Sri Lanka', type: 'apartment', status: 'active', total_units: '', default_rent: '' })
     setEditing(null)
@@ -184,7 +186,7 @@ const { isPro, plan } = usePro()
       name: p.name, address: p.address, city: p.city, country: p.country,
       type: p.type, status: p.status,
       total_units: String(p.total_units),
-      default_rent: '', // FIX: never pre-fill default rent on edit
+      default_rent: '',
     })
     setEditing(p)
     setSaveError(null)
@@ -266,9 +268,6 @@ const { isPro, plan } = usePro()
         const { error: updErr } = await supabase.from('properties').update(payload).eq('id', editing.id)
         if (updErr) throw new Error(updErr.message)
 
-        // FIX: Never update unit rents from the edit property form
-        // Rents must be set individually per unit from the Units page
-
         setProperties(prev => prev.map(p =>
           p.id === editing.id
             ? {
@@ -319,7 +318,7 @@ const { isPro, plan } = usePro()
             width: 38px;
             height: 38px;
             border-radius: 11px;
-            background: rgba(255, 255, 255, 0.05); /* Very subtle white */
+            background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
             display: flex;
             align-items: center;
@@ -570,7 +569,6 @@ const { isPro, plan } = usePro()
             </div>
           </div>
 
-          {/* FIX: Total Units disabled on edit, Default Rent only shown on ADD */}
           <div className="field-row">
             <div className="field">
               <label>Total Units {drawer === 'edit' && <span style={{ color: '#94A3B8', fontWeight: 400 }}>(locked)</span>}</label>
@@ -634,14 +632,18 @@ const { isPro, plan } = usePro()
             <a href="/landlord/settings" className="sb-item"><span className="sb-ico">⚙️</span>Settings</a>
           </nav>
           <div className="sb-footer">
-            <div className="sb-upgrade">
-              <div className="sb-up-title">⭐ Upgrade to Pro</div>
-              <div className="sb-up-sub">Unlimited properties, reports & priority support.</div>
-              <button className="sb-up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
-            </div>
+            {/* ── FIX: Hide upgrade nudge for Pro users — they're already subscribed */}
+            {!isPro && (
+              <div className="sb-upgrade">
+                <div className="sb-up-title">⭐ Upgrade to Pro</div>
+                <div className="sb-up-sub">Unlimited properties, reports & priority support.</div>
+                <button className="sb-up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
+              </div>
+            )}
             <div className="sb-user">
               <div className="sb-av">{userInitials}</div>
-              <div><div className="sb-uname">{fullName}</div><span className="sb-uplan">FREE</span></div>
+              {/* ── FIX: Show real plan label from usePro() */}
+              <div><div className="sb-uname">{fullName}</div><span className="sb-uplan">{isPro ? 'PRO' : 'FREE'}</span></div>
             </div>
           </div>
         </aside>
@@ -663,16 +665,28 @@ const { isPro, plan } = usePro()
               </div>
             </div>
 
-            <div className="plan-bar">
-              <div className="plan-bar-left">
-                <div className="plan-bar-label">Free plan · Properties used</div>
-                <div className="plan-bar-track">
-                  <div className="plan-bar-fill" style={{ width: `${Math.min((counts.all / FREE_PLAN_LIMIT) * 100, 100)}%`, background: counts.all >= FREE_PLAN_LIMIT ? '#EF4444' : 'linear-gradient(90deg,#3B82F6,#6366F1)' }} />
+            {/* ── FIX: Plan bar only shown for free users; Pro users see an "unlimited" badge instead */}
+            {!isPro ? (
+              <div className="plan-bar">
+                <div className="plan-bar-left">
+                  <div className="plan-bar-label">Free plan · Properties used</div>
+                  <div className="plan-bar-track">
+                    <div className="plan-bar-fill" style={{ width: `${Math.min((counts.all / FREE_PLAN_LIMIT) * 100, 100)}%`, background: counts.all >= FREE_PLAN_LIMIT ? '#EF4444' : 'linear-gradient(90deg,#3B82F6,#6366F1)' }} />
+                  </div>
+                  <div className="plan-bar-count" style={{ color: counts.all >= FREE_PLAN_LIMIT ? '#DC2626' : '#0F172A' }}>{counts.all} / {FREE_PLAN_LIMIT}</div>
                 </div>
-                <div className="plan-bar-count" style={{ color: counts.all >= FREE_PLAN_LIMIT ? '#DC2626' : '#0F172A' }}>{counts.all} / {FREE_PLAN_LIMIT}</div>
+                <button className="plan-bar-upgrade" onClick={() => window.location.href = '/landlord/upgrade'}>⭐ Upgrade for unlimited</button>
               </div>
-              <button className="plan-bar-upgrade" onClick={() => window.location.href = '/landlord/upgrade'}>⭐ Upgrade for unlimited</button>
-            </div>
+            ) : (
+              <div className="plan-bar">
+                <div className="plan-bar-left">
+                  <div className="plan-bar-label">⭐ Pro plan · Unlimited properties</div>
+                </div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#16A34A', background: '#DCFCE7', border: '1px solid #BBF7D0', borderRadius: 8, padding: '4px 12px' }}>
+                  ✓ No limits
+                </div>
+              </div>
+            )}
 
             <div className="stat-strip">
               <div className="sstat"><div className="sstat-ico" style={{ background: '#EFF6FF' }}>🏘️</div><div><div className="sstat-num">{counts.all}</div><div className="sstat-lbl">Total</div></div></div>
