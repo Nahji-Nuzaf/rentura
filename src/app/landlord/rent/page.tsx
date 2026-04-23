@@ -473,7 +473,7 @@ export default function RentTrackerPage() {
             <div className="tb-right">
               {isPro
                 ? <button className="btn-export" onClick={handleExportCSV}>📥 Export CSV</button>
-                : <button className="btn-export-locked" onClick={() => setShowUpgradeModal(true)}>🔒 Export CSV</button>
+                : <button className="btn-export-locked" onClick={() => setShowUpgradeModal(true)}>🔒 CSV</button>
               }
               <button className="btn-primary" disabled={generating} onClick={generatePayments}>
                 {generating ? '⏳ Generating…' : `⚡ Generate ${selectedMonth} Payments`}
