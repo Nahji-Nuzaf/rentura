@@ -140,7 +140,7 @@ export default function TenantsPage() {
   const [leaseSaving, setLeaseSaving] = useState(false)
   const [leaseError, setLeaseError] = useState('')
 
-    const planLabel = isPro ? plan.toUpperCase() : 'FREE'
+  const planLabel = isPro ? plan.toUpperCase() : 'FREE'
   const planColor = isPro
     ? { color: '#FCD34D', bg: 'rgba(251,191,36,.14)', border: 'rgba(251,191,36,.3)' }
     : { color: '#60A5FA', bg: 'rgba(59,130,246,.14)', border: 'rgba(59,130,246,.25)' }
@@ -509,7 +509,13 @@ export default function TenantsPage() {
     const lc = dLeft !== null && dLeft < 30 ? '#DC2626' : dLeft !== null && dLeft < 60 ? '#D97706' : '#3B82F6'
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: inSheet ? 'auto' : '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: inSheet ? 'auto' : '80%' }}>
+        {/* <div className="drawer-close-btn md:hidden" style={{ display: 'flex', justifyContent: 'end', marginRight: 10, paddingTop: 6 }}>
+          <button className="drawer-close" style={{ width: 40 }} onClick={() => setSheetOpen(false)}>✕</button>
+        </div> */}
+        <div className="drawer-close-btn" style={{ justifyContent: 'end', marginRight: 10, paddingTop: 6 }}>
+          <button className="drawer-close" onClick={() => setSheetOpen(false)}>✕</button>
+        </div>
         <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #E2E8F0', textAlign: 'center' }}>
           {t.avatar_url
             ? <img src={t.avatar_url} alt={t.full_name} style={{ width: 64, height: 64, borderRadius: 18, objectFit: 'cover', margin: '0 auto 10px', display: 'block' }} />
@@ -648,6 +654,17 @@ export default function TenantsPage() {
         .content{padding:22px 20px;flex:1;width:100%;min-width:0;overflow-x:hidden}
         .page-title{font-family:'Fraunces',serif;font-size:26px;font-weight:400;color:#0F172A;letter-spacing:-.5px}
         .page-sub{font-size:13px;color:#94A3B8;margin-top:2px}
+        .drawer-close{background:none;border:none;font-size:20px;cursor:pointer;color:#94A3B8;padding:4px 8px;border-radius:6px;}
+        .drawer-close:hover{background:#F1F5F9;color:#0F172A}
+
+        .drawer-close-btn {
+          display: flex;
+        }
+        @media (min-width: 768px) {
+          .drawer-close-btn {
+            display: none !important;
+          }
+        }
 
         /* Real-time indicator */
         .rt-indicator{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#16A34A;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:99px;padding:3px 10px;margin-left:8px;vertical-align:middle}
@@ -1107,7 +1124,11 @@ export default function TenantsPage() {
           </div>
         </aside>
 
-        <div className="main">
+        <div className="main"
+          onClick={() => {
+            setSelected(null);
+            setSheetOpen(false); // Close the sheet/sidebar too
+          }}>
           <div className="topbar">
             <div className="tb-left">
               <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
@@ -1230,7 +1251,10 @@ export default function TenantsPage() {
                   return (
                     <div key={t.id}
                       className={`tenant-card${selected?.id === t.id ? ' sel' : ''}`}
-                      onClick={() => selectTenant(t)}>
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        selectTenant(t);
+                      }}>
                       {t.avatar_url
                         ? <img src={t.avatar_url} alt={t.full_name} style={{ width: 44, height: 44, borderRadius: 13, objectFit: 'cover', flexShrink: 0 }} />
                         : <div style={{ width: 44, height: 44, borderRadius: 13, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{initials(t.full_name)}</div>
