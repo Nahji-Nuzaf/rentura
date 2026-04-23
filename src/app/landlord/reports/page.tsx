@@ -51,6 +51,7 @@ export default function ReportsPage() {
   const [avgMonthlyRevenue, setAvgMonthlyRevenue]   = useState(0)
   const [bestMonth, setBestMonth]           = useState('')
   const [userId, setUserId]                 = useState('')
+  const [showExportMenu, setShowExportMenu] = useState(false)
 
   const planLabel = isPro ? plan.toUpperCase() : 'FREE'
   const planColor = isPro
@@ -303,11 +304,13 @@ export default function ReportsPage() {
         .skeleton{border-radius:8px;background:linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}
         @media(min-width:1100px){.summary{grid-template-columns:repeat(4,1fr)}.row2{grid-template-columns:3fr 2fr}.row2b{grid-template-columns:1fr 1fr}}
         @media(min-width:769px) and (max-width:1099px){.summary{grid-template-columns:repeat(2,1fr)}.row2{grid-template-columns:1fr}.row2b{grid-template-columns:1fr 1fr}.pro-stats{grid-template-columns:repeat(3,1fr)}}
+        /* Hide mobile export strip on desktop, show topbar dropdown instead */
+        .mobile-export-strip{display:none!important}
         @media(max-width:768px){
+          .mobile-export-strip{display:flex!important}
           .sidebar{transform:translateX(-100%)}.main{margin-left:0!important;width:100%!important}.hamburger{display:block}
           .topbar{padding:0 14px}.content{padding:14px 14px}.summary{grid-template-columns:repeat(2,1fr)}
           .row2{grid-template-columns:1fr}.row2b{grid-template-columns:1fr}.pro-stats{grid-template-columns:1fr}
-          .hd-actions .btn-export,.hd-actions .btn-export-locked{display:none}
         }
         @media(max-width:480px){
           .topbar{padding:0 12px}.content{padding:12px 12px}.page-title{font-size:22px}
@@ -383,16 +386,36 @@ export default function ReportsPage() {
             </div>
             <div className="hd-actions">
               {isPro ? (
-                <>
-                  <button className="btn-export" onClick={handleExportMonthlyCSV}>📥 Monthly CSV</button>
-                  <button className="btn-export" onClick={handleExportPropertyCSV}>📥 Property CSV</button>
-                  <button className="btn-export" onClick={handleExportAnnualCSV}>📥 Annual CSV</button>
-                </>
+                <div className="export-dropdown">
+                  <button
+                    className="btn-export"
+                    onClick={()=>setShowExportMenu(v=>!v)}
+                    style={{gap:6}}>
+                    📥 Export CSV ▾
+                  </button>
+                  {showExportMenu && (
+                    <>
+                      {/* Click-away backdrop */}
+                      <div style={{position:'fixed',inset:0,zIndex:199}} onClick={()=>setShowExportMenu(false)}/>
+                      <div className="export-menu">
+                        <button className="export-menu-item" onClick={()=>{handleExportMonthlyCSV();setShowExportMenu(false)}}>
+                          📅 Monthly Collection
+                        </button>
+                        <button className="export-menu-item" onClick={()=>{handleExportPropertyCSV();setShowExportMenu(false)}}>
+                          🏠 Property Breakdown
+                        </button>
+                        <button className="export-menu-item" onClick={()=>{handleExportAnnualCSV();setShowExportMenu(false)}}>
+                          📈 Annual Revenue
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               ) : (
-                <>
-                  <button className="btn-export-locked" onClick={()=>setShowUpgradeModal(true)}>🔒 CSV Export</button>
+                <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                  <button className="btn-export-locked" onClick={()=>setShowUpgradeModal(true)}>🔒 Export CSV</button>
                   <a href="/landlord/upgrade" className="btn-upgrade">⭐ Pro</a>
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -404,6 +427,16 @@ export default function ReportsPage() {
                 <div className="page-sub">Financial & occupancy overview · {MONTHS[NOW.getMonth()]} {NOW.getFullYear()}</div>
               </div>
             </div>
+
+            {/* Mobile export strip — visible only on small screens */}
+            {isPro && (
+              <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:16,padding:'12px 14px',background:'#fff',border:'1px solid #E2E8F0',borderRadius:12,boxShadow:'0 1px 4px rgba(15,23,42,.04)'}} className="mobile-export-strip">
+                <div style={{fontSize:12.5,fontWeight:700,color:'#374151',width:'100%',marginBottom:4}}>📥 Export Reports</div>
+                <button className="btn-export" style={{fontSize:12,padding:'7px 12px'}} onClick={handleExportMonthlyCSV}>📅 Monthly CSV</button>
+                <button className="btn-export" style={{fontSize:12,padding:'7px 12px'}} onClick={handleExportPropertyCSV}>🏠 Property CSV</button>
+                <button className="btn-export" style={{fontSize:12,padding:'7px 12px'}} onClick={handleExportAnnualCSV}>📈 Annual CSV</button>
+              </div>
+            )}
 
             {/* Summary stats */}
             <div className="summary">

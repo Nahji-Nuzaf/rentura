@@ -28,7 +28,16 @@ const STATUS_CFG: Record<string, { label: string; bg: string; color: string; ban
 }
 
 const TYPE_ICON: Record<string, string> = {
-  apartment: '🏢', house: '🏠', commercial: '🏪', land: '🌿',
+  apartment: '🏢',
+  house: '🏠',
+  studio: '🛋️',
+  townhouse: '🏘️',
+  commercial: '🏪',
+  office: '💼',
+  shop: '🛍️',
+  land: '🌿',
+  warehouse: '📦',
+  annex: '🏡',
 }
 
 const FREE_PLAN_LIMIT = 3
@@ -560,9 +569,16 @@ export default function PropertiesPage() {
               <label>Property Type</label>
               <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
                 <option value="apartment">Apartment Building</option>
-                <option value="house">House / Villa</option>
-                <option value="commercial">Commercial</option>
-                <option value="land">Land</option>
+                <option value="house">House</option>
+                <option value="house">Villa</option>
+                <option value="studio">Studio Apartment</option>
+                <option value="townhouse">Townhouse</option>
+                <option value="office">Offices</option>
+                <option value="shop">Shop / Retail</option>
+                <option value="warehouse">Warehouse</option>
+                <option value="annex">Annex</option>
+                <option value="commercial">Commercial Spaces</option>
+                <option value="land">Land / Plot</option>
               </select>
             </div>
             <div className="field">
@@ -582,13 +598,13 @@ export default function PropertiesPage() {
                 onChange={e => setForm(f => ({ ...f, total_units: e.target.value }))}
                 disabled={drawer === 'edit'} />
             </div>
-            {drawer === 'add' && (
+            {/* {drawer === 'add' && (
               <div className="field">
                 <label>Default Rent (USD)</label>
                 <input type="number" min="0" placeholder="e.g. 500" value={form.default_rent}
                   onChange={e => setForm(f => ({ ...f, default_rent: e.target.value }))} />
               </div>
-            )}
+            )} */}
           </div>
 
           <div className="hint">
