@@ -28,8 +28,6 @@ function exportCSV(filename: string, headers: string[], rows: (string|number)[][
 
 export default function ReportsPage() {
   const router = useRouter()
-
-  // ── usePro MUST be inside the component ──
   const { isPro, plan } = usePro()
 
   const [userInitials, setUserInitials]   = useState('NN')
@@ -45,7 +43,6 @@ export default function ReportsPage() {
   const [totalPending, setTotalPending]     = useState(0)
   const [openMaint, setOpenMaint]           = useState(0)
   const [resolvedMaint, setResolvedMaint]   = useState(0)
-  // Annual data for Pro charts
   const [annualStats, setAnnualStats]       = useState<{month:string;revenue:number}[]>([])
   const [totalAnnualRevenue, setTotalAnnualRevenue] = useState(0)
   const [avgMonthlyRevenue, setAvgMonthlyRevenue]   = useState(0)
@@ -83,7 +80,6 @@ export default function ReportsPage() {
       const { data: units } = await supabase.from('units').select('id,property_id,monthly_rent,status').in('property_id', propIds)
       const unitIds = (units||[]).map((u:any) => u.id)
 
-      // Property stats
       const ps: PropStat[] = (props||[]).map((p:any) => {
         const pu  = (units||[]).filter((u:any) => u.property_id === p.id)
         const occ = pu.filter((u:any) => u.status === 'occupied').length
@@ -92,7 +88,6 @@ export default function ReportsPage() {
       })
       setPropStats(ps)
 
-      // Last 6 months
       const buckets: Record<string,MonthStat> = {}
       for (let i=5; i>=0; i--) {
         const d = new Date(NOW.getFullYear(), NOW.getMonth()-i, 1)
@@ -118,18 +113,15 @@ export default function ReportsPage() {
       setTotalOverdue(buckets[curKey]?.overdue||0)
       setTotalPending(buckets[curKey]?.pending||0)
 
-      // Occupancy stats
       const totalU = (units||[]).length
       const occU   = (units||[]).filter((u:any) => u.status==='occupied').length
       const occRate = totalU > 0 ? Math.round((occU/totalU)*100) : 0
       setOccStats(ms.map((m,i) => ({ month: m.month, rate: Math.max(5, Math.min(100, occRate+(i-3)*3+(i%2===0?2:-1))) })))
 
-      // Maintenance
       const { data: maint } = await supabase.from('maintenance_requests').select('status').in('property_id', propIds)
       setOpenMaint((maint||[]).filter((m:any) => m.status!=='resolved').length)
       setResolvedMaint((maint||[]).filter((m:any) => m.status==='resolved').length)
 
-      // Annual data (last 12 months) — for Pro charts
       const twelveAgo = new Date(NOW.getFullYear(), NOW.getMonth()-11, 1).toISOString()
       const { data: annualPay } = await supabase.from('rent_payments').select('amount,due_date,status')
         .in('unit_id', unitIds).gte('due_date', twelveAgo).eq('status','paid')
@@ -226,7 +218,44 @@ export default function ReportsPage() {
         .btn-export{padding:8px 12px;border-radius:9px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:12.5px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;transition:all .15s}
         .btn-export:hover{border-color:#3B82F6;color:#2563EB;background:#EFF6FF}
         .btn-export-locked{padding:8px 12px;border-radius:9px;border:1.5px solid #E2E8F0;background:#F8FAFC;color:#94A3B8;font-size:12.5px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
-        .hd-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex-shrink:0}
+        .hd-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
+
+        /* ── FIX: Export dropdown — fixed position to escape topbar stacking context */
+        .export-dropdown{position:relative;display:inline-block}
+        .export-menu{
+          position:fixed;
+          top:58px;
+          right:20px;
+          background:#fff;
+          border:1.5px solid #E2E8F0;
+          border-radius:12px;
+          box-shadow:0 8px 24px rgba(15,23,42,.14);
+          z-index:1000;
+          min-width:210px;
+          overflow:hidden;
+          animation:menuFadeIn .15s ease;
+        }
+        @keyframes menuFadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+        .export-menu-item{
+          display:flex;
+          align-items:center;
+          gap:9px;
+          width:100%;
+          padding:12px 16px;
+          font-size:13px;
+          font-weight:600;
+          color:#374151;
+          background:none;
+          border:none;
+          cursor:pointer;
+          font-family:'Plus Jakarta Sans',sans-serif;
+          text-align:left;
+          transition:background .12s;
+          border-bottom:1px solid #F1F5F9;
+        }
+        .export-menu-item:last-child{border-bottom:none}
+        .export-menu-item:hover{background:#F8FAFC;color:#2563EB}
+
         .content{padding:22px 20px;flex:1;width:100%;min-width:0;overflow-x:hidden}
         .page-hd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;gap:12px;flex-wrap:wrap}
         .page-title{font-family:'Fraunces',serif;font-size:26px;font-weight:400;color:#0F172A;letter-spacing:-.5px;margin-bottom:3px}
@@ -277,13 +306,11 @@ export default function ReportsPage() {
         .prog-top{display:flex;justify-content:space-between;font-size:12px;color:#64748B;font-weight:600;margin-bottom:8px}
         .prog-bg{height:7px;background:#E2E8F0;border-radius:99px;overflow:hidden}
         .prog-fill{height:100%;border-radius:99px;transition:width .6s ease}
-        /* PRO STAT CARDS */
         .pro-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
         .pro-stat-card{background:linear-gradient(135deg,#0F172A,#1E293B);border:1px solid rgba(59,130,246,.2);border-radius:14px;padding:16px}
         .pro-stat-val{font-family:'Fraunces',serif;font-size:22px;font-weight:700;color:#F1F5F9;line-height:1;margin-bottom:4px}
         .pro-stat-lbl{font-size:11.5px;color:#64748B;font-weight:500}
         .pro-stat-trend{font-size:11px;font-weight:700;color:#34D399;margin-top:4px}
-        /* PRO WRAP for locked sections */
         .pro-wrap{position:relative;border-radius:16px;overflow:hidden;margin-bottom:12px}
         .pro-blur{filter:blur(5px);pointer-events:none;user-select:none;opacity:.55}
         .pro-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(248,250,252,.88);backdrop-filter:blur(2px);padding:16px;text-align:center}
@@ -292,7 +319,6 @@ export default function ReportsPage() {
         .pro-title{font-size:15px;font-weight:700;color:#0F172A}
         .pro-desc{font-size:12px;color:#64748B;max-width:240px;line-height:1.5}
         .pro-btn{padding:9px 20px;border-radius:9px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;text-decoration:none;display:inline-block;box-shadow:0 2px 10px rgba(37,99,235,.3);margin-top:2px}
-        /* UPGRADE MODAL */
         .umodal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:600;display:flex;align-items:center;justify-content:center;padding:20px}
         .umodal{background:#fff;border-radius:22px;padding:32px;max-width:400px;width:100%;text-align:center;box-shadow:0 24px 60px rgba(15,23,42,.2)}
         .umodal-icon{font-size:40px;margin-bottom:14px}
@@ -300,14 +326,31 @@ export default function ReportsPage() {
         .umodal-sub{font-size:14px;color:#64748B;line-height:1.6;margin-bottom:20px}
         .umodal-btn-pro{width:100%;padding:13px;border-radius:11px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;margin-bottom:10px}
         .umodal-btn-cancel{background:none;border:none;color:#94A3B8;font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
+
+        /* ── FIX: Mobile export strip — hidden by default on desktop, shown only on mobile */
+        .mobile-export-strip{display:none!important}
+        /* ── FIX: Topbar export wrap — shown on desktop, hidden on mobile */
+        .topbar-export-wrap{display:flex!important}
+
         @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
         .skeleton{border-radius:8px;background:linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}
-        @media(min-width:1100px){.summary{grid-template-columns:repeat(4,1fr)}.row2{grid-template-columns:3fr 2fr}.row2b{grid-template-columns:1fr 1fr}}
-        @media(min-width:769px) and (max-width:1099px){.summary{grid-template-columns:repeat(2,1fr)}.row2{grid-template-columns:1fr}.row2b{grid-template-columns:1fr 1fr}.pro-stats{grid-template-columns:repeat(3,1fr)}}
-        /* Hide mobile export strip on desktop, show topbar dropdown instead */
-        .mobile-export-strip{display:none!important}
+
+        @media(min-width:1100px){
+          .summary{grid-template-columns:repeat(4,1fr)}
+          .row2{grid-template-columns:3fr 2fr}
+          .row2b{grid-template-columns:1fr 1fr}
+        }
+        @media(min-width:769px) and (max-width:1099px){
+          .summary{grid-template-columns:repeat(2,1fr)}
+          .row2{grid-template-columns:1fr}
+          .row2b{grid-template-columns:1fr 1fr}
+          .pro-stats{grid-template-columns:repeat(3,1fr)}
+        }
         @media(max-width:768px){
+          /* On mobile: hide topbar dropdown, show content strip instead */
+          .topbar-export-wrap{display:none!important}
           .mobile-export-strip{display:flex!important}
+
           .sidebar{transform:translateX(-100%)}.main{margin-left:0!important;width:100%!important}.hamburger{display:block}
           .topbar{padding:0 14px}.content{padding:14px 14px}.summary{grid-template-columns:repeat(2,1fr)}
           .row2{grid-template-columns:1fr}.row2b{grid-template-columns:1fr}.pro-stats{grid-template-columns:1fr}
@@ -384,18 +427,17 @@ export default function ReportsPage() {
               <button className="hamburger" onClick={()=>setSidebarOpen(true)}>☰</button>
               <div className="breadcrumb">Rentura &nbsp;/&nbsp; <b>Reports</b></div>
             </div>
-            <div className="hd-actions">
+            {/* ── FIX: Topbar export — hidden on mobile via .topbar-export-wrap */}
+            <div className="hd-actions topbar-export-wrap">
               {isPro ? (
                 <div className="export-dropdown">
                   <button
                     className="btn-export"
-                    onClick={()=>setShowExportMenu(v=>!v)}
-                    style={{gap:6}}>
+                    onClick={()=>setShowExportMenu(v=>!v)}>
                     📥 Export CSV ▾
                   </button>
                   {showExportMenu && (
                     <>
-                      {/* Click-away backdrop */}
                       <div style={{position:'fixed',inset:0,zIndex:199}} onClick={()=>setShowExportMenu(false)}/>
                       <div className="export-menu">
                         <button className="export-menu-item" onClick={()=>{handleExportMonthlyCSV();setShowExportMenu(false)}}>
@@ -428,13 +470,26 @@ export default function ReportsPage() {
               </div>
             </div>
 
-            {/* Mobile export strip — visible only on small screens */}
+            {/* ── FIX: Mobile export strip — shown only on mobile (≤768px), hidden on desktop */}
             {isPro && (
-              <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:16,padding:'12px 14px',background:'#fff',border:'1px solid #E2E8F0',borderRadius:12,boxShadow:'0 1px 4px rgba(15,23,42,.04)'}} className="mobile-export-strip">
+              <div
+                className="mobile-export-strip"
+                style={{gap:8,flexWrap:'wrap',marginBottom:16,padding:'12px 14px',background:'#fff',border:'1px solid #E2E8F0',borderRadius:12,boxShadow:'0 1px 4px rgba(15,23,42,.04)'}}>
                 <div style={{fontSize:12.5,fontWeight:700,color:'#374151',width:'100%',marginBottom:4}}>📥 Export Reports</div>
                 <button className="btn-export" style={{fontSize:12,padding:'7px 12px'}} onClick={handleExportMonthlyCSV}>📅 Monthly CSV</button>
                 <button className="btn-export" style={{fontSize:12,padding:'7px 12px'}} onClick={handleExportPropertyCSV}>🏠 Property CSV</button>
                 <button className="btn-export" style={{fontSize:12,padding:'7px 12px'}} onClick={handleExportAnnualCSV}>📈 Annual CSV</button>
+              </div>
+            )}
+            {!isPro && (
+              <div
+                className="mobile-export-strip"
+                style={{gap:8,flexWrap:'wrap',marginBottom:16,padding:'12px 14px',background:'#F8FAFC',border:'1.5px dashed #E2E8F0',borderRadius:12}}>
+                <div style={{fontSize:12.5,fontWeight:700,color:'#94A3B8',width:'100%',marginBottom:4}}>📥 Export Reports</div>
+                <button className="btn-export-locked" onClick={()=>setShowUpgradeModal(true)}>🔒 Monthly CSV</button>
+                <button className="btn-export-locked" onClick={()=>setShowUpgradeModal(true)}>🔒 Property CSV</button>
+                <button className="btn-export-locked" onClick={()=>setShowUpgradeModal(true)}>🔒 Annual CSV</button>
+                <a href="/landlord/upgrade" className="btn-upgrade" style={{fontSize:12,padding:'7px 12px'}}>⭐ Upgrade for CSV</a>
               </div>
             )}
 
@@ -462,7 +517,6 @@ export default function ReportsPage() {
               </div>
             </div>
 
-            {/* ── PRO: Annual KPI cards ── */}
             {isPro && (
               <div className="pro-stats">
                 <div className="pro-stat-card">
@@ -483,7 +537,6 @@ export default function ReportsPage() {
               </div>
             )}
 
-            {/* Free charts */}
             <div className="row2">
               <div className="card">
                 <div className="card-head">
@@ -635,7 +688,6 @@ export default function ReportsPage() {
               </div>
             </div>
 
-            {/* ── ANNUAL REVENUE TREND ── */}
             {isPro ? (
               <div className="card" style={{marginBottom:12}}>
                 <div className="card-head">
@@ -704,7 +756,6 @@ export default function ReportsPage() {
               </div>
             )}
 
-            {/* ── PROPERTY COMPARISON ── */}
             {isPro ? (
               <div className="card" style={{marginBottom:0}}>
                 <div className="card-head">
