@@ -2,6 +2,9 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+
+
+
   let response = NextResponse.next({
     request: { headers: request.headers },
   })
@@ -36,6 +39,15 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const { pathname } = request.nextUrl
 
+  // Admin protection
+  if (pathname.startsWith('/admin')) {
+    const adminCookie = request.cookies.get('admin_auth')?.value
+    const adminSecret = process.env.ADMIN_SECRET || 'rentura-admin-2024'
+    if (pathname !== '/admin/login' && adminCookie !== adminSecret) {
+      return NextResponse.redirect(new URL('/admin/login', request.url))
+    }
+  }
+
   // 1. Define protected and auth routes
   const protectedPrefixes = ['/landlord', '/tenant', '/seeker', '/onboarding']
   const isProtected = protectedPrefixes.some(p => pathname.startsWith(p))
@@ -55,13 +67,13 @@ export async function middleware(request: NextRequest) {
       .maybeSingle()
 
     const role = profile?.active_role || 'landlord'
-    
+
     // Redirect to their specific dashboard
     const url = request.nextUrl.clone()
     if (role === 'tenant') url.pathname = '/tenant'
     else if (role === 'seeker') url.pathname = '/seeker'
     else url.pathname = '/landlord'
-    
+
     return NextResponse.redirect(url)
   }
 
