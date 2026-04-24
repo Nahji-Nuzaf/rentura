@@ -675,9 +675,9 @@ export default function TenantsPage() {
         /* Pro revenue bar */
         .pro-revenue-bar{background:linear-gradient(135deg,#0F172A,#1E3A5F);border-radius:14px;padding:14px 20px;margin-bottom:18px;display:flex;align-items:center;gap:20px;flex-wrap:wrap}
         .prb-item{display:flex;flex-direction:column;gap:1px;min-width:80px}
-        .prb-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#4B6587}
+        .prb-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#6d94c7}
         .prb-val{font-family:'Fraunces',serif;font-size:22px;font-weight:700;color:#F8FAFC}
-        .prb-sub{font-size:11px;color:#475569}
+        .prb-sub{font-size:11px;color:#6f86a6}
         .prb-divider{width:1px;height:34px;background:rgba(255,255,255,.07);flex-shrink:0}
         .prb-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;background:linear-gradient(135deg,#7C3AED,#2563EB);color:#fff;padding:2px 8px;border-radius:99px;margin-left:8px;vertical-align:middle}
 
@@ -831,7 +831,7 @@ export default function TenantsPage() {
           .detail-panel{display:none}
           .hd-stats{grid-template-columns:repeat(2,1fr)}
           .hist-drawer{width:100vw}
-          .pro-revenue-bar{flex-direction:column;gap:10px}.prb-divider{display:none}
+          .pro-revenue-bar{flex-direction:row;gap:20px}.prb-divider{display:flex;align-self:stretch;width:1px;height:auto}
         }
         @media(max-width:480px){
           .topbar{padding:0 12px}

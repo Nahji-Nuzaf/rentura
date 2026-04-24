@@ -328,7 +328,7 @@ export default function UnitsPage() {
 
         /* ── Pro insight bar */
         .pro-insight{background:linear-gradient(135deg,#0F172A,#1E3A5F);border-radius:14px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-        .pi-item{display:flex;flex-direction:column;gap:2px;min-width:80px}
+        .pi-item{display:flex;flex-direction:column;gap:2px;min-width:80px;}
         .pi-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#4B6587}
         .pi-val{font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:#F8FAFC}
         .pi-sub{font-size:11px;color:#64748B}
@@ -470,7 +470,7 @@ export default function UnitsPage() {
           .field-row{grid-template-columns:1fr!important}
           .units-table-wrap{display:none!important}.unit-cards{display:flex!important}
           .bulk-bar{flex-direction:column;align-items:stretch}.bulk-field{width:100%}
-          .pro-insight{flex-direction:column;gap:10px}.pi-divider{display:none}
+          .pro-insight{flex-direction:row;gap:25px}.pi-divider{display:none}
         }
         @media(max-width:480px){
           .topbar{padding:0 12px}.content{padding:12px 12px}.page-title{font-size:22px}
@@ -669,7 +669,7 @@ export default function UnitsPage() {
             {/* ── Pro: occupancy insight bar (only for Pro users) */}
             {isPro && !loading && counts.all > 0 && (
               <div className="pro-insight">
-                <div className="pi-item">
+                {/* <div className="pi-item">
                   <div className="pi-label">Total Units</div>
                   <div className="pi-val">{counts.all}</div>
                 </div>
@@ -688,8 +688,8 @@ export default function UnitsPage() {
                   <div className="pi-label">Monthly Revenue</div>
                   <div className="pi-val">${totalRevenue.toLocaleString()}</div>
                   <div className="pi-sub">from occupied units</div>
-                </div>
-                <div className="pi-divider" />
+                </div> */}
+                {/* <div className="pi-divider" /> */}
                 <div className="pi-occ-wrap">
                   <div className="pi-label">Occupancy Rate</div>
                   <div className="pi-val">{occupancyRate}%</div>
