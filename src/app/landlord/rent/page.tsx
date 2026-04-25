@@ -386,7 +386,7 @@ export default function RentTrackerPage() {
         @media(max-width:768px){
           .sidebar{transform:translateX(-100%)}.main{margin-left:0!important;width:100%!important}.hamburger{display:block}
           .topbar{padding:0 14px}.content{padding:14px 14px}.summary{grid-template-columns:repeat(2,1fr)}
-          .rtable{display:none}.rent-mobile-cards{display:flex}.btn-export{display:none}
+          .rtable{display:none}.rent-mobile-cards{display:flex}.btn-export{display:flex}
         }
         @media(max-width:480px){
           .topbar{padding:0 12px}.content{padding:12px 12px}.sum-val{font-size:18px}
@@ -472,11 +472,11 @@ export default function RentTrackerPage() {
             </div>
             <div className="tb-right">
               {isPro
-                ? <button className="btn-export" onClick={handleExportCSV}>📥 Export CSV</button>
+                ? <button className="btn-export" onClick={handleExportCSV}>📥 CSV</button>
                 : <button className="btn-export-locked" onClick={() => setShowUpgradeModal(true)}>🔒 CSV</button>
               }
               <button className="btn-primary" disabled={generating} onClick={generatePayments}>
-                {generating ? '⏳ Generating…' : `⚡ Generate ${selectedMonth} Payments`}
+                {generating ? '⏳ Generating…' : `⚡ Generate Payments`}
               </button>
             </div>
           </div>
@@ -487,7 +487,8 @@ export default function RentTrackerPage() {
 
             {records.length > 0 && (
               <div className="info-banner">
-                💡 Payments auto-generated when lease dates are set. Use <strong>Generate {selectedMonth} Payments</strong> to add missing records.
+                {/* 💡 Payments auto-generated when lease dates are set. Use <strong>Generate {selectedMonth} Payments</strong> to add missing records. */}
+                💡 Payments are auto generated when lease / rent dates are set. Use Generate Payments to add missing records.
               </div>
             )}
 
