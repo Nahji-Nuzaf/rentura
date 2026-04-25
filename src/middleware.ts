@@ -39,7 +39,6 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const { pathname } = request.nextUrl
 
-  // Admin protection
   if (pathname.startsWith('/admin')) {
     const adminCookie = request.cookies.get('admin_auth')?.value
     const adminSecret = process.env.ADMIN_SECRET || 'rentura-admin-2024'
