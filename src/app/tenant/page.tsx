@@ -822,7 +822,7 @@ export default function TenantDashboard() {
                       })}
                     </div>
 
-                    <div className="card">
+                    {/* <div className="card">
                       <div className="card-header">
                         <div className="card-title">
                           Messages
@@ -843,7 +843,7 @@ export default function TenantDashboard() {
                           {!msg.read && <div className="msg-unread" />}
                         </div>
                       ))}
-                    </div>
+                    </div> */}
                   </div>
                 </div>
               </>
