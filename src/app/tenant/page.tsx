@@ -308,15 +308,20 @@ export default function TenantDashboard() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-        html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;overflow-x:hidden}
-
-        /* ── LAYOUT SHELL ── */
-        .shell{display:flex;min-height:100vh}
-
-        /* ── SIDEBAR ── */
-        .sidebar{width:260px;min-width:260px;background:#0F172A;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:200;transition:transform .25s ease}
-        .sb-logo{display:flex;align-items:center;gap:12px;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,0.07)}
-        .sb-logo-icon{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center}
+        html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;overflow-x:hidden;max-width:100vw}
+        .shell{display:flex;min-height:100vh;position:relative}
+        .sidebar{width:260px;background:#0F172A;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:200;transition:transform .25s ease}
+        .sb-logo { display:flex; align-items:center; gap:12px; padding:22px 20px 18px; border-bottom:1px solid rgba(255,255,255,0.07); }
+        .sb-logo-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 11px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
         .sb-logo-name{font-family:'Fraunces',serif;font-size:19px;font-weight:700;color:#F8FAFC}
         .sb-nav{flex:1;padding:14px 12px;overflow-y:auto}.sb-nav::-webkit-scrollbar{width:0}
         .sb-section{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#4B6587;padding:16px 10px 7px;display:block}
@@ -325,34 +330,32 @@ export default function TenantDashboard() {
         .sb-item.active{background:rgba(59,130,246,.16);color:#93C5FD;font-weight:700;border:1px solid rgba(59,130,246,.22)}
         .sb-ico{font-size:16px;width:20px;text-align:center;flex-shrink:0}
         .sb-count{margin-left:auto;background:#DC2626;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px}
-        .sb-footer{border-top:1px solid rgba(255,255,255,0.07)}
+        .sb-footer { border-top:1px solid rgba(255,255,255,0.07); }
+        .sb-role-wrap{position:relative;padding:12px}
         .sb-user{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;cursor:pointer;transition:background .15s}
         .sb-user:hover{background:rgba(255,255,255,.06)}
         .sb-av{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#10B981,#34D399);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0}
+        .sb-uinfo{flex:1;min-width:0}
         .sb-uname{font-size:13px;font-weight:700;color:#E2E8F0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .sb-uemail{font-size:11px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-
-        /* ── MAIN AREA ── */
-        .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;width:calc(100vw - 260px)}
-        .topbar{height:58px;background:#fff;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(15,23,42,.04)}
+        .sb-role-badge{display:inline-block;font-size:9.5px;font-weight:700;color:#34D399;background:rgba(16,185,129,.14);border:1px solid rgba(16,185,129,.25);border-radius:4px;padding:1px 6px;margin-top:2px}
+        .role-popover{position:absolute;bottom:100%;left:12px;right:12px;background:#1E293B;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:8px;margin-bottom:6px;box-shadow:0 20px 40px rgba(0,0,0,.4);z-index:300}
+        .rp-title{font-size:10px;color:#64748B;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:4px 8px 8px}
+        .rp-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;color:#CBD5E1;font-size:13px;font-weight:500;transition:background .15s}
+        .rp-item:hover{background:rgba(255,255,255,.06)}
+        .rp-divider{height:1px;background:rgba(255,255,255,.06);margin:4px 0}
+        .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:hidden;width:calc(100% - 260px)}
+        .topbar{height:58px;background:#fff;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(15,23,42,.04)}
         .tb-left{display:flex;align-items:center;gap:8px}
         .breadcrumb{font-size:13px;color:#94A3B8;font-weight:500}.breadcrumb b{color:#0F172A}
         .hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;color:#475569;padding:4px}
-        .notif-btn{width:34px;height:34px;border-radius:9px;background:#F1F5F9;border:none;cursor:pointer;font-size:15px;position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .notif-btn{width:34px;height:34px;border-radius:9px;background:#F1F5F9;border:none;cursor:pointer;font-size:15px;position:relative;display:flex;align-items:center;justify-content:center}
         .notif-dot{width:8px;height:8px;background:#DC2626;border-radius:50%;position:absolute;top:5px;right:5px;border:1.5px solid #fff}
-        .content{padding:24px;flex:1;width:100%}
-        .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:199}
-        .sb-overlay.open{display:block}
-
-        /* ── LINK BANNER ── */
-        .link-banner{background:linear-gradient(135deg,rgba(37,99,235,.06),rgba(99,102,241,.06));border:1px solid rgba(37,99,235,.15);border-radius:14px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-        .link-btn{padding:8px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;white-space:nowrap;flex-shrink:0}
-
-        /* ── HERO ── */
-        .hero{background:linear-gradient(135deg,#0F172A 0%,#1E293B 55%,#1a3354 100%);border-radius:20px;padding:24px 28px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;position:relative;overflow:hidden;gap:20px}
+        .content{padding:22px 20px;flex:1}
+        .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:199}.sb-overlay.open{display:block}
+        .hero{background:linear-gradient(135deg,#0F172A 0%,#1E293B 55%,#1a3354 100%);border-radius:20px;padding:24px 28px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;position:relative;overflow:hidden;flex-wrap:wrap;gap:20px}
         .hero::before{content:'';position:absolute;top:-60px;right:-60px;width:260px;height:260px;background:radial-gradient(circle,rgba(99,102,241,.2),transparent 65%);pointer-events:none}
         .hero::after{content:'';position:absolute;bottom:-40px;left:30%;width:180px;height:180px;background:radial-gradient(circle,rgba(59,130,246,.12),transparent 65%);pointer-events:none}
-        .hero-left{flex:1;min-width:0}
         .hero-greeting{font-size:13px;color:#64748B;margin-bottom:4px}
         .hero-name{font-family:'Fraunces',serif;font-size:26px;font-weight:700;color:#fff;margin-bottom:10px}
         .hero-chips{display:flex;gap:8px;flex-wrap:wrap}
@@ -362,25 +365,18 @@ export default function TenantDashboard() {
         .hero-rent{font-family:'Fraunces',serif;font-size:32px;font-weight:700;color:#fff;line-height:1}
         .hero-rent-sub{font-size:12px;color:#64748B;margin-top:4px}
         .hero-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:4px 12px;border-radius:99px;margin-top:8px}
-
-        /* ── QUICK ACTIONS ── */
         .quick-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
         .qa-card{background:#fff;border:1.5px solid #E2E8F0;border-radius:14px;padding:16px 12px;text-align:center;cursor:pointer;transition:all .18s;box-shadow:0 1px 4px rgba(15,23,42,.04);text-decoration:none;display:block}
         .qa-card:hover{border-color:#BFDBFE;box-shadow:0 6px 20px rgba(37,99,235,.1);transform:translateY(-2px)}
         .qa-icon{font-size:22px;margin-bottom:6px}
         .qa-label{font-size:12px;font-weight:700;color:#475569}
-
-        /* ── STATS ── */
-        .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+        .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px}
         .stat-card{background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:16px;box-shadow:0 1px 4px rgba(15,23,42,.04)}
         .stat-icon{font-size:18px;margin-bottom:7px}
         .stat-val{font-family:'Fraunces',serif;font-size:24px;font-weight:700;color:#0F172A;line-height:1;margin-bottom:3px}
         .stat-label{font-size:11px;color:#94A3B8;font-weight:500}
         .stat-sub{font-size:11.5px;font-weight:600;margin-top:5px}
-
-        /* ── BOTTOM GRID ── */
-        .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
-        .grid2-col{display:flex;flex-direction:column;gap:14px}
+        .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
         .card{background:#fff;border:1px solid #E2E8F0;border-radius:16px;padding:18px;box-shadow:0 1px 4px rgba(15,23,42,.04)}
         .card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
         .card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8}
@@ -411,14 +407,10 @@ export default function TenantDashboard() {
         .msg-text{font-size:12px;color:#64748B;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .msg-time{font-size:11px;color:#94A3B8;margin-top:2px}
         .msg-unread{width:8px;height:8px;background:#2563EB;border-radius:50%;flex-shrink:0;margin-top:4px}
-
-        /* ── NO TENANT STATE ── */
         .no-tenant{text-align:center;padding:80px 24px;color:#94A3B8}
         .no-tenant-icon{font-size:48px;margin-bottom:16px}
         .no-tenant-title{font-family:'Fraunces',serif;font-size:22px;color:#475569;margin-bottom:8px}
         .no-tenant-sub{font-size:14px;line-height:1.6}
-
-        /* ── MODALS ── */
         .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:500;align-items:center;justify-content:center;padding:16px}
         .modal-overlay.open{display:flex}
         .modal{background:#fff;border-radius:22px;padding:32px 28px;width:100%;max-width:400px;box-shadow:0 24px 60px rgba(15,23,42,.2)}
@@ -432,44 +424,20 @@ export default function TenantDashboard() {
         .modal-cancel{width:100%;padding:11px;border-radius:12px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:13.5px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
         .modal-error{background:#FEE2E2;border:1px solid #FECACA;border-radius:10px;padding:10px 14px;font-size:13px;color:#DC2626;font-weight:600;margin-bottom:12px;text-align:center}
         .modal-success{background:#DCFCE7;border:1px solid #BBF7D0;border-radius:10px;padding:10px 14px;font-size:13px;color:#16A34A;font-weight:600;margin-bottom:12px;text-align:center}
-
-        /* ════════════════════════════════════════════
-           RESPONSIVE BREAKPOINTS
-           ════════════════════════════════════════════ */
-
-        /* ── TABLET (769px – 1023px): sidebar hidden, 2-col grids ── */
-        @media (max-width:1023px) {
-          .sidebar { transform: translateX(-100%); }
-          .sidebar.open { transform: translateX(0); }
-          .main { margin-left: 0; width: 100%; }
-          .hamburger { display: block; }
-          .topbar { padding: 0 16px; }
-          .content { padding: 18px 16px; }
-          .stats { grid-template-columns: repeat(2, 1fr); }
+        .link-banner{background:linear-gradient(135deg,rgba(37,99,235,.06),rgba(99,102,241,.06));border:1px solid rgba(37,99,235,.15);border-radius:14px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+        .link-btn{padding:8px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;white-space:nowrap;flex-shrink:0}
+        @media(min-width:1100px){.stats{grid-template-columns:repeat(4,1fr)}}
+        @media(max-width:768px){
+          .sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}
+          .main{margin-left:0!important;width:100%!important}
+          .hamburger{display:block}.topbar{padding:0 14px}.content{padding:14px 14px}
+          .hero{padding:18px 20px}
+          .quick-actions{grid-template-columns:repeat(2,1fr)}
+          .grid2{grid-template-columns:1fr}
         }
-
-        /* ── MOBILE (up to 768px): everything stacks ── */
-        @media (max-width: 768px) {
-          .content { padding: 14px; }
-          .hero { flex-wrap: wrap; padding: 18px 20px; gap: 16px; }
-          .hero-right { text-align: left; width: 100%; }
-          .quick-actions { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-          .stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-          .grid2 { grid-template-columns: 1fr; }
-          .link-banner { flex-direction: column; align-items: flex-start; }
-          .link-btn { width: 100%; text-align: center; }
-        }
-
-        /* ── SMALL MOBILE (up to 480px) ── */
-        @media (max-width: 480px) {
-          .content { padding: 12px; }
-          .hero { padding: 16px; border-radius: 16px; }
-          .hero-name { font-size: 20px; }
-          .hero-rent { font-size: 26px; }
-          .stat-card { padding: 13px 12px; }
-          .stat-val { font-size: 20px; }
-          .card { padding: 14px; }
-          .rent-amount { font-size: 28px; }
+        @media(max-width:480px){
+          .hero-name{font-size:22px}.hero-rent{font-size:26px}
+          .quick-actions{gap:8px}.content{padding:12px 12px}
         }
       `}</style>
 
@@ -545,8 +513,38 @@ export default function TenantDashboard() {
               <div>
                 <div className="sb-uname">{profile?.full_name || 'Loading...'}</div>
                 <div className="sb-uemail">{profile?.email || ''}</div>
+                {/* <span className="sb-uplan" style={{ color: planColor.color, background: planColor.bg, border: `1px solid ${planColor.border}` }}>
+                  {planLabel}
+                </span> */}
               </div>
             </div>
+            {/* <div className="sb-role-wrap">
+              {rolePopoverOpen && (
+                <div className="role-popover">
+                  <div className="rp-title">Switch Role</div>
+                  {['landlord', 'tenant', 'seeker'].map(role => (
+                    <div key={role} className="rp-item" onClick={() => handleRoleSwitch(role)}>
+                      <span style={{ fontSize: 16 }}>{role === 'landlord' ? '🏠' : role === 'tenant' ? '🔑' : '🔍'}</span>
+                      <span style={{ textTransform: 'capitalize' }}>{role}</span>
+                      {activeRole === role && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5" style={{ marginLeft: 'auto' }}><polyline points="20 6 9 17 4 12" /></svg>}
+                    </div>
+                  ))}
+                  <div className="rp-divider" />
+                  <div className="rp-item" onClick={async () => { await createClient().auth.signOut(); window.location.href = '/login' }}>
+                    <span style={{ fontSize: 16 }}>🚪</span> Sign out
+                  </div>
+                </div>
+              )}
+              <div className="sb-user" onClick={() => setRolePopoverOpen(v => !v)}>
+                <div className="sb-av">{profile ? initials(profile.full_name) : '?'}</div>
+                <div className="sb-uinfo">
+                  <div className="sb-uname">{profile?.full_name || 'Loading...'}</div>
+                  <div className="sb-uemail">{profile?.email || ''}</div>
+                  <div className="sb-role-badge">tenant</div>
+                </div>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2"><polyline points="7 15 12 20 17 15" /><polyline points="7 9 12 4 17 9" /></svg>
+              </div>
+            </div> */}
           </div>
         </aside>
 
@@ -593,7 +591,7 @@ export default function TenantDashboard() {
 
                 {/* Hero */}
                 <div className="hero">
-                  <div className="hero-left">
+                  <div>
                     <div className="hero-greeting">{greeting()},</div>
                     <div className="hero-name">{profile?.full_name || 'Tenant'} 👋</div>
                     <div className="hero-chips">
@@ -672,7 +670,7 @@ export default function TenantDashboard() {
 
                 {/* Bottom grid */}
                 <div className="grid2">
-                  <div className="grid2-col">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                     <div className="card">
                       <div className="card-header">
                         <div className="card-title">Current Month Rent</div>
@@ -716,7 +714,7 @@ export default function TenantDashboard() {
                     </div>
                   </div>
 
-                  <div className="grid2-col">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                     <div className="card">
                       <div className="card-header">
                         <div className="card-title">Recent Payments</div>
