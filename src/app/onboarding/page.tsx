@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Image from 'next/image'
 
 // ── Field defined OUTSIDE component to prevent remount on every keystroke ──
 function Field({
@@ -35,39 +36,39 @@ function Field({
 
 export default function OnboardingPage() {
   const router = useRouter()
-  const [role, setRole]           = useState('')
-  const [userId, setUserId]       = useState('')
+  const [role, setRole] = useState('')
+  const [userId, setUserId] = useState('')
   const [firstName, setFirstName] = useState('')
-  const [step, setStep]           = useState(1)
-  const [loading, setLoading]     = useState(false)
-  const [errors, setErrors]       = useState<Record<string, string>>({})
+  const [step, setStep] = useState(1)
+  const [loading, setLoading] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
   const [skippedProperty, setSkippedProperty] = useState(false)
 
   // Landlord
-  const [phone, setPhone]               = useState('')
+  const [phone, setPhone] = useState('')
   const [propertyName, setPropertyName] = useState('')
-  const [address, setAddress]           = useState('')
-  const [city, setCity]                 = useState('')
-  const [country, setCountry]           = useState('')
-  const [propType, setPropType]         = useState('apartment')
-  const [units, setUnits]               = useState('1')
-  const [rent, setRent]                 = useState('0')
-  const [currency, setCurrency]         = useState('USD')
+  const [address, setAddress] = useState('')
+  const [city, setCity] = useState('')
+  const [country, setCountry] = useState('')
+  const [propType, setPropType] = useState('apartment')
+  const [units, setUnits] = useState('1')
+  const [rent, setRent] = useState('0')
+  const [currency, setCurrency] = useState('USD')
 
   // Tenant
-  const [tenantPhone, setTenantPhone]         = useState('')
-  const [tenantCode, setTenantCode]           = useState('')
-  const [inviteError, setInviteError]         = useState('')
-  const [inviteChecking, setInviteChecking]   = useState(false)
+  const [tenantPhone, setTenantPhone] = useState('')
+  const [tenantCode, setTenantCode] = useState('')
+  const [inviteError, setInviteError] = useState('')
+  const [inviteChecking, setInviteChecking] = useState(false)
 
   // Seeker
   const [seekerPhone, setSeekerPhone] = useState('')
-  const [budget, setBudget]           = useState('')
-  const [seekerCity, setSeekerCity]   = useState('')
-  const [seekerType, setSeekerType]   = useState('apartment')
+  const [budget, setBudget] = useState('')
+  const [seekerCity, setSeekerCity] = useState('')
+  const [seekerType, setSeekerType] = useState('apartment')
 
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       const sb = createClient()
       const { data: { user } } = await sb.auth.getUser()
       if (!user) { router.push('/login'); return }
@@ -83,7 +84,7 @@ export default function OnboardingPage() {
 
   const validateLandlordStep1 = () => {
     const e: Record<string, string> = {}
-    if (!phone.trim())           e.phone = 'Phone number is required'
+    if (!phone.trim()) e.phone = 'Phone number is required'
     else if (!isValidPhone(phone)) e.phone = 'Enter a valid phone number (e.g. +94 77 123 4567)'
     setErrors(e); return Object.keys(e).length === 0
   }
@@ -91,24 +92,24 @@ export default function OnboardingPage() {
   const validateLandlordStep2 = () => {
     const e: Record<string, string> = {}
     if (!propertyName.trim()) e.propertyName = 'Property name is required'
-    if (!address.trim())      e.address      = 'Address is required'
-    if (!city.trim())         e.city         = 'City is required'
-    if (!country.trim())      e.country      = 'Country is required'
+    if (!address.trim()) e.address = 'Address is required'
+    if (!city.trim()) e.city = 'City is required'
+    if (!country.trim()) e.country = 'Country is required'
     setErrors(e); return Object.keys(e).length === 0
   }
 
   const validateTenant = () => {
     const e: Record<string, string> = {}
-    if (!tenantPhone)                    e.tenantPhone = 'Phone number is required'
+    if (!tenantPhone) e.tenantPhone = 'Phone number is required'
     else if (!isValidPhone(tenantPhone)) e.tenantPhone = 'Enter a valid phone number'
-    if (!tenantCode.trim())              e.tenantCode  = 'Invite code is required'
+    if (!tenantCode.trim()) e.tenantCode = 'Invite code is required'
     setErrors(e); return Object.keys(e).length === 0
   }
 
   const validateSeeker = () => {
     const e: Record<string, string> = {}
     if (seekerPhone && !isValidPhone(seekerPhone)) e.seekerPhone = 'Enter a valid phone number'
-    if (budget && parseFloat(budget) <= 0)         e.budget      = 'Budget must be greater than 0'
+    if (budget && parseFloat(budget) <= 0) e.budget = 'Budget must be greater than 0'
     setErrors(e); return Object.keys(e).length === 0
   }
 
@@ -225,7 +226,7 @@ export default function OnboardingPage() {
     : ['Your Profile', 'All Done!']
 
   if (!role) return (
-    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:"'Plus Jakarta Sans',sans-serif", color:'#64748B', fontSize:14 }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Plus Jakarta Sans',sans-serif", color: '#64748B', fontSize: 14 }}>
       Loading...
     </div>
   )
@@ -239,7 +240,7 @@ export default function OnboardingPage() {
 
         .ob-page{min-height:100vh;font-family:'Plus Jakarta Sans',sans-serif;background:linear-gradient(135deg,#E8F4FD 0%,#EEF2FF 40%,#F0F9FF 70%,#E8F4FD 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 16px;position:relative;overflow:hidden}
         .ob-page::after{content:'';position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle,rgba(99,102,241,.1) 1px,transparent 1px);background-size:32px 32px}
-
+        .sb-logo-icon{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center}
         .blob1{position:absolute;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(56,189,248,.15) 0%,transparent 65%);top:-200px;right:-150px;pointer-events:none;animation:floatAnim 9s ease-in-out infinite}
         .blob2{position:absolute;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.12) 0%,transparent 65%);bottom:-120px;left:-100px;pointer-events:none;animation:floatAnim 12s ease-in-out infinite reverse}
         .blob3{position:absolute;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(14,165,233,.1) 0%,transparent 65%);top:50%;left:-80px;pointer-events:none;animation:floatAnim 7s ease-in-out infinite 2s}
@@ -283,33 +284,35 @@ export default function OnboardingPage() {
       `}</style>
 
       <div className="ob-page">
-        <div className="blob1"/><div className="blob2"/><div className="blob3"/>
+        <div className="blob1" /><div className="blob2" /><div className="blob3" />
 
         <div className="ob-wrap">
 
           {/* Logo */}
-          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:36, justifyContent:'center' }}>
-            <div style={{ width:42, height:42, borderRadius:12, background:'linear-gradient(135deg,#38BDF8,#6366F1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, boxShadow:'0 8px 24px rgba(56,189,248,.3)' }}>🏘️</div>
-            <span style={{ fontFamily:'Fraunces,serif', fontSize:22, fontWeight:700, color:'#0F172A', letterSpacing:'-.3px' }}>Rentura</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 36, justifyContent: 'center' }}>
+            <div style={{ width: 38, height: 38, borderRadius: 11, background: 'rgba(255,255,255,0.05)', border: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="sb-logo-icon">
+              <Image src="/icon.png" alt="Rentura Logo" width={36} height={36} />
+            </div>
+            <span style={{ fontFamily: 'Fraunces,serif', fontSize: 22, fontWeight: 700, color: '#0F172A', letterSpacing: '-.3px' }}>Rentura</span>
           </div>
 
           {/* Step tracker */}
-          <div style={{ display:'flex', alignItems:'flex-start', marginBottom:32 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 32 }}>
             {steps.map((s, i) => (
-              <div key={s} style={{ display:'flex', alignItems:'flex-start', flex: i < steps.length - 1 ? 1 : 'none' }}>
-                <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
+              <div key={s} style={{ display: 'flex', alignItems: 'flex-start', flex: i < steps.length - 1 ? 1 : 'none' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   <div className="step-circle" style={{
-                    background: step > i+1 ? 'linear-gradient(135deg,#38BDF8,#6366F1)' : step === i+1 ? 'linear-gradient(135deg,#0EA5E9,#6366F1)' : '#F1F5F9',
-                    border: step >= i+1 ? 'none' : '1.5px solid #E2E8F0',
-                    color: step >= i+1 ? '#fff' : '#94A3B8',
-                    boxShadow: step === i+1 ? '0 0 20px rgba(14,165,233,.35)' : 'none',
+                    background: step > i + 1 ? 'linear-gradient(135deg,#38BDF8,#6366F1)' : step === i + 1 ? 'linear-gradient(135deg,#0EA5E9,#6366F1)' : '#F1F5F9',
+                    border: step >= i + 1 ? 'none' : '1.5px solid #E2E8F0',
+                    color: step >= i + 1 ? '#fff' : '#94A3B8',
+                    boxShadow: step === i + 1 ? '0 0 20px rgba(14,165,233,.35)' : 'none',
                   }}>
-                    {step > i+1 ? '✓' : i+1}
+                    {step > i + 1 ? '✓' : i + 1}
                   </div>
-                  <span className="step-label" style={{ color: step === i+1 ? '#0F172A' : step > i+1 ? '#94A3B8' : '#CBD5E1' }}>{s}</span>
+                  <span className="step-label" style={{ color: step === i + 1 ? '#0F172A' : step > i + 1 ? '#94A3B8' : '#CBD5E1' }}>{s}</span>
                 </div>
                 {i < steps.length - 1 && (
-                  <div className="step-line" style={{ background: step > i+1 ? 'linear-gradient(90deg,#38BDF8,#6366F1)' : '#E2E8F0' }}/>
+                  <div className="step-line" style={{ background: step > i + 1 ? 'linear-gradient(90deg,#38BDF8,#6366F1)' : '#E2E8F0' }} />
                 )}
               </div>
             ))}
@@ -318,11 +321,11 @@ export default function OnboardingPage() {
           {/* ══ LANDLORD STEP 1 ══ */}
           {role === 'landlord' && step === 1 && (
             <div className="ob-card">
-              <h2 style={{ fontFamily:'Fraunces,serif', fontSize:30, fontWeight:400, color:'#0F172A', letterSpacing:'-.6px', marginBottom:8 }}>
+              <h2 style={{ fontFamily: 'Fraunces,serif', fontSize: 30, fontWeight: 400, color: '#0F172A', letterSpacing: '-.6px', marginBottom: 8 }}>
                 Welcome, {firstName}! 👋
               </h2>
-              <p style={{ color:'#64748B', fontSize:14, lineHeight:1.7, marginBottom:28 }}>
-                You're setting up as a <span style={{ color:'#2563EB', fontWeight:600 }}>Landlord</span>. Let's get your portfolio ready in under 2 minutes.
+              <p style={{ color: '#64748B', fontSize: 14, lineHeight: 1.7, marginBottom: 28 }}>
+                You're setting up as a <span style={{ color: '#2563EB', fontWeight: 600 }}>Landlord</span>. Let's get your portfolio ready in under 2 minutes.
               </p>
 
               <Field label="Phone Number" id="phone" value={phone}
@@ -330,14 +333,14 @@ export default function OnboardingPage() {
                 placeholder="+94 77 123 4567" errors={errors} />
 
               <div className="info-box">
-                <span style={{ fontSize:18 }}>🏠</span>
-                <p style={{ fontSize:13, color:'#1D4ED8', lineHeight:1.65 }}>
-                  As a landlord, you'll manage properties, track rent, invite tenants, and handle maintenance — all from one dashboard.
+                <span style={{ fontSize: 18 }}>🏠</span>
+                <p style={{ fontSize: 13, color: '#1D4ED8', lineHeight: 1.65 }}>
+                  As a landlord, you'll manage properties, track rent, invite tenants, and handle maintenance - all from one dashboard.
                 </p>
               </div>
 
               <button className="ob-btn" onClick={handleLandlordProfile} disabled={loading}>
-                {loading ? 'Saving...' : 'Continue — Add Your Property →'}
+                {loading ? 'Saving...' : 'Continue, Add Your Property →'}
               </button>
             </div>
           )}
@@ -345,44 +348,51 @@ export default function OnboardingPage() {
           {/* ══ LANDLORD STEP 2 ══ */}
           {role === 'landlord' && step === 2 && (
             <div className="ob-card">
-              <h2 style={{ fontFamily:'Fraunces,serif', fontSize:28, fontWeight:400, color:'#0F172A', letterSpacing:'-.6px', marginBottom:6 }}>
+              <h2 style={{ fontFamily: 'Fraunces,serif', fontSize: 28, fontWeight: 400, color: '#0F172A', letterSpacing: '-.6px', marginBottom: 6 }}>
                 Add your first property 🏠
               </h2>
-              <p style={{ color:'#64748B', fontSize:14, marginBottom:24 }}>
+              <p style={{ color: '#64748B', fontSize: 14, marginBottom: 24 }}>
                 You can add more properties and units from your dashboard anytime.
               </p>
-              <div className="divider"/>
+              <div className="divider" />
 
               <Field label="Property Name" id="propertyName" value={propertyName}
                 onChange={e => setPropertyName(e.target.value)} placeholder='e.g. "Sunset Apartments"' errors={errors} />
               <Field label="Street Address" id="address" value={address}
                 onChange={e => setAddress(e.target.value)} placeholder="123 Main Street" errors={errors} />
 
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <Field label="City" id="city" value={city}
-                  onChange={e => setCity(e.target.value)} placeholder="Colombo" errors={errors} />
+                  onChange={e => setCity(e.target.value)} placeholder="London" errors={errors} />
                 <Field label="Country" id="country" value={country}
-                  onChange={e => setCountry(e.target.value)} placeholder="Sri Lanka" errors={errors} />
+                  onChange={e => setCountry(e.target.value)} placeholder="United Kingdom" errors={errors} />
               </div>
 
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                <div style={{ marginBottom:16 }}>
-                  <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#374151', marginBottom:7 }}>Property Type</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 7 }}>Property Type</label>
                   <select className="ob-inp" value={propType} onChange={e => setPropType(e.target.value)}>
-                    <option value="apartment">Apartment</option>
+                    <option value="apartment">Apartment Building</option>
                     <option value="house">House</option>
-                    <option value="commercial">Commercial</option>
-                    <option value="land">Land</option>
+                    <option value="house">Villa</option>
+                    <option value="studio">Studio Apartment</option>
+                    <option value="townhouse">Townhouse</option>
+                    <option value="office">Offices</option>
+                    <option value="shop">Shop / Retail</option>
+                    <option value="warehouse">Warehouse</option>
+                    <option value="annex">Annex</option>
+                    <option value="commercial">Commercial Spaces</option>
+                    <option value="land">Land / Plot</option>
                   </select>
                 </div>
-                <div style={{ marginBottom:16 }}>
-                  <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#374151', marginBottom:7 }}>No. of Units</label>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 7 }}>No. of Units</label>
                   <input className="ob-inp" type="number" min="1" max="999"
-                    value={units} onChange={e => setUnits(String(Math.max(1, parseInt(e.target.value) || 1)))} />
+                    value={units} onChange={e => setUnits(String(Math.max(1, parseInt(e.target.value))))} />
                 </div>
               </div>
 
-              <button className="ob-btn" onClick={handleLandlordProperty} disabled={loading} style={{ marginTop:8 }}>
+              <button className="ob-btn" onClick={handleLandlordProperty} disabled={loading} style={{ marginTop: 8 }}>
                 {loading ? 'Saving...' : 'Save & Continue →'}
               </button>
               <button className="ob-skip" onClick={() => { setSkippedProperty(true); setStep(3); }}>Skip for now</button>
@@ -391,23 +401,23 @@ export default function OnboardingPage() {
 
           {/* ══ LANDLORD STEP 3 ══ */}
           {role === 'landlord' && step === 3 && (
-            <div className="ob-card" style={{ textAlign:'center' }}>
-              <div style={{ fontSize:60, marginBottom:16 }}>🎉</div>
-              <h2 style={{ fontFamily:'Fraunces,serif', fontSize:32, fontWeight:400, color:'#0F172A', letterSpacing:'-.8px', marginBottom:10 }}>
+            <div className="ob-card" style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 60, marginBottom: 16 }}>🎉</div>
+              <h2 style={{ fontFamily: 'Fraunces,serif', fontSize: 32, fontWeight: 400, color: '#0F172A', letterSpacing: '-.8px', marginBottom: 10 }}>
                 You're all set!
               </h2>
-              <p style={{ color:'#64748B', fontSize:15, lineHeight:1.7, maxWidth:320, margin:'0 auto 32px' }}>
+              <p style={{ color: '#64748B', fontSize: 15, lineHeight: 1.7, maxWidth: 320, margin: '0 auto 32px' }}>
                 Your account is ready. Your dashboard is ready to go.
               </p>
-              <div style={{ marginBottom:32, textAlign:'left' }}>
+              <div style={{ marginBottom: 32, textAlign: 'left' }}>
                 {[
                   ['✅', 'Account created'],
                   skippedProperty ? ['⏳', 'Property setup skipped'] : ['✅', 'First property added'],
                   ['⏳', 'Invite your first tenant']
                 ].map(([icon, text]) => (
                   <div className="check-item" key={text}>
-                    <span style={{ fontSize:16 }}>{icon}</span>
-                    <span style={{ fontSize:14, color: icon === '✅' ? '#475569' : '#94A3B8' }}>{text}</span>
+                    <span style={{ fontSize: 16 }}>{icon}</span>
+                    <span style={{ fontSize: 14, color: icon === '✅' ? '#475569' : '#94A3B8' }}>{text}</span>
                   </div>
                 ))}
               </div>
@@ -420,24 +430,24 @@ export default function OnboardingPage() {
           {/* ══ TENANT STEP 1 ══ */}
           {role === 'tenant' && step === 1 && (
             <div className="ob-card">
-              <div style={{ display:'inline-flex', alignItems:'center', gap:6, background:'#DCFCE7', border:'1px solid #BBF7D0', borderRadius:20, padding:'5px 12px', marginBottom:20 }}>
-                <span style={{ width:7, height:7, borderRadius:'50%', background:'#10B981', display:'inline-block' }}/>
-                <span style={{ color:'#16A34A', fontSize:12, fontWeight:600 }}>Tenant Account</span>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#DCFCE7', border: '1px solid #BBF7D0', borderRadius: 20, padding: '5px 12px', marginBottom: 20 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981', display: 'inline-block' }} />
+                <span style={{ color: '#16A34A', fontSize: 12, fontWeight: 600 }}>Tenant Account</span>
               </div>
-              <h2 style={{ fontFamily:'Fraunces,serif', fontSize:30, fontWeight:400, color:'#0F172A', letterSpacing:'-.6px', marginBottom:8 }}>
+              <h2 style={{ fontFamily: 'Fraunces,serif', fontSize: 30, fontWeight: 400, color: '#0F172A', letterSpacing: '-.6px', marginBottom: 8 }}>
                 Welcome, {firstName}! 👋
               </h2>
-              <p style={{ color:'#64748B', fontSize:14, lineHeight:1.7, marginBottom:24 }}>
+              <p style={{ color: '#64748B', fontSize: 14, lineHeight: 1.7, marginBottom: 24 }}>
                 Enter your phone number and the invite code your landlord sent you to link your account.
               </p>
-              <div className="divider"/>
+              <div className="divider" />
 
               <Field label="Phone Number" id="tenantPhone" value={tenantPhone}
                 onChange={e => setTenantPhone(e.target.value)} type="tel"
                 placeholder="+94 77 123 4567" errors={errors} />
 
-              <div style={{ marginBottom:16 }}>
-                <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#374151', marginBottom:7 }}>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 7 }}>
                   Invite Code
                 </label>
                 <input
@@ -446,26 +456,26 @@ export default function OnboardingPage() {
                   value={tenantCode}
                   onChange={e => { setTenantCode(e.target.value.toUpperCase()); setInviteError('') }}
                   placeholder="e.g. RENT-4829"
-                  style={{ textTransform:'uppercase', letterSpacing:2, fontWeight:600 }}
+                  style={{ textTransform: 'uppercase', letterSpacing: 2, fontWeight: 600 }}
                 />
                 {errors.tenantCode && (
-                  <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:6 }}>
-                    <span style={{ fontSize:12 }}>⚠️</span>
-                    <span style={{ fontSize:12, color:'#EF4444', fontWeight:500 }}>{errors.tenantCode}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                    <span style={{ fontSize: 12 }}>⚠️</span>
+                    <span style={{ fontSize: 12, color: '#EF4444', fontWeight: 500 }}>{errors.tenantCode}</span>
                   </div>
                 )}
               </div>
 
               {inviteError && (
                 <div className="error-box">
-                  <span style={{ fontSize:18 }}>❌</span>
-                  <p style={{ fontSize:13, color:'#DC2626', lineHeight:1.65 }}>{inviteError}</p>
+                  <span style={{ fontSize: 18 }}>❌</span>
+                  <p style={{ fontSize: 13, color: '#DC2626', lineHeight: 1.65 }}>{inviteError}</p>
                 </div>
               )}
 
               <div className="info-box">
-                <span style={{ fontSize:18 }}>💡</span>
-                <p style={{ fontSize:13, color:'#1D4ED8', lineHeight:1.65 }}>
+                <span style={{ fontSize: 18 }}>💡</span>
+                <p style={{ fontSize: 13, color: '#1D4ED8', lineHeight: 1.65 }}>
                   Your invite code links you to your unit. Ask your landlord to generate one from their tenant management page.
                 </p>
               </div>
@@ -478,19 +488,19 @@ export default function OnboardingPage() {
 
           {/* ══ TENANT STEP 2 ══ */}
           {role === 'tenant' && step === 2 && (
-            <div className="ob-card" style={{ textAlign:'center' }}>
-              <div style={{ fontSize:60, marginBottom:16 }}>🏡</div>
-              <h2 style={{ fontFamily:'Fraunces,serif', fontSize:32, fontWeight:400, color:'#0F172A', letterSpacing:'-.8px', marginBottom:10 }}>
+            <div className="ob-card" style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 60, marginBottom: 16 }}>🏡</div>
+              <h2 style={{ fontFamily: 'Fraunces,serif', fontSize: 32, fontWeight: 400, color: '#0F172A', letterSpacing: '-.8px', marginBottom: 10 }}>
                 Welcome aboard!
               </h2>
-              <p style={{ color:'#64748B', fontSize:15, lineHeight:1.7, maxWidth:320, margin:'0 auto 32px' }}>
+              <p style={{ color: '#64748B', fontSize: 15, lineHeight: 1.7, maxWidth: 320, margin: '0 auto 32px' }}>
                 Your account is linked to your unit. Everything is ready for you.
               </p>
-              <div style={{ marginBottom:32, textAlign:'left' }}>
-                {[['✅','Tenant account created'],['✅','Linked to your unit'],['✅','Profile saved']].map(([icon,text]) => (
+              <div style={{ marginBottom: 32, textAlign: 'left' }}>
+                {[['✅', 'Tenant account created'], ['✅', 'Linked to your unit'], ['✅', 'Profile saved']].map(([icon, text]) => (
                   <div className="check-item" key={text}>
-                    <span style={{ fontSize:16 }}>{icon}</span>
-                    <span style={{ fontSize:14, color:'#475569' }}>{text}</span>
+                    <span style={{ fontSize: 16 }}>{icon}</span>
+                    <span style={{ fontSize: 14, color: '#475569' }}>{text}</span>
                   </div>
                 ))}
               </div>
@@ -503,35 +513,42 @@ export default function OnboardingPage() {
           {/* ══ SEEKER STEP 1 ══ */}
           {role === 'seeker' && step === 1 && (
             <div className="ob-card">
-              <div style={{ display:'inline-flex', alignItems:'center', gap:6, background:'#FFFBEB', border:'1px solid #FDE68A', borderRadius:20, padding:'5px 12px', marginBottom:20 }}>
-                <span style={{ width:7, height:7, borderRadius:'50%', background:'#F59E0B', display:'inline-block' }}/>
-                <span style={{ color:'#D97706', fontSize:12, fontWeight:600 }}>Property Seeker</span>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 20, padding: '5px 12px', marginBottom: 20 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#F59E0B', display: 'inline-block' }} />
+                <span style={{ color: '#D97706', fontSize: 12, fontWeight: 600 }}>Property Seeker</span>
               </div>
-              <h2 style={{ fontFamily:'Fraunces,serif', fontSize:30, fontWeight:400, color:'#0F172A', letterSpacing:'-.6px', marginBottom:8 }}>
+              <h2 style={{ fontFamily: 'Fraunces,serif', fontSize: 30, fontWeight: 400, color: '#0F172A', letterSpacing: '-.6px', marginBottom: 8 }}>
                 Welcome, {firstName}! 👋
               </h2>
-              <p style={{ color:'#64748B', fontSize:14, lineHeight:1.7, marginBottom:24 }}>
+              <p style={{ color: '#64748B', fontSize: 14, lineHeight: 1.7, marginBottom: 24 }}>
                 Tell us what you're looking for and we'll find the best matches.
               </p>
-              <div className="divider"/>
+              <div className="divider" />
 
               <Field label="Phone Number" id="seekerPhone" value={seekerPhone}
                 onChange={e => setSeekerPhone(e.target.value)} type="tel"
                 placeholder="+94 77 123 4567" optional errors={errors} />
 
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                <div style={{ marginBottom:16 }}>
-                  <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#374151', marginBottom:7 }}>Preferred City</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 7 }}>Preferred City</label>
                   <input className="ob-inp" value={seekerCity}
                     onChange={e => setSeekerCity(e.target.value)} placeholder="Colombo" />
                 </div>
-                <div style={{ marginBottom:16 }}>
-                  <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#374151', marginBottom:7 }}>Property Type</label>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 7 }}>Property Type</label>
                   <select className="ob-inp" value={seekerType} onChange={e => setSeekerType(e.target.value)}>
-                    <option value="apartment">Apartment</option>
+                    <option value="apartment">Apartment Building</option>
                     <option value="house">House</option>
-                    <option value="commercial">Commercial</option>
-                    <option value="any">Any</option>
+                    <option value="house">Villa</option>
+                    <option value="studio">Studio Apartment</option>
+                    <option value="townhouse">Townhouse</option>
+                    <option value="office">Offices</option>
+                    <option value="shop">Shop / Retail</option>
+                    <option value="warehouse">Warehouse</option>
+                    <option value="annex">Annex</option>
+                    <option value="commercial">Commercial Spaces</option>
+                    <option value="land">Land / Plot</option>
                   </select>
                 </div>
               </div>
@@ -541,8 +558,8 @@ export default function OnboardingPage() {
                 placeholder="e.g. 800" optional errors={errors} />
 
               <div className="info-box">
-                <span style={{ fontSize:18 }}>🔍</span>
-                <p style={{ fontSize:13, color:'#1D4ED8', lineHeight:1.65 }}>
+                <span style={{ fontSize: 18 }}>🔍</span>
+                <p style={{ fontSize: 13, color: '#1D4ED8', lineHeight: 1.65 }}>
                   Browse verified listings, contact landlords directly, and schedule viewings — all in one place.
                 </p>
               </div>
@@ -555,19 +572,19 @@ export default function OnboardingPage() {
 
           {/* ══ SEEKER STEP 2 ══ */}
           {role === 'seeker' && step === 2 && (
-            <div className="ob-card" style={{ textAlign:'center' }}>
-              <div style={{ fontSize:60, marginBottom:16 }}>🔍</div>
-              <h2 style={{ fontFamily:'Fraunces,serif', fontSize:32, fontWeight:400, color:'#0F172A', letterSpacing:'-.8px', marginBottom:10 }}>
+            <div className="ob-card" style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 60, marginBottom: 16 }}>🔍</div>
+              <h2 style={{ fontFamily: 'Fraunces,serif', fontSize: 32, fontWeight: 400, color: '#0F172A', letterSpacing: '-.8px', marginBottom: 10 }}>
                 Ready to explore!
               </h2>
-              <p style={{ color:'#64748B', fontSize:15, lineHeight:1.7, maxWidth:320, margin:'0 auto 32px' }}>
+              <p style={{ color: '#64748B', fontSize: 15, lineHeight: 1.7, maxWidth: 320, margin: '0 auto 32px' }}>
                 Your preferences have been saved. Start browsing properties that match what you're looking for.
               </p>
-              <div style={{ marginBottom:32, textAlign:'left' }}>
-                {[['✅','Seeker account created'],['✅','Preferences saved'],['⏳','Find your first property']].map(([icon,text]) => (
+              <div style={{ marginBottom: 32, textAlign: 'left' }}>
+                {[['✅', 'Seeker account created'], ['✅', 'Preferences saved'], ['⏳', 'Find your first property']].map(([icon, text]) => (
                   <div className="check-item" key={text}>
-                    <span style={{ fontSize:16 }}>{icon}</span>
-                    <span style={{ fontSize:14, color: icon==='✅' ? '#475569' : '#94A3B8' }}>{text}</span>
+                    <span style={{ fontSize: 16 }}>{icon}</span>
+                    <span style={{ fontSize: 14, color: icon === '✅' ? '#475569' : '#94A3B8' }}>{text}</span>
                   </div>
                 ))}
               </div>
