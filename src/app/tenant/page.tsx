@@ -830,19 +830,23 @@ export default function TenantDashboard() {
                         </div>
                         <a href="/tenant/messages" className="card-action">View All →</a>
                       </div>
-                      {/* {messages.length === 0 ? (
+                      {messages.length === 0 ? (
                         <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>No messages yet</div>
                       ) : messages.slice(0, 2).map(msg => (
                         <div key={msg.id} className="msg-row">
                           <div className="msg-av">{initials(msg.sender_name || 'U')}</div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div className="msg-from">{msg.sender_name}</div>
-                            <div className="msg-text">{msg.content}</div>
+                            <div className="msg-text">
+                              {msg.content.length > 60
+                                ? `${msg.content.substring(0, 60)}...`
+                                : msg.content}
+                            </div>
                             <div className="msg-time">{fmtTimeAgo(msg.created_at)}</div>
                           </div>
                           {!msg.read && <div className="msg-unread" />}
                         </div>
-                      ))} */}
+                      ))}
                     </div>
                   </div>
                 </div>
