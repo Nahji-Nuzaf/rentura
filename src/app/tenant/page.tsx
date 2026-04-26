@@ -838,8 +838,8 @@ export default function TenantDashboard() {
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div className="msg-from">{msg.sender_name}</div>
                             <div className="msg-text">
-                              {msg.content.length > 50
-                                ? `${msg.content.substring(0, 50)}...`
+                              {msg.content.length > 40
+                                ? `${msg.content.substring(0, 40)}...`
                                 : msg.content}
                             </div>
                             <div className="msg-time">{fmtTimeAgo(msg.created_at)}</div>
