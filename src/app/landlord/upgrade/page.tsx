@@ -6,18 +6,18 @@ import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
 
 const FREE_FEATURES = [
-  { text: '3 properties',             included: true  },
-  { text: 'Up to 10 units',           included: true  },
-  { text: 'Rent tracker',             included: true  },
-  { text: 'Maintenance requests',     included: true  },
-  { text: 'Basic documents',          included: true  },
-  { text: '2 active listings',        included: true  },
-  { text: 'Tenant messaging',         included: true  },
-  { text: 'Advanced reports',         included: false },
-  { text: 'CSV / PDF exports',        included: false },
-  { text: 'Unlimited properties',     included: false },
+  { text: '3 properties', included: true },
+  { text: 'Up to 10 units', included: true },
+  { text: 'Rent tracker', included: true },
+  { text: 'Maintenance requests', included: true },
+  { text: 'Basic documents', included: true },
+  { text: '2 active listings', included: true },
+  { text: 'Tenant messaging', included: true },
+  { text: 'Advanced reports', included: false },
+  { text: 'CSV / PDF exports', included: false },
+  { text: 'Unlimited properties', included: false },
   { text: 'Year-over-year analytics', included: false },
-  { text: 'Priority support',         included: false },
+  { text: 'Priority support', included: false },
 ]
 
 const PRO_FEATURES = [
@@ -45,31 +45,31 @@ const BUSINESS_FEATURES = [
 ]
 
 const FAQS = [
-  { q: 'Can I cancel anytime?',                   a: "Yes — cancel anytime from your settings. You keep Pro access until the end of your billing period." },
+  { q: 'Can I cancel anytime?', a: "Yes — cancel anytime from your settings. You keep Pro access until the end of your billing period." },
   { q: 'What happens to my data if I downgrade?', a: "Your data stays safe. If you have more than 3 properties you'll need to archive extras, but nothing is deleted." },
-  { q: 'Is there a free trial?',                  a: 'The Free plan is free forever. Pro features are available immediately after upgrading — no trial needed.' },
-  { q: 'How does billing work?',                  a: 'Billed monthly or annually. Annual billing saves you 2 months (effectively 17% off).' },
-  { q: 'Can I upgrade mid-month?',                a: "Yes — you'll be charged a prorated amount for the rest of the current billing cycle." },
+  { q: 'Is there a free trial?', a: 'The Free plan is free forever. Pro features are available immediately after upgrading — no trial needed.' },
+  { q: 'How does billing work?', a: 'Billed monthly or annually. Annual billing saves you 2 months (effectively 17% off).' },
+  { q: 'Can I upgrade mid-month?', a: "Yes — you'll be charged a prorated amount for the rest of the current billing cycle." },
 ]
 
 export default function UpgradePage() {
   const router = useRouter()
-  const [initials, setInitials]       = useState('NN')
-  const [fullName, setFullName]       = useState('User')
-  const [userId, setUserId]           = useState('')
+  const [initials, setInitials] = useState('NN')
+  const [fullName, setFullName] = useState('User')
+  const [userId, setUserId] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [billing, setBilling]         = useState<'monthly'|'annual'>('monthly')
-  const [openFaq, setOpenFaq]         = useState<number|null>(null)
-  const [openMaint, setOpenMaint]     = useState(0)
+  const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly')
+  const [openFaq, setOpenFaq] = useState<number | null>(null)
+  const [openMaint, setOpenMaint] = useState(0)
   const [currentPlan, setCurrentPlan] = useState('free')
-  const [loadingPlan, setLoadingPlan] = useState<string|null>(null)
-  const [activating, setActivating]   = useState(false)
-  const [toast, setToast]             = useState<{msg:string;type:'success'|'error'}|null>(null)
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
+  const [activating, setActivating] = useState(false)
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
   const monthlyPrice = 9.99
-  const annualPrice  = parseFloat((monthlyPrice * 10 / 12).toFixed(2))
+  const annualPrice = parseFloat((monthlyPrice * 10 / 12).toFixed(2))
 
-  function showToast(msg: string, type: 'success'|'error' = 'success') {
+  function showToast(msg: string, type: 'success' | 'error' = 'success') {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 6000)
   }
@@ -83,21 +83,21 @@ export default function UpgradePage() {
       setUserId(user.id)
       const name = user.user_metadata?.full_name || 'User'
       setFullName(name)
-      setInitials(name.split(' ').map((n:string)=>n[0]).join('').toUpperCase().slice(0,2))
+      setInitials(name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2))
 
       // Check current plan
       const { data: sub } = await supabase
         .from('subscriptions').select('plan,status')
-        .eq('profile_id',user.id).eq('status','active').maybeSingle()
+        .eq('profile_id', user.id).eq('status', 'active').maybeSingle()
       if (sub?.plan) setCurrentPlan(sub.plan)
 
       // Open maintenance count
-      const { data: props } = await supabase.from('properties').select('id').eq('landlord_id',user.id)
-      const propIds = (props||[]).map((p:any)=>p.id)
+      const { data: props } = await supabase.from('properties').select('id').eq('landlord_id', user.id)
+      const propIds = (props || []).map((p: any) => p.id)
       if (propIds.length > 0) {
         const { count } = await supabase.from('maintenance_requests')
-          .select('id',{count:'exact',head:true}).in('property_id',propIds).neq('status','resolved')
-        setOpenMaint(count||0)
+          .select('id', { count: 'exact', head: true }).in('property_id', propIds).neq('status', 'resolved')
+        setOpenMaint(count || 0)
       }
 
       // ── Handle Stripe success redirect ──
@@ -108,7 +108,7 @@ export default function UpgradePage() {
 
       if (successParam === 'true' && sessionId) {
         setActivating(true)
-        showToast('⏳ Verifying payment...','success')
+        showToast('⏳ Verifying payment...', 'success')
 
         try {
           // Call our activate API to verify payment with Stripe and update DB
@@ -125,44 +125,44 @@ export default function UpgradePage() {
 
           if (data.success) {
             setCurrentPlan(data.plan)
-            showToast(`🎉 You're now on ${data.plan.charAt(0).toUpperCase()+data.plan.slice(1)}! All Pro features are unlocked.`,'success')
+            showToast(`🎉 You're now on ${data.plan.charAt(0).toUpperCase() + data.plan.slice(1)}! All Pro features are unlocked.`, 'success')
           } else {
-            showToast('Payment verified but activation failed. Please contact support.','error')
+            showToast('Payment verified but activation failed. Please contact support.', 'error')
           }
         } catch {
-          showToast('Could not activate plan. Please contact support.','error')
+          showToast('Could not activate plan. Please contact support.', 'error')
         } finally {
           setActivating(false)
-          window.history.replaceState({},'','/landlord/upgrade')
+          window.history.replaceState({}, '', '/landlord/upgrade')
         }
       } else if (successParam === 'true') {
         // Fallback: no session_id, just re-fetch plan
         setTimeout(async () => {
           const { data: newSub } = await supabase.from('subscriptions')
-            .select('plan,status').eq('profile_id',user.id).eq('status','active').maybeSingle()
+            .select('plan,status').eq('profile_id', user.id).eq('status', 'active').maybeSingle()
           if (newSub?.plan) {
             setCurrentPlan(newSub.plan)
-            showToast('🎉 Plan upgraded successfully!','success')
+            showToast('🎉 Plan upgraded successfully!', 'success')
           }
         }, 2000)
-        window.history.replaceState({},'','/landlord/upgrade')
-      } else if (params.get('cancelled')==='true') {
-        showToast('Payment cancelled — no charge was made.','error')
-        window.history.replaceState({},'','/landlord/upgrade')
+        window.history.replaceState({}, '', '/landlord/upgrade')
+      } else if (params.get('cancelled') === 'true') {
+        showToast('Payment cancelled — no charge was made.', 'error')
+        window.history.replaceState({}, '', '/landlord/upgrade')
       }
     }
     load()
   }, [router])
 
-  async function handleUpgrade(plan: 'pro'|'business') {
-    if (currentPlan === plan) { showToast('You are already on this plan.','error'); return }
+  async function handleUpgrade(plan: 'pro' | 'business') {
+    if (currentPlan === plan) { showToast('You are already on this plan.', 'error'); return }
 
     const priceId = plan === 'pro'
       ? process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID
       : process.env.NEXT_PUBLIC_STRIPE_BUSINESS_PRICE_ID
 
     if (!priceId) {
-      showToast('Plan price not configured. Add NEXT_PUBLIC_STRIPE_PRO_PRICE_ID to .env.local','error')
+      showToast('Plan price not configured. Add NEXT_PUBLIC_STRIPE_PRO_PRICE_ID to .env.local', 'error')
       return
     }
 
@@ -174,13 +174,39 @@ export default function UpgradePage() {
         body: JSON.stringify({ priceId, plan }),
       })
       const data = await res.json()
-      if (data.error) { showToast('Error: '+data.error,'error'); setLoadingPlan(null); return }
+      if (data.error) { showToast('Error: ' + data.error, 'error'); setLoadingPlan(null); return }
       if (data.url) window.location.href = data.url
     } catch {
-      showToast('Something went wrong. Please try again.','error')
+      showToast('Something went wrong. Please try again.', 'error')
       setLoadingPlan(null)
     }
   }
+
+  const [unreadMessages, setUnreadMessages] = useState(0)
+
+  useEffect(() => {
+    let channel: any = null
+    const initMessages = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const fetchUnread = async () => {
+        const { count } = await supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('receiver_id', user.id)
+          .eq('read', false)
+        setUnreadMessages(count || 0)
+      }
+      await fetchUnread()
+      channel = supabase
+        .channel('sidebar-unread')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` }, fetchUnread)
+        .subscribe()
+    }
+    initMessages()
+    return () => { if (channel) createClient().removeChannel(channel) }
+  }, [])
 
   const isPro = currentPlan === 'pro' || currentPlan === 'business'
 
@@ -356,13 +382,13 @@ export default function UpgradePage() {
         </div>
       )}
 
-      <div className={`sb-overlay${sidebarOpen?' open':''}`} onClick={()=>setSidebarOpen(false)}/>
+      <div className={`sb-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
 
       <div className="shell">
-        <aside className={`sidebar${sidebarOpen?' open':''}`}>
+        <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="sb-logo">
             <div className="sb-logo-icon">
-              <Image src="/icon.png" alt="Rentura Logo" width={24} height={24}/>
+              <Image src="/icon.png" alt="Rentura Logo" width={24} height={24} />
             </div>
             <span className="sb-logo-name">Rentura</span>
           </div>
@@ -377,28 +403,43 @@ export default function UpgradePage() {
             <span className="sb-section">Management</span>
             <a href="/landlord/maintenance" className="sb-item">
               <span className="sb-ico">🔧</span>Maintenance
-              {openMaint>0&&<span className="sb-badge">{openMaint}</span>}
+              {openMaint > 0 && <span className="sb-badge">{openMaint}</span>}
             </a>
             <a href="/landlord/documents" className="sb-item"><span className="sb-ico">📁</span>Documents</a>
-            <a href="/landlord/messages" className="sb-item"><span className="sb-ico">💬</span>Messages</a>
+            <a href="/landlord/messages" className="sb-item" style={{ justifyContent: 'space-between' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                <span className="sb-ico">💬</span>Messages
+              </span>
+              {unreadMessages > 0 && (
+                <span style={{
+                  minWidth: 18, height: 18, borderRadius: 99,
+                  background: '#EF4444', color: '#fff',
+                  fontSize: 10, fontWeight: 800,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '0 5px', flexShrink: 0, lineHeight: 1,
+                }}>
+                  {unreadMessages > 99 ? '99+' : unreadMessages}
+                </span>
+              )}
+            </a>
             <a href="/landlord/listings" className="sb-item"><span className="sb-ico">📋</span>Listings</a>
             <span className="sb-section">Account</span>
             <a href="/landlord/settings" className="sb-item"><span className="sb-ico">⚙️</span>Settings</a>
             <a href="/landlord/upgrade" className="sb-item active"><span className="sb-ico">⭐</span>Upgrade</a>
           </nav>
           <div className="sb-footer">
-            {!isPro&&(
+            {!isPro && (
               <div className="sb-upgrade">
                 <div className="sb-up-title">⭐ Upgrade to Pro</div>
                 <div className="sb-up-sub">Unlimited properties & priority support.</div>
-                <button className="sb-up-btn" onClick={()=>window.location.href='/landlord/upgrade'}>See Plans →</button>
+                <button className="sb-up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
               </div>
             )}
             <div className="sb-user">
               <div className="sb-av">{initials}</div>
               <div>
                 <div className="sb-uname">{fullName}</div>
-                <span className={`sb-uplan${isPro?' pro':''}`}>{currentPlan}</span>
+                <span className={`sb-uplan${isPro ? ' pro' : ''}`}>{currentPlan}</span>
               </div>
             </div>
           </div>
@@ -406,22 +447,22 @@ export default function UpgradePage() {
 
         <div className="main">
           <div className="topbar">
-            <button className="hamburger" onClick={()=>setSidebarOpen(true)}>☰</button>
+            <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
             <div className="breadcrumb">Rentura &nbsp;/&nbsp; <b>Upgrade to Pro</b></div>
           </div>
 
           <div className="content">
 
             {/* Pro active banner */}
-            {isPro&&(
+            {isPro && (
               <div className="pro-active-banner">
                 <div className="pab-left">
                   <div className="pab-icon">⭐</div>
                   <div>
-                    <div className="pab-title">You're on {currentPlan.charAt(0).toUpperCase()+currentPlan.slice(1)}!</div>
+                    <div className="pab-title">You're on {currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}!</div>
                     <div className="pab-sub">All Pro features are active. Enjoy your upgraded account.</div>
                     <div className="pab-features">
-                      {['Unlimited properties','CSV exports','Advanced analytics','Unlimited listings'].map(f=>(
+                      {['Unlimited properties', 'CSV exports', 'Advanced analytics', 'Unlimited listings'].map(f => (
                         <span key={f} className="pab-feat">✓ {f}</span>
                       ))}
                     </div>
@@ -433,21 +474,21 @@ export default function UpgradePage() {
 
             {/* Sandbox banner */}
             <div className="sandbox-banner">
-              🧪 Stripe Sandbox &nbsp;·&nbsp; Test card: <strong style={{margin:'0 4px'}}>4242 4242 4242 4242</strong> &nbsp;·&nbsp; Any future expiry &nbsp;·&nbsp; Any 3-digit CVC &nbsp;·&nbsp; No real charge
+              🧪 Stripe Sandbox &nbsp;·&nbsp; Test card: <strong style={{ margin: '0 4px' }}>4242 4242 4242 4242</strong> &nbsp;·&nbsp; Any future expiry &nbsp;·&nbsp; Any 3-digit CVC &nbsp;·&nbsp; No real charge
             </div>
 
             {/* Hero */}
             <div className="hero">
               <div className="hero-eyebrow">⭐ Simple, transparent pricing</div>
-              <h1 className="hero-title">Grow your portfolio<br/>with <span>Rentura Pro</span></h1>
-              <p className="hero-sub">Everything you need to manage properties like a pro — from ${billing==='annual'?annualPrice.toFixed(2):monthlyPrice}/month. No hidden fees, cancel anytime.</p>
+              <h1 className="hero-title">Grow your portfolio<br />with <span>Rentura Pro</span></h1>
+              <p className="hero-sub">Everything you need to manage properties like a pro — from ${billing === 'annual' ? annualPrice.toFixed(2) : monthlyPrice}/month. No hidden fees, cancel anytime.</p>
             </div>
 
             {/* Billing toggle */}
             <div className="billing-wrap">
               <div className="billing-toggle">
-                <button className={`bt-opt${billing==='monthly'?' active':''}`} onClick={()=>setBilling('monthly')}>Monthly</button>
-                <button className={`bt-opt${billing==='annual'?' active':''}`} onClick={()=>setBilling('annual')}>
+                <button className={`bt-opt${billing === 'monthly' ? ' active' : ''}`} onClick={() => setBilling('monthly')}>Monthly</button>
+                <button className={`bt-opt${billing === 'annual' ? ' active' : ''}`} onClick={() => setBilling('annual')}>
                   Annual
                   <span className="save-chip">Save 15%</span>
                 </button>
@@ -459,7 +500,7 @@ export default function UpgradePage() {
 
               {/* FREE */}
               <div className="plan">
-                <span className="plan-label" style={{background:'#F1F5F9',color:'#64748B'}}>Free</span>
+                <span className="plan-label" style={{ background: '#F1F5F9', color: '#64748B' }}>Free</span>
                 <div className="plan-name">Starter</div>
                 <div className="plan-desc">Perfect for landlords just getting started.</div>
                 <div className="plan-price-row">
@@ -467,75 +508,75 @@ export default function UpgradePage() {
                   <div className="plan-price-unit">/mo</div>
                 </div>
                 <div className="plan-billed">Free forever</div>
-                <div className="plan-divider light"/>
+                <div className="plan-divider light" />
                 <div className="plan-feature-list">
-                  {FREE_FEATURES.map((f,i)=>(
+                  {FREE_FEATURES.map((f, i) => (
                     <div key={i} className="pf">
-                      <div className={`pf-check ${f.included?'yes':'no'}`}>{f.included?'✓':'×'}</div>
-                      <span className={`pf-text${f.included?'':' muted'}`}>{f.text}</span>
+                      <div className={`pf-check ${f.included ? 'yes' : 'no'}`}>{f.included ? '✓' : '×'}</div>
+                      <span className={`pf-text${f.included ? '' : ' muted'}`}>{f.text}</span>
                     </div>
                   ))}
                 </div>
                 <button className="plan-cta free-cta">
-                  {currentPlan==='free'?'✓ Current Plan':'Free Plan'}
+                  {currentPlan === 'free' ? '✓ Current Plan' : 'Free Plan'}
                 </button>
               </div>
 
               {/* PRO */}
               <div className="plan featured">
                 <div className="popular-badge">⭐ Most Popular</div>
-                <span className="plan-label" style={{background:'linear-gradient(135deg,#2563EB,#6366F1)',color:'#fff'}}>Pro</span>
+                <span className="plan-label" style={{ background: 'linear-gradient(135deg,#2563EB,#6366F1)', color: '#fff' }}>Pro</span>
                 <div className="plan-name">Pro</div>
-                <div className="plan-desc" style={{color:'#93C5FD'}}>For serious landlords who want full control.</div>
+                <div className="plan-desc" style={{ color: '#93C5FD' }}>For serious landlords who want full control.</div>
                 <div className="plan-price-row">
-                  <div className="plan-price">${billing==='annual'?annualPrice.toFixed(2):monthlyPrice}</div>
+                  <div className="plan-price">${billing === 'annual' ? annualPrice.toFixed(2) : monthlyPrice}</div>
                   <div className="plan-price-unit">/mo</div>
                 </div>
-                <div className="plan-billed" style={{color:'#64748B'}}>
-                  {billing==='annual'
-                    ?`Billed $${(annualPrice*12).toFixed(2)}/year`
-                    :'Billed monthly'}
+                <div className="plan-billed" style={{ color: '#64748B' }}>
+                  {billing === 'annual'
+                    ? `Billed $${(annualPrice * 12).toFixed(2)}/year`
+                    : 'Billed monthly'}
                 </div>
-                <div className="plan-divider"/>
+                <div className="plan-divider" />
                 <div className="plan-feature-list">
-                  {PRO_FEATURES.map((f,i)=>(
+                  {PRO_FEATURES.map((f, i) => (
                     <div key={i} className="pf">
                       <div className="pf-check yes-bright">✓</div>
                       <span className="pf-text bright">{f.text}</span>
                     </div>
                   ))}
                 </div>
-                {currentPlan==='pro'
-                  ?<button className="plan-cta current-cta">✓ Current Plan</button>
-                  :<button className="plan-cta pro-cta" disabled={!!loadingPlan||activating} onClick={()=>handleUpgrade('pro')}>
-                    {loadingPlan==='pro'?'⏳ Redirecting...':'Upgrade to Pro →'}
+                {currentPlan === 'pro'
+                  ? <button className="plan-cta current-cta">✓ Current Plan</button>
+                  : <button className="plan-cta pro-cta" disabled={!!loadingPlan || activating} onClick={() => handleUpgrade('pro')}>
+                    {loadingPlan === 'pro' ? '⏳ Redirecting...' : 'Upgrade to Pro →'}
                   </button>
                 }
               </div>
 
               {/* BUSINESS */}
               <div className="plan">
-                <span className="plan-label" style={{background:'#FEF3C7',color:'#D97706'}}>Business</span>
+                <span className="plan-label" style={{ background: '#FEF3C7', color: '#D97706' }}>Business</span>
                 <div className="plan-name">Business</div>
                 <div className="plan-desc">For agencies and large-scale property managers.</div>
                 <div className="plan-price-row">
                   <div className="plan-price">$24</div>
                   <div className="plan-price-unit">/mo</div>
                 </div>
-                <div className="plan-billed">{billing==='annual'?'Billed $240/year':'Billed monthly'}</div>
-                <div className="plan-divider light"/>
+                <div className="plan-billed">{billing === 'annual' ? 'Billed $240/year' : 'Billed monthly'}</div>
+                <div className="plan-divider light" />
                 <div className="plan-feature-list">
-                  {BUSINESS_FEATURES.map((f,i)=>(
+                  {BUSINESS_FEATURES.map((f, i) => (
                     <div key={i} className="pf">
                       <div className="pf-check yes">✓</div>
                       <span className="pf-text">{f}</span>
                     </div>
                   ))}
                 </div>
-                {currentPlan==='business'
-                  ?<button className="plan-cta biz-current">✓ Current Plan</button>
-                  :<button className="plan-cta biz-cta" disabled={!!loadingPlan||activating} onClick={()=>handleUpgrade('business')}>
-                    {loadingPlan==='business'?'⏳ Redirecting...':'Upgrade to Business →'}
+                {currentPlan === 'business'
+                  ? <button className="plan-cta biz-current">✓ Current Plan</button>
+                  : <button className="plan-cta biz-cta" disabled={!!loadingPlan || activating} onClick={() => handleUpgrade('business')}>
+                    {loadingPlan === 'business' ? '⏳ Redirecting...' : 'Upgrade to Business →'}
                   </button>
                 }
               </div>
@@ -560,27 +601,27 @@ export default function UpgradePage() {
                   </thead>
                   <tbody>
                     {[
-                      ['Properties',           '3',     'Unlimited','Unlimited'],
-                      ['Units',                '10',    'Unlimited','Unlimited'],
-                      ['Rent tracker',         '✓',     '✓',        '✓'],
-                      ['Maintenance requests', '✓',     '✓',        '✓'],
-                      ['Documents',            'Basic', 'Unlimited','Unlimited'],
-                      ['Listings',             '2',     'Unlimited','Unlimited'],
-                      ['Messaging',            '✓',     '✓',        '✓'],
-                      ['Reports & analytics',  '✗',     'PRO',      'PRO'],
-                      ['CSV / PDF exports',    '✗',     'PRO',      'PRO'],
-                      ['Year-over-year trends','✗',     'PRO',      'PRO'],
-                      ['Property comparison',  '✗',     'PRO',      'PRO'],
-                      ['Priority support',     '✗',     'PRO',      'PRO'],
-                      ['Team access',          '✗',     '✗',        '✓'],
-                      ['API access',           '✗',     '✗',        '✓'],
-                      ['White-label branding', '✗',     '✗',        '✓'],
-                    ].map(([feat,free,pro,biz],i)=>(
+                      ['Properties', '3', 'Unlimited', 'Unlimited'],
+                      ['Units', '10', 'Unlimited', 'Unlimited'],
+                      ['Rent tracker', '✓', '✓', '✓'],
+                      ['Maintenance requests', '✓', '✓', '✓'],
+                      ['Documents', 'Basic', 'Unlimited', 'Unlimited'],
+                      ['Listings', '2', 'Unlimited', 'Unlimited'],
+                      ['Messaging', '✓', '✓', '✓'],
+                      ['Reports & analytics', '✗', 'PRO', 'PRO'],
+                      ['CSV / PDF exports', '✗', 'PRO', 'PRO'],
+                      ['Year-over-year trends', '✗', 'PRO', 'PRO'],
+                      ['Property comparison', '✗', 'PRO', 'PRO'],
+                      ['Priority support', '✗', 'PRO', 'PRO'],
+                      ['Team access', '✗', '✗', '✓'],
+                      ['API access', '✗', '✗', '✓'],
+                      ['White-label branding', '✗', '✗', '✓'],
+                    ].map(([feat, free, pro, biz], i) => (
                       <tr key={i}>
                         <td>{feat}</td>
-                        <td>{free==='✓'?<span className="ct-yes">✓</span>:free==='✗'?<span className="ct-no">✗</span>:free}</td>
-                        <td>{pro==='✓'?<span className="ct-yes">✓</span>:pro==='✗'?<span className="ct-no">✗</span>:pro==='PRO'?<span className="ct-pro">PRO</span>:pro}</td>
-                        <td>{biz==='✓'?<span className="ct-yes">✓</span>:biz==='✗'?<span className="ct-no">✗</span>:biz==='PRO'?<span className="ct-pro">PRO</span>:biz}</td>
+                        <td>{free === '✓' ? <span className="ct-yes">✓</span> : free === '✗' ? <span className="ct-no">✗</span> : free}</td>
+                        <td>{pro === '✓' ? <span className="ct-yes">✓</span> : pro === '✗' ? <span className="ct-no">✗</span> : pro === 'PRO' ? <span className="ct-pro">PRO</span> : pro}</td>
+                        <td>{biz === '✓' ? <span className="ct-yes">✓</span> : biz === '✗' ? <span className="ct-no">✗</span> : biz === 'PRO' ? <span className="ct-pro">PRO</span> : biz}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -591,24 +632,24 @@ export default function UpgradePage() {
             {/* FAQ */}
             <div className="faq-wrap">
               <div className="faq-title">Frequently Asked Questions</div>
-              {FAQS.map((faq,i)=>(
-                <div key={i} className={`faq-item${openFaq===i?' open':''}`}>
-                  <div className="faq-q" onClick={()=>setOpenFaq(openFaq===i?null:i)}>
+              {FAQS.map((faq, i) => (
+                <div key={i} className={`faq-item${openFaq === i ? ' open' : ''}`}>
+                  <div className="faq-q" onClick={() => setOpenFaq(openFaq === i ? null : i)}>
                     <div className="faq-q-text">{faq.q}</div>
                     <div className="faq-chevron">▼</div>
                   </div>
-                  {openFaq===i&&<div className="faq-a">{faq.a}</div>}
+                  {openFaq === i && <div className="faq-a">{faq.a}</div>}
                 </div>
               ))}
             </div>
 
             {/* Bottom CTA — only for non-pro */}
-            {!isPro&&(
+            {!isPro && (
               <div className="bottom-cta">
                 <div className="bc-title">Ready to scale up?</div>
                 <div className="bc-sub">Join landlords using Rentura Pro to manage their portfolios smarter. Start today — cancel anytime.</div>
-                <button className="bc-btn" disabled={!!loadingPlan||activating} onClick={()=>handleUpgrade('pro')}>
-                  {loadingPlan==='pro'?'⏳ Redirecting to Stripe...':'⭐ Get Rentura Pro →'}
+                <button className="bc-btn" disabled={!!loadingPlan || activating} onClick={() => handleUpgrade('pro')}>
+                  {loadingPlan === 'pro' ? '⏳ Redirecting to Stripe...' : '⭐ Get Rentura Pro →'}
                 </button>
                 <div className="bc-note">Test: 4242 4242 4242 4242 · Any future date · Any CVC</div>
               </div>

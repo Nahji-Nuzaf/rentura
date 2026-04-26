@@ -86,20 +86,20 @@ function timeAgo(str: string) {
 export default function LandlordDashboard() {
   const router = useRouter()
   const { isPro, plan } = usePro()
-  const [firstName, setFirstName]     = useState('there')
-  const [initials, setInitials]       = useState('NN')
-  const [fullName, setFullName]       = useState('User')
+  const [firstName, setFirstName] = useState('there')
+  const [initials, setInitials] = useState('NN')
+  const [fullName, setFullName] = useState('User')
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [loading, setLoading]         = useState(true)
-  const [stats, setStats]             = useState<Stats>({
+  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState<Stats>({
     totalProperties: 0, totalUnits: 0, occupiedUnits: 0,
     totalTenants: 0, monthlyRevenue: 0, openMaintenance: 0,
     paidThisMonth: 0, overdueCount: 0,
   })
-  const [properties, setProperties]   = useState<PropertyRow[]>([])
-  const [rentRows, setRentRows]       = useState<RentRow[]>([])
-  const [maintRows, setMaintRows]     = useState<MaintRow[]>([])
-  const [leaseRows, setLeaseRows]     = useState<LeaseRow[]>([])
+  const [properties, setProperties] = useState<PropertyRow[]>([])
+  const [rentRows, setRentRows] = useState<RentRow[]>([])
+  const [maintRows, setMaintRows] = useState<MaintRow[]>([])
+  const [leaseRows, setLeaseRows] = useState<LeaseRow[]>([])
   const [lastMonthRevenue, setLastMonthRevenue] = useState(0)
   const [lastMonthTenants, setLastMonthTenants] = useState(0)
 
@@ -133,13 +133,13 @@ export default function LandlordDashboard() {
         let totalUnits = 0, occupiedUnits = 0, monthlyRevenue = 0
 
         const propRows: PropertyRow[] = (props || []).map((p: any) => {
-          const units    = p.units || []
+          const units = p.units || []
           const occupied = units.filter((u: any) => u.status === 'occupied').length
-          const rents    = units.filter((u: any) => u.status === 'occupied').map((u: any) => u.monthly_rent || 0)
-          const revenue  = rents.reduce((a: number, b: number) => a + b, 0)
+          const rents = units.filter((u: any) => u.status === 'occupied').map((u: any) => u.monthly_rent || 0)
+          const revenue = rents.reduce((a: number, b: number) => a + b, 0)
           const allRents = units.map((u: any) => u.monthly_rent || 0).filter(Boolean)
-          const avgRent  = allRents.length > 0 ? Math.round(allRents.reduce((a: number, b: number) => a + b, 0) / allRents.length) : 0
-          totalUnits    += p.total_units
+          const avgRent = allRents.length > 0 ? Math.round(allRents.reduce((a: number, b: number) => a + b, 0) / allRents.length) : 0
+          totalUnits += p.total_units
           occupiedUnits += occupied
           monthlyRevenue += revenue
           return {
@@ -162,9 +162,9 @@ export default function LandlordDashboard() {
         }
 
         // ── 3. Rent payments this month ────────────────────
-        const now   = new Date()
+        const now = new Date()
         const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-        const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
 
         let paidThisMonth = 0, overdueCount = 0
         const rentRowsData: RentRow[] = []
@@ -173,12 +173,12 @@ export default function LandlordDashboard() {
           const allUnitIds = (props || []).flatMap((p: any) => (p.units || []).map((u: any) => u.id))
 
           // Build unit lookup from already-fetched props
-          const unitInfoMap: Record<string, {unit_number: string, property_name: string}> = {}
-          ;(props || []).forEach((p: any) => {
-            ;(p.units || []).forEach((u: any) => {
-              unitInfoMap[u.id] = { unit_number: u.unit_number || '—', property_name: p.name || '—' }
+          const unitInfoMap: Record<string, { unit_number: string, property_name: string }> = {}
+            ; (props || []).forEach((p: any) => {
+              ; (p.units || []).forEach((u: any) => {
+                unitInfoMap[u.id] = { unit_number: u.unit_number || '—', property_name: p.name || '—' }
+              })
             })
-          })
 
           // Fetch payments flat
           const { data: payments } = await supabase
@@ -201,23 +201,23 @@ export default function LandlordDashboard() {
               const { data: pArr } = await supabase
                 .from('profiles').select('id, full_name').in('id', pIds)
               const pidMap: Record<string, string> = {}
-              ;(pArr || []).forEach((p: any) => { pidMap[p.id] = p.full_name })
-              ;(tArr || []).forEach((t: any) => { payProfileMap[t.id] = pidMap[t.profile_id] || 'Unknown' })
+                ; (pArr || []).forEach((p: any) => { pidMap[p.id] = p.full_name })
+                ; (tArr || []).forEach((t: any) => { payProfileMap[t.id] = pidMap[t.profile_id] || 'Unknown' })
             }
           }
 
-          ;(payments || []).forEach((pay: any) => {
+          ; (payments || []).forEach((pay: any) => {
             if (pay.status === 'paid') paidThisMonth++
             if (pay.status === 'overdue') overdueCount++
             const tName = payProfileMap[pay.tenant_id] || 'Unknown'
             const uInfo = unitInfoMap[pay.unit_id] || { unit_number: '—', property_name: '—' }
             rentRowsData.push({
-              tenant_name:   tName,
-              unit_number:   uInfo.unit_number,
+              tenant_name: tName,
+              unit_number: uInfo.unit_number,
               property_name: uInfo.property_name,
-              amount:        pay.amount || 0,
-              status:        pay.status || 'pending',
-              initials:      tName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
+              amount: pay.amount || 0,
+              status: pay.status || 'pending',
+              initials: tName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
             })
           })
         }
@@ -238,7 +238,7 @@ export default function LandlordDashboard() {
 
           // Build prop name map from already-fetched props
           const propNameMap: Record<string, string> = {}
-          ;(props || []).forEach((p: any) => { propNameMap[p.id] = p.name })
+            ; (props || []).forEach((p: any) => { propNameMap[p.id] = p.name })
 
           // Fetch unit numbers for maintenance
           const maintUnitIds = [...new Set((maint || []).map((m: any) => m.unit_id).filter(Boolean))]
@@ -246,23 +246,23 @@ export default function LandlordDashboard() {
           if (maintUnitIds.length > 0) {
             const { data: uArr } = await supabase
               .from('units').select('id, unit_number').in('id', maintUnitIds)
-            ;(uArr || []).forEach((u: any) => { maintUnitMap[u.id] = u.unit_number })
+              ; (uArr || []).forEach((u: any) => { maintUnitMap[u.id] = u.unit_number })
           }
 
           setMaintRows((maint || []).map((m: any) => ({
-            id:            m.id,
-            title:         m.title,
+            id: m.id,
+            title: m.title,
             property_name: propNameMap[m.property_id] || '—',
-            unit_number:   maintUnitMap[m.unit_id] || '—',
-            priority:      m.priority || 'medium',
-            status:        m.status || 'open',
-            created_at:    m.created_at,
+            unit_number: maintUnitMap[m.unit_id] || '—',
+            priority: m.priority || 'medium',
+            status: m.status || 'open',
+            created_at: m.created_at,
           })))
         }
 
         // ── 5. Lease expirations (next 60 days) ──────────────
         if (propIds.length > 0) {
-          const today    = new Date().toISOString().split('T')[0]
+          const today = new Date().toISOString().split('T')[0]
           const in60days = new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0]
           const { data: expiringUnits } = await supabase
             .from('units')
@@ -281,17 +281,17 @@ export default function LandlordDashboard() {
             if (expProfileIds.length > 0) {
               const { data: pArr } = await supabase
                 .from('profiles').select('id, full_name').in('id', expProfileIds)
-              ;(pArr || []).forEach((p: any) => { expProfileMap[p.id] = p.full_name })
+                ; (pArr || []).forEach((p: any) => { expProfileMap[p.id] = p.full_name })
             }
             const tenantByUnit: Record<string, string> = {}
-            ;(expTenants || []).forEach((t: any) => { tenantByUnit[t.unit_id] = expProfileMap[t.profile_id] || 'Unknown' })
+              ; (expTenants || []).forEach((t: any) => { tenantByUnit[t.unit_id] = expProfileMap[t.profile_id] || 'Unknown' })
             const propNameMap2: Record<string, string> = {}
-            ;(props || []).forEach((p: any) => { propNameMap2[p.id] = p.name })
-            const leaseColors = ['linear-gradient(135deg,#6366F1,#8B5CF6)','linear-gradient(135deg,#EF4444,#F87171)','linear-gradient(135deg,#0EA5E9,#38BDF8)','linear-gradient(135deg,#10B981,#34D399)']
+              ; (props || []).forEach((p: any) => { propNameMap2[p.id] = p.name })
+            const leaseColors = ['linear-gradient(135deg,#6366F1,#8B5CF6)', 'linear-gradient(135deg,#EF4444,#F87171)', 'linear-gradient(135deg,#0EA5E9,#38BDF8)', 'linear-gradient(135deg,#10B981,#34D399)']
             setLeaseRows(expiringUnits.map((u: any, i: number) => {
               const name = tenantByUnit[u.id] || 'Vacant'
               const daysLeft = Math.ceil((new Date(u.lease_end).getTime() - Date.now()) / 86400000)
-              return { tenant_name: name, initials: name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0,2), property: propNameMap2[u.property_id] || '—', unit: u.unit_number, lease_end: u.lease_end, days_left: daysLeft, color: leaseColors[i % leaseColors.length] }
+              return { tenant_name: name, initials: name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2), property: propNameMap2[u.property_id] || '—', unit: u.unit_number, lease_end: u.lease_end, days_left: daysLeft, color: leaseColors[i % leaseColors.length] }
             }))
           }
         }
@@ -299,7 +299,7 @@ export default function LandlordDashboard() {
         // ── 6. Last month revenue for trend ───────────────────
         if (propIds.length > 0) {
           const lmStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
-          const lmEnd   = new Date(now.getFullYear(), now.getMonth(), 0).toISOString()
+          const lmEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString()
           const allUnitIds2 = (props || []).flatMap((p: any) => (p.units || []).map((u: any) => u.id))
           const { data: lmPayments } = await supabase
             .from('rent_payments').select('amount').in('unit_id', allUnitIds2)
@@ -338,22 +338,48 @@ export default function LandlordDashboard() {
     const pct = Math.round(((current - previous) / previous) * 100)
     return { pct, up: pct >= 0 }
   }
-  const revTrend     = trend(stats.monthlyRevenue, lastMonthRevenue)
-  const tenantTrend  = trend(stats.totalTenants, lastMonthTenants)
+  const revTrend = trend(stats.monthlyRevenue, lastMonthRevenue)
+  const tenantTrend = trend(stats.totalTenants, lastMonthTenants)
 
   const RENT_STATUS: Record<string, { label: string; color: string }> = {
-    paid:    { label: 'Paid',    color: '#16A34A' },
-    pending: { label: 'Due',     color: '#D97706' },
+    paid: { label: 'Paid', color: '#16A34A' },
+    pending: { label: 'Due', color: '#D97706' },
     overdue: { label: 'Overdue', color: '#DC2626' },
-    late:    { label: 'Late',    color: '#DC2626' },
+    late: { label: 'Late', color: '#DC2626' },
   }
 
   const PRIORITY_CFG: Record<string, { color: string; bg: string }> = {
     urgent: { color: '#DC2626', bg: '#FEE2E2' },
-    high:   { color: '#D97706', bg: '#FEF3C7' },
+    high: { color: '#D97706', bg: '#FEF3C7' },
     medium: { color: '#CA8A04', bg: '#FEF9C3' },
-    low:    { color: '#16A34A', bg: '#DCFCE7' },
+    low: { color: '#16A34A', bg: '#DCFCE7' },
   }
+
+  const [unreadMessages, setUnreadMessages] = useState(0)
+
+  useEffect(() => {
+    let channel: any = null
+    const initMessages = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const fetchUnread = async () => {
+        const { count } = await supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('receiver_id', user.id)
+          .eq('read', false)
+        setUnreadMessages(count || 0)
+      }
+      await fetchUnread()
+      channel = supabase
+        .channel('sidebar-unread')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` }, fetchUnread)
+        .subscribe()
+    }
+    initMessages()
+    return () => { if (channel) createClient().removeChannel(channel) }
+  }, [])
 
   return (
     <>
@@ -583,7 +609,22 @@ export default function LandlordDashboard() {
               {stats.openMaintenance > 0 && <span className="sb-badge">{stats.openMaintenance}</span>}
             </a>
             <a href="/landlord/documents" className="sb-item"><span className="sb-ico">📁</span>Documents</a>
-            <a href="/landlord/messages" className="sb-item"><span className="sb-ico">💬</span>Messages</a>
+            <a href="/landlord/messages" className="sb-item" style={{ justifyContent: 'space-between' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                <span className="sb-ico">💬</span>Messages
+              </span>
+              {unreadMessages > 0 && (
+                <span style={{
+                  minWidth: 18, height: 18, borderRadius: 99,
+                  background: '#EF4444', color: '#fff',
+                  fontSize: 10, fontWeight: 800,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '0 5px', flexShrink: 0, lineHeight: 1,
+                }}>
+                  {unreadMessages > 99 ? '99+' : unreadMessages}
+                </span>
+              )}
+            </a>
             <a href="/landlord/listings" className="sb-item"><span className="sb-ico">📋</span>Listings</a>
             <span className="sb-section">Account</span>
             <a href="/landlord/settings" className="sb-item"><span className="sb-ico">⚙️</span>Settings</a>
@@ -608,15 +649,15 @@ export default function LandlordDashboard() {
               </div>
             </div>
             {/* <div className="sb-user"> */}
-              {/* <div className="sb-av">{initials}</div> */}
-              {/* <div> */}
-                {/* <div className="sb-uname">{fullName}</div> */}
-                {/* Show plan badge — PRO styling for pro users, FREE for others */}
-                {/* {isPro */}
-                  {/* ? <span className="sb-uplan-pro">⭐ {plan?.toUpperCase() || 'PRO'}</span> */}
-                  {/* : <span className="sb-uplan">FREE</span> */}
-                {/* } */}
-              {/* </div> */}
+            {/* <div className="sb-av">{initials}</div> */}
+            {/* <div> */}
+            {/* <div className="sb-uname">{fullName}</div> */}
+            {/* Show plan badge — PRO styling for pro users, FREE for others */}
+            {/* {isPro */}
+            {/* ? <span className="sb-uplan-pro">⭐ {plan?.toUpperCase() || 'PRO'}</span> */}
+            {/* : <span className="sb-uplan">FREE</span> */}
+            {/* } */}
+            {/* </div> */}
             {/* </div> */}
           </div>
         </aside>
@@ -642,26 +683,26 @@ export default function LandlordDashboard() {
             <div className="stats">
               <div className="stat">
                 <div className="stat-top">
-                  <div className="stat-ico" style={{background:'#EFF6FF'}}>🏘️</div>
+                  <div className="stat-ico" style={{ background: '#EFF6FF' }}>🏘️</div>
                   <span className="tag tg">{stats.totalProperties} props</span>
                 </div>
-                {loading ? <div className="skeleton" style={{height:32,width:60,marginBottom:8}} /> : (
+                {loading ? <div className="skeleton" style={{ height: 32, width: 60, marginBottom: 8 }} /> : (
                   <div className="stat-num">${stats.monthlyRevenue.toLocaleString()}</div>
                 )}
                 <div className="stat-lbl">Monthly Revenue</div>
-                <div style={{display:'flex',alignItems:'center',gap:6,marginTop:3}}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
                   <span className="stat-sub">{stats.occupiedUnits} occupied units</span>
-                  {revTrend && <span style={{fontSize:11.5,fontWeight:700,color:revTrend.up?'#16A34A':'#DC2626'}}>{revTrend.up?'↑':'↓'}{Math.abs(revTrend.pct)}% vs last month</span>}
+                  {revTrend && <span style={{ fontSize: 11.5, fontWeight: 700, color: revTrend.up ? '#16A34A' : '#DC2626' }}>{revTrend.up ? '↑' : '↓'}{Math.abs(revTrend.pct)}% vs last month</span>}
                 </div>
               </div>
 
               <div className="stat">
                 <div className="stat-top">
-                  <div className="stat-ico" style={{background:'#DCFCE7'}}>📊</div>
+                  <div className="stat-ico" style={{ background: '#DCFCE7' }}>📊</div>
                   <span className={`tag ${occupancyRate >= 80 ? 'tg' : occupancyRate >= 50 ? 'ty' : 'tr'}`}>{occupancyRate}%</span>
                 </div>
-                {loading ? <div className="skeleton" style={{height:32,width:60,marginBottom:8}} /> : (
-                  <div className="stat-num">{stats.occupiedUnits}<span style={{fontSize:18,color:'#94A3B8'}}>/{stats.totalUnits}</span></div>
+                {loading ? <div className="skeleton" style={{ height: 32, width: 60, marginBottom: 8 }} /> : (
+                  <div className="stat-num">{stats.occupiedUnits}<span style={{ fontSize: 18, color: '#94A3B8' }}>/{stats.totalUnits}</span></div>
                 )}
                 <div className="stat-lbl">Occupancy</div>
                 <div className="stat-sub">{stats.totalUnits - stats.occupiedUnits} vacant units</div>
@@ -669,27 +710,27 @@ export default function LandlordDashboard() {
 
               <div className="stat">
                 <div className="stat-top">
-                  <div className="stat-ico" style={{background:'#FEF3C7'}}>👥</div>
+                  <div className="stat-ico" style={{ background: '#FEF3C7' }}>👥</div>
                   <span className="tag tg">Active</span>
                 </div>
-                {loading ? <div className="skeleton" style={{height:32,width:60,marginBottom:8}} /> : (
+                {loading ? <div className="skeleton" style={{ height: 32, width: 60, marginBottom: 8 }} /> : (
                   <div className="stat-num">{stats.totalTenants}</div>
                 )}
                 <div className="stat-lbl">Total Tenants</div>
-                <div style={{display:'flex',alignItems:'center',gap:6,marginTop:3}}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
                   <span className="stat-sub">{stats.paidThisMonth} paid this month</span>
-                  {tenantTrend && tenantTrend.pct !== 0 && <span style={{fontSize:11.5,fontWeight:700,color:tenantTrend.up?'#16A34A':'#DC2626'}}>{tenantTrend.up?'↑':'↓'}{Math.abs(tenantTrend.pct)}%</span>}
+                  {tenantTrend && tenantTrend.pct !== 0 && <span style={{ fontSize: 11.5, fontWeight: 700, color: tenantTrend.up ? '#16A34A' : '#DC2626' }}>{tenantTrend.up ? '↑' : '↓'}{Math.abs(tenantTrend.pct)}%</span>}
                 </div>
               </div>
 
               <div className="stat">
                 <div className="stat-top">
-                  <div className="stat-ico" style={{background:'#FEE2E2'}}>🔧</div>
+                  <div className="stat-ico" style={{ background: '#FEE2E2' }}>🔧</div>
                   <span className={`tag ${stats.openMaintenance > 0 ? 'tr' : 'tg'}`}>
                     {stats.openMaintenance > 0 ? `${stats.openMaintenance} open` : 'All clear'}
                   </span>
                 </div>
-                {loading ? <div className="skeleton" style={{height:32,width:60,marginBottom:8}} /> : (
+                {loading ? <div className="skeleton" style={{ height: 32, width: 60, marginBottom: 8 }} /> : (
                   <div className="stat-num">{stats.openMaintenance}</div>
                 )}
                 <div className="stat-lbl">Maintenance</div>
@@ -707,7 +748,7 @@ export default function LandlordDashboard() {
                     <span className="card-title">Properties</span>
                     <a href="/landlord/properties" className="card-link">View all →</a>
                   </div>
-                  <div style={{overflowX:'auto'}}>
+                  <div style={{ overflowX: 'auto' }}>
                     <table className="ptable">
                       <thead>
                         <tr>
@@ -719,12 +760,12 @@ export default function LandlordDashboard() {
                       </thead>
                       <tbody>
                         {loading ? (
-                          [1,2].map(i => (
+                          [1, 2].map(i => (
                             <tr key={i}>
-                              <td><div className="skeleton" style={{height:13,width:120,marginBottom:4}} /><div className="skeleton" style={{height:10,width:80}} /></td>
-                              <td><div className="skeleton" style={{height:13,width:30}} /></td>
-                              <td><div className="skeleton" style={{height:8,width:100}} /></td>
-                              <td><div className="skeleton" style={{height:20,width:60,borderRadius:99}} /></td>
+                              <td><div className="skeleton" style={{ height: 13, width: 120, marginBottom: 4 }} /><div className="skeleton" style={{ height: 10, width: 80 }} /></td>
+                              <td><div className="skeleton" style={{ height: 13, width: 30 }} /></td>
+                              <td><div className="skeleton" style={{ height: 8, width: 100 }} /></td>
+                              <td><div className="skeleton" style={{ height: 20, width: 60, borderRadius: 99 }} /></td>
                             </tr>
                           ))
                         ) : properties.length === 0 ? (
@@ -741,11 +782,11 @@ export default function LandlordDashboard() {
                                 <div className="p-name">{p.name}</div>
                                 <div className="p-loc">{p.city}, {p.country}</div>
                               </td>
-                              <td><span style={{fontWeight:700}}>{p.total_units}</span></td>
+                              <td><span style={{ fontWeight: 700 }}>{p.total_units}</span></td>
                               <td>
                                 <div className="occ">
                                   <div className="occ-bar">
-                                    <div className="occ-fill" style={{width:`${pct}%`}} />
+                                    <div className="occ-fill" style={{ width: `${pct}%` }} />
                                   </div>
                                   <span className="occ-lbl">{p.occupied}/{p.total_units}</span>
                                 </div>
@@ -770,11 +811,11 @@ export default function LandlordDashboard() {
                     <a href="/landlord/maintenance" className="card-link">View all →</a>
                   </div>
                   {loading ? (
-                    [1,2].map(i => (
+                    [1, 2].map(i => (
                       <div key={i} className="mrow">
-                        <div className="skeleton" style={{width:8,height:8,borderRadius:'50%',marginTop:5,flexShrink:0}} />
-                        <div style={{flex:1}}><div className="skeleton" style={{height:13,width:'70%',marginBottom:6}} /><div className="skeleton" style={{height:10,width:'50%'}} /></div>
-                        <div className="skeleton" style={{height:20,width:50,borderRadius:99}} />
+                        <div className="skeleton" style={{ width: 8, height: 8, borderRadius: '50%', marginTop: 5, flexShrink: 0 }} />
+                        <div style={{ flex: 1 }}><div className="skeleton" style={{ height: 13, width: '70%', marginBottom: 6 }} /><div className="skeleton" style={{ height: 10, width: '50%' }} /></div>
+                        <div className="skeleton" style={{ height: 20, width: 50, borderRadius: 99 }} />
                       </div>
                     ))
                   ) : maintRows.length === 0 ? (
@@ -784,7 +825,7 @@ export default function LandlordDashboard() {
                     const tagClass = m.priority === 'urgent' ? 'mred' : m.priority === 'high' ? 'mamber' : m.priority === 'medium' ? 'myell' : 'mgreen'
                     return (
                       <div key={m.id} className="mrow">
-                        <div className="m-dot" style={{background:pc.color}} />
+                        <div className="m-dot" style={{ background: pc.color }} />
                         <div className="m-body">
                           <div className="m-title">{m.title}</div>
                           <div className="m-sub">{m.property_name} · {m.unit_number}</div>
@@ -805,11 +846,11 @@ export default function LandlordDashboard() {
                     <a href="/landlord/tenants" className="card-link">View tenants →</a>
                   </div>
                   {loading ? (
-                    [1,2].map(i => (
+                    [1, 2].map(i => (
                       <div key={i} className="lease-row">
-                        <div className="skeleton" style={{width:34,height:34,borderRadius:9,flexShrink:0}} />
-                        <div style={{flex:1}}><div className="skeleton" style={{height:12,width:'60%',marginBottom:5}} /><div className="skeleton" style={{height:10,width:'40%'}} /></div>
-                        <div className="skeleton" style={{height:12,width:40}} />
+                        <div className="skeleton" style={{ width: 34, height: 34, borderRadius: 9, flexShrink: 0 }} />
+                        <div style={{ flex: 1 }}><div className="skeleton" style={{ height: 12, width: '60%', marginBottom: 5 }} /><div className="skeleton" style={{ height: 10, width: '40%' }} /></div>
+                        <div className="skeleton" style={{ height: 12, width: 40 }} />
                       </div>
                     ))
                   ) : leaseRows.length === 0 ? (
@@ -818,13 +859,13 @@ export default function LandlordDashboard() {
                     const urgent = l.days_left <= 30
                     return (
                       <div key={i} className="lease-row">
-                        <div className="lr-av" style={{background: l.color}}>{l.initials}</div>
-                        <div style={{flex:1,minWidth:0}}>
+                        <div className="lr-av" style={{ background: l.color }}>{l.initials}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
                           <div className="lr-name">{l.tenant_name}</div>
                           <div className="lr-sub">{l.property} · {l.unit}</div>
                         </div>
                         <div className="lr-days">
-                          <div className="lr-days-num" style={{color: urgent ? '#DC2626' : '#D97706'}}>{l.days_left}d</div>
+                          <div className="lr-days-num" style={{ color: urgent ? '#DC2626' : '#D97706' }}>{l.days_left}d</div>
                           <div className="lr-days-lbl">{l.lease_end}</div>
                         </div>
                       </div>
@@ -843,20 +884,20 @@ export default function LandlordDashboard() {
                     <a href="/landlord/rent" className="card-link">Tracker →</a>
                   </div>
                   {loading ? (
-                    [1,2,3].map(i => (
+                    [1, 2, 3].map(i => (
                       <div key={i} className="rrow">
-                        <div className="skeleton" style={{width:36,height:36,borderRadius:10,flexShrink:0}} />
-                        <div style={{flex:1}}><div className="skeleton" style={{height:13,width:'70%',marginBottom:6}} /><div className="skeleton" style={{height:10,width:'50%'}} /></div>
-                        <div><div className="skeleton" style={{height:13,width:40,marginBottom:4}} /><div className="skeleton" style={{height:10,width:30}} /></div>
+                        <div className="skeleton" style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0 }} />
+                        <div style={{ flex: 1 }}><div className="skeleton" style={{ height: 13, width: '70%', marginBottom: 6 }} /><div className="skeleton" style={{ height: 10, width: '50%' }} /></div>
+                        <div><div className="skeleton" style={{ height: 13, width: 40, marginBottom: 4 }} /><div className="skeleton" style={{ height: 10, width: 30 }} /></div>
                       </div>
                     ))
                   ) : rentRows.length === 0 ? (
-                    <div className="empty">No rent payments this month yet.<br/><a href="/landlord/rent">Go to Rent Tracker →</a></div>
+                    <div className="empty">No rent payments this month yet.<br /><a href="/landlord/rent">Go to Rent Tracker →</a></div>
                   ) : rentRows.map((r, i) => {
                     const rs = RENT_STATUS[r.status] || { label: r.status, color: '#94A3B8' }
                     return (
                       <div key={i} className="rrow">
-                        <div className="rav" style={{background: AVATAR_GRADIENTS[i % AVATAR_GRADIENTS.length]}}>
+                        <div className="rav" style={{ background: AVATAR_GRADIENTS[i % AVATAR_GRADIENTS.length] }}>
                           {r.initials}
                         </div>
                         <div>
@@ -865,7 +906,7 @@ export default function LandlordDashboard() {
                         </div>
                         <div className="rright">
                           <div className="ramt">${r.amount.toLocaleString()}</div>
-                          <div className="rstatus" style={{color: rs.color}}>● {rs.label}</div>
+                          <div className="rstatus" style={{ color: rs.color }}>● {rs.label}</div>
                         </div>
                       </div>
                     )
@@ -873,40 +914,40 @@ export default function LandlordDashboard() {
                 </div>
 
                 {/* Analytics — unlocked for Pro, blurred teaser for free */}
-                <div style={{background:'#fff',border:'1px solid #E2E8F0',borderRadius:18,padding:20,boxShadow:'0 1px 4px rgba(15,23,42,0.04)',position:'relative',overflow:'hidden'}}>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-                    <span style={{fontSize:15,fontWeight:700,color:'#0F172A'}}>Year-over-Year Growth</span>
+                <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 18, padding: 20, boxShadow: '0 1px 4px rgba(15,23,42,0.04)', position: 'relative', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: '#0F172A' }}>Year-over-Year Growth</span>
                     {!isPro && (
-                      <span style={{fontSize:10.5,fontWeight:800,background:'linear-gradient(135deg,#2563EB,#6366F1)',color:'#fff',padding:'2px 8px',borderRadius:99}}>PRO</span>
+                      <span style={{ fontSize: 10.5, fontWeight: 800, background: 'linear-gradient(135deg,#2563EB,#6366F1)', color: '#fff', padding: '2px 8px', borderRadius: 99 }}>PRO</span>
                     )}
                   </div>
                   {/* Chart — always rendered, blurred only for free users */}
-                  <div style={!isPro ? {filter:'blur(5px)',pointerEvents:'none',userSelect:'none',opacity:0.6} : {}}>
-                    <div style={{display:'flex',alignItems:'flex-end',gap:5,height:90,marginBottom:6}}>
-                      {[35,50,42,58,54,68,62,78,72,85,79,92].map((h,i) => (
-                        <div key={i} style={{flex:1,height:`${h}%`,borderRadius:'4px 4px 0 0',background: i>=9 ? 'linear-gradient(180deg,#3B82F6,#6366F1)' : '#CBD5E1'}} />
+                  <div style={!isPro ? { filter: 'blur(5px)', pointerEvents: 'none', userSelect: 'none', opacity: 0.6 } : {}}>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, height: 90, marginBottom: 6 }}>
+                      {[35, 50, 42, 58, 54, 68, 62, 78, 72, 85, 79, 92].map((h, i) => (
+                        <div key={i} style={{ flex: 1, height: `${h}%`, borderRadius: '4px 4px 0 0', background: i >= 9 ? 'linear-gradient(180deg,#3B82F6,#6366F1)' : '#CBD5E1' }} />
                       ))}
                     </div>
-                    <div style={{display:'flex',gap:5}}>
-                      {['J','F','M','A','M','J','J','A','S','O','N','D'].map((m,i) => (
-                        <span key={i} style={{flex:1,textAlign:'center',fontSize:9,color:'#94A3B8'}}>{m}</span>
+                    <div style={{ display: 'flex', gap: 5 }}>
+                      {['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'].map((m, i) => (
+                        <span key={i} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: '#94A3B8' }}>{m}</span>
                       ))}
                     </div>
-                    <div style={{display:'flex',justifyContent:'space-between',marginTop:10,padding:'8px 10px',background:'#F8FAFC',borderRadius:8}}>
-                      <span style={{fontSize:11.5,color:'#64748B',fontWeight:500}}>Revenue growth</span>
-                      <span style={{fontSize:11.5,color:'#16A34A',fontWeight:700}}>↑ +24% YoY</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, padding: '8px 10px', background: '#F8FAFC', borderRadius: 8 }}>
+                      <span style={{ fontSize: 11.5, color: '#64748B', fontWeight: 500 }}>Revenue growth</span>
+                      <span style={{ fontSize: 11.5, color: '#16A34A', fontWeight: 700 }}>↑ +24% YoY</span>
                     </div>
                   </div>
                   {/* Overlay — only shown for free users */}
                   {!isPro && (
-                    <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:8,background:'rgba(255,255,255,0.82)',backdropFilter:'blur(3px)'}}>
-                      <div style={{fontSize:22}}>📊</div>
-                      <span style={{fontSize:11,fontWeight:800,background:'linear-gradient(135deg,#2563EB,#6366F1)',color:'#fff',padding:'3px 12px',borderRadius:99,letterSpacing:0.5}}>⭐ PRO FEATURE</span>
-                      <div style={{fontSize:14,fontWeight:700,color:'#0F172A',marginTop:2}}>Advanced Analytics</div>
-                      <div style={{fontSize:12,color:'#64748B',textAlign:'center',maxWidth:190,lineHeight:1.5}}>Year-over-year trends, forecasts & portfolio insights</div>
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(3px)' }}>
+                      <div style={{ fontSize: 22 }}>📊</div>
+                      <span style={{ fontSize: 11, fontWeight: 800, background: 'linear-gradient(135deg,#2563EB,#6366F1)', color: '#fff', padding: '3px 12px', borderRadius: 99, letterSpacing: 0.5 }}>⭐ PRO FEATURE</span>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginTop: 2 }}>Advanced Analytics</div>
+                      <div style={{ fontSize: 12, color: '#64748B', textAlign: 'center', maxWidth: 190, lineHeight: 1.5 }}>Year-over-year trends, forecasts & portfolio insights</div>
                       <button
                         onClick={() => window.location.href = '/landlord/upgrade'}
-                        style={{marginTop:6,padding:'9px 20px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#2563EB,#6366F1)',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:"'Plus Jakarta Sans',sans-serif",boxShadow:'0 2px 10px rgba(37,99,235,0.3)'}}
+                        style={{ marginTop: 6, padding: '9px 20px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#2563EB,#6366F1)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif", boxShadow: '0 2px 10px rgba(37,99,235,0.3)' }}
                       >
                         Unlock with Pro →
                       </button>
@@ -920,12 +961,12 @@ export default function LandlordDashboard() {
                     <span className="card-title">Quick Actions</span>
                   </div>
                   <div className="qa">
-                    <a href="/landlord/tenants"    className="qa-item"><div className="qa-ico" style={{background:'#EEF2FF'}}>👥</div><span className="qa-lbl">Invite Tenant</span></a>
-                    <a href="/landlord/rent"       className="qa-item"><div className="qa-ico" style={{background:'#EFF6FF'}}>💰</div><span className="qa-lbl">Rent Tracker</span></a>
-                    <a href="/landlord/documents"  className="qa-item"><div className="qa-ico" style={{background:'#FFFBEB'}}>📁</div><span className="qa-lbl">Upload Doc</span></a>
-                    <a href="/landlord/listings"   className="qa-item"><div className="qa-ico" style={{background:'#F0FDF4'}}>📋</div><span className="qa-lbl">Post Listing</span></a>
-                    <a href="/landlord/maintenance" className="qa-item"><div className="qa-ico" style={{background:'#FFF1F2'}}>🔧</div><span className="qa-lbl">Maintenance</span></a>
-                    <a href="/landlord/properties" className="qa-item"><div className="qa-ico" style={{background:'#F5F3FF'}}>🏘️</div><span className="qa-lbl">Properties</span></a>
+                    <a href="/landlord/tenants" className="qa-item"><div className="qa-ico" style={{ background: '#EEF2FF' }}>👥</div><span className="qa-lbl">Invite Tenant</span></a>
+                    <a href="/landlord/rent" className="qa-item"><div className="qa-ico" style={{ background: '#EFF6FF' }}>💰</div><span className="qa-lbl">Rent Tracker</span></a>
+                    <a href="/landlord/documents" className="qa-item"><div className="qa-ico" style={{ background: '#FFFBEB' }}>📁</div><span className="qa-lbl">Upload Doc</span></a>
+                    <a href="/landlord/listings" className="qa-item"><div className="qa-ico" style={{ background: '#F0FDF4' }}>📋</div><span className="qa-lbl">Post Listing</span></a>
+                    <a href="/landlord/maintenance" className="qa-item"><div className="qa-ico" style={{ background: '#FFF1F2' }}>🔧</div><span className="qa-lbl">Maintenance</span></a>
+                    <a href="/landlord/properties" className="qa-item"><div className="qa-ico" style={{ background: '#F5F3FF' }}>🏘️</div><span className="qa-lbl">Properties</span></a>
                   </div>
                 </div>
 

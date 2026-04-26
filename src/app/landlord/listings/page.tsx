@@ -43,7 +43,7 @@ export default function ListingsPage() {
   const router = useRouter()
 
   // ── FIX: Use ONLY isPro from usePro() — do not redeclare
-  const { isPro , plan} = usePro()
+  const { isPro, plan } = usePro()
   const photoInputRef = useRef<HTMLInputElement>(null)
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName] = useState('User')
@@ -354,6 +354,32 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
     taken: listings.filter(l => l.status === 'taken').length,
   }
   const totalPhotosInForm = existingPhotos.length + photoFiles.length
+
+  const [unreadMessages, setUnreadMessages] = useState(0)
+
+  useEffect(() => {
+    let channel: any = null
+    const initMessages = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const fetchUnread = async () => {
+        const { count } = await supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('receiver_id', user.id)
+          .eq('read', false)
+        setUnreadMessages(count || 0)
+      }
+      await fetchUnread()
+      channel = supabase
+        .channel('sidebar-unread')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` }, fetchUnread)
+        .subscribe()
+    }
+    initMessages()
+    return () => { if (channel) createClient().removeChannel(channel) }
+  }, [])
 
   return (
     <>
@@ -748,7 +774,22 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
             <span className="sb-section">Management</span>
             <a href="/landlord/maintenance" className="sb-item"><span className="sb-ico">🔧</span>Maintenance</a>
             <a href="/landlord/documents" className="sb-item"><span className="sb-ico">📁</span>Documents</a>
-            <a href="/landlord/messages" className="sb-item"><span className="sb-ico">💬</span>Messages</a>
+            <a href="/landlord/messages" className="sb-item" style={{ justifyContent: 'space-between' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                <span className="sb-ico">💬</span>Messages
+              </span>
+              {unreadMessages > 0 && (
+                <span style={{
+                  minWidth: 18, height: 18, borderRadius: 99,
+                  background: '#EF4444', color: '#fff',
+                  fontSize: 10, fontWeight: 800,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '0 5px', flexShrink: 0, lineHeight: 1,
+                }}>
+                  {unreadMessages > 99 ? '99+' : unreadMessages}
+                </span>
+              )}
+            </a>
             <a href="/landlord/listings" className="sb-item active"><span className="sb-ico">📋</span>Listings</a>
             <span className="sb-section">Account</span>
             <a href="/landlord/settings" className="sb-item"><span className="sb-ico">⚙️</span>Settings</a>

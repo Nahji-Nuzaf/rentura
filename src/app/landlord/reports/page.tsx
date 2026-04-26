@@ -6,23 +6,23 @@ import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
 import { usePro } from '@/components/ProProvider'
 
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const NOW = new Date()
 
 type MonthStat = { month: string; collected: number; overdue: number; pending: number; total: number }
-type OccStat   = { month: string; rate: number }
-type PropStat  = { name: string; units: number; occupied: number; revenue: number }
+type OccStat = { month: string; rate: number }
+type PropStat = { name: string; units: number; occupied: number; revenue: number }
 
-function exportCSV(filename: string, headers: string[], rows: (string|number)[][]) {
-  const esc = (v: string|number) => {
+function exportCSV(filename: string, headers: string[], rows: (string | number)[][]) {
+  const esc = (v: string | number) => {
     const s = String(v ?? '')
-    return s.includes(',')||s.includes('"')||s.includes('\n') ? `"${s.replace(/"/g,'""')}"` : s
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
   }
   const csv = [headers.map(esc).join(','), ...rows.map(r => r.map(esc).join(','))].join('\n')
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
-  a.href = url; a.download = `${filename}-${new Date().toISOString().slice(0,10)}.csv`; a.click()
+  a.href = url; a.download = `${filename}-${new Date().toISOString().slice(0, 10)}.csv`; a.click()
   URL.revokeObjectURL(url)
 }
 
@@ -30,24 +30,24 @@ export default function ReportsPage() {
   const router = useRouter()
   const { isPro, plan } = usePro()
 
-  const [userInitials, setUserInitials]   = useState('NN')
-  const [fullName, setFullName]           = useState('User')
-  const [sidebarOpen, setSidebarOpen]     = useState(false)
-  const [loading, setLoading]             = useState(true)
+  const [userInitials, setUserInitials] = useState('NN')
+  const [fullName, setFullName] = useState('User')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
-  const [monthStats, setMonthStats]       = useState<MonthStat[]>([])
-  const [occStats, setOccStats]           = useState<OccStat[]>([])
-  const [propStats, setPropStats]         = useState<PropStat[]>([])
+  const [monthStats, setMonthStats] = useState<MonthStat[]>([])
+  const [occStats, setOccStats] = useState<OccStat[]>([])
+  const [propStats, setPropStats] = useState<PropStat[]>([])
   const [totalCollected, setTotalCollected] = useState(0)
-  const [totalOverdue, setTotalOverdue]     = useState(0)
-  const [totalPending, setTotalPending]     = useState(0)
-  const [openMaint, setOpenMaint]           = useState(0)
-  const [resolvedMaint, setResolvedMaint]   = useState(0)
-  const [annualStats, setAnnualStats]       = useState<{month:string;revenue:number}[]>([])
+  const [totalOverdue, setTotalOverdue] = useState(0)
+  const [totalPending, setTotalPending] = useState(0)
+  const [openMaint, setOpenMaint] = useState(0)
+  const [resolvedMaint, setResolvedMaint] = useState(0)
+  const [annualStats, setAnnualStats] = useState<{ month: string; revenue: number }[]>([])
   const [totalAnnualRevenue, setTotalAnnualRevenue] = useState(0)
-  const [avgMonthlyRevenue, setAvgMonthlyRevenue]   = useState(0)
-  const [bestMonth, setBestMonth]           = useState('')
-  const [userId, setUserId]                 = useState('')
+  const [avgMonthlyRevenue, setAvgMonthlyRevenue] = useState(0)
+  const [bestMonth, setBestMonth] = useState('')
+  const [userId, setUserId] = useState('')
   const [showExportMenu, setShowExportMenu] = useState(false)
 
   const planLabel = isPro ? plan.toUpperCase() : 'FREE'
@@ -63,7 +63,7 @@ export default function ReportsPage() {
       setUserId(user.id)
       const name = user.user_metadata?.full_name || 'User'
       setFullName(name)
-      setUserInitials(name.split(' ').map((n:string) => n[0]).join('').toUpperCase().slice(0,2))
+      setUserInitials(name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2))
       await loadReports(user.id)
     }
     init()
@@ -74,79 +74,79 @@ export default function ReportsPage() {
     try {
       const supabase = createClient()
       const { data: props } = await supabase.from('properties').select('id,name,total_units').eq('landlord_id', uid)
-      const propIds = (props||[]).map((p:any) => p.id)
+      const propIds = (props || []).map((p: any) => p.id)
       if (!propIds.length) { setLoading(false); return }
 
       const { data: units } = await supabase.from('units').select('id,property_id,monthly_rent,status').in('property_id', propIds)
-      const unitIds = (units||[]).map((u:any) => u.id)
+      const unitIds = (units || []).map((u: any) => u.id)
 
-      const ps: PropStat[] = (props||[]).map((p:any) => {
-        const pu  = (units||[]).filter((u:any) => u.property_id === p.id)
-        const occ = pu.filter((u:any) => u.status === 'occupied').length
-        const rev = pu.filter((u:any) => u.status === 'occupied').reduce((s:number,u:any) => s+(u.monthly_rent||0), 0)
+      const ps: PropStat[] = (props || []).map((p: any) => {
+        const pu = (units || []).filter((u: any) => u.property_id === p.id)
+        const occ = pu.filter((u: any) => u.status === 'occupied').length
+        const rev = pu.filter((u: any) => u.status === 'occupied').reduce((s: number, u: any) => s + (u.monthly_rent || 0), 0)
         return { name: p.name, units: p.total_units, occupied: occ, revenue: rev }
       })
       setPropStats(ps)
 
-      const buckets: Record<string,MonthStat> = {}
-      for (let i=5; i>=0; i--) {
-        const d = new Date(NOW.getFullYear(), NOW.getMonth()-i, 1)
-        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
-        buckets[key] = { month: MONTHS[d.getMonth()], collected:0, overdue:0, pending:0, total:0 }
+      const buckets: Record<string, MonthStat> = {}
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(NOW.getFullYear(), NOW.getMonth() - i, 1)
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        buckets[key] = { month: MONTHS[d.getMonth()], collected: 0, overdue: 0, pending: 0, total: 0 }
       }
-      const sixAgo = new Date(NOW.getFullYear(), NOW.getMonth()-5, 1).toISOString()
+      const sixAgo = new Date(NOW.getFullYear(), NOW.getMonth() - 5, 1).toISOString()
       const { data: payments } = await supabase.from('rent_payments').select('amount,status,due_date')
         .in('unit_id', unitIds).gte('due_date', sixAgo).order('due_date', { ascending: true })
-      ;(payments||[]).forEach((p:any) => {
-        const key = p.due_date?.slice(0,7)
-        if (!buckets[key]) return
-        const amt = p.amount||0
-        if (p.status==='paid')         buckets[key].collected += amt
-        else if (p.status==='overdue') buckets[key].overdue   += amt
-        else                           buckets[key].pending   += amt
-        buckets[key].total += amt
-      })
-      const ms: MonthStat[] = Object.values(buckets).map(b => ({...b, _ghost: b.total===0?1:0} as any))
+        ; (payments || []).forEach((p: any) => {
+          const key = p.due_date?.slice(0, 7)
+          if (!buckets[key]) return
+          const amt = p.amount || 0
+          if (p.status === 'paid') buckets[key].collected += amt
+          else if (p.status === 'overdue') buckets[key].overdue += amt
+          else buckets[key].pending += amt
+          buckets[key].total += amt
+        })
+      const ms: MonthStat[] = Object.values(buckets).map(b => ({ ...b, _ghost: b.total === 0 ? 1 : 0 } as any))
       setMonthStats(ms)
-      const curKey = `${NOW.getFullYear()}-${String(NOW.getMonth()+1).padStart(2,'0')}`
-      setTotalCollected(buckets[curKey]?.collected||0)
-      setTotalOverdue(buckets[curKey]?.overdue||0)
-      setTotalPending(buckets[curKey]?.pending||0)
+      const curKey = `${NOW.getFullYear()}-${String(NOW.getMonth() + 1).padStart(2, '0')}`
+      setTotalCollected(buckets[curKey]?.collected || 0)
+      setTotalOverdue(buckets[curKey]?.overdue || 0)
+      setTotalPending(buckets[curKey]?.pending || 0)
 
-      const totalU = (units||[]).length
-      const occU   = (units||[]).filter((u:any) => u.status==='occupied').length
-      const occRate = totalU > 0 ? Math.round((occU/totalU)*100) : 0
-      setOccStats(ms.map((m,i) => ({ month: m.month, rate: Math.max(5, Math.min(100, occRate+(i-3)*3+(i%2===0?2:-1))) })))
+      const totalU = (units || []).length
+      const occU = (units || []).filter((u: any) => u.status === 'occupied').length
+      const occRate = totalU > 0 ? Math.round((occU / totalU) * 100) : 0
+      setOccStats(ms.map((m, i) => ({ month: m.month, rate: Math.max(5, Math.min(100, occRate + (i - 3) * 3 + (i % 2 === 0 ? 2 : -1))) })))
 
       const { data: maint } = await supabase.from('maintenance_requests').select('status').in('property_id', propIds)
-      setOpenMaint((maint||[]).filter((m:any) => m.status!=='resolved').length)
-      setResolvedMaint((maint||[]).filter((m:any) => m.status==='resolved').length)
+      setOpenMaint((maint || []).filter((m: any) => m.status !== 'resolved').length)
+      setResolvedMaint((maint || []).filter((m: any) => m.status === 'resolved').length)
 
-      const twelveAgo = new Date(NOW.getFullYear(), NOW.getMonth()-11, 1).toISOString()
+      const twelveAgo = new Date(NOW.getFullYear(), NOW.getMonth() - 11, 1).toISOString()
       const { data: annualPay } = await supabase.from('rent_payments').select('amount,due_date,status')
-        .in('unit_id', unitIds).gte('due_date', twelveAgo).eq('status','paid')
-      const annualBuckets: Record<string,number> = {}
-      for (let i=11; i>=0; i--) {
-        const d = new Date(NOW.getFullYear(), NOW.getMonth()-i, 1)
-        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+        .in('unit_id', unitIds).gte('due_date', twelveAgo).eq('status', 'paid')
+      const annualBuckets: Record<string, number> = {}
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(NOW.getFullYear(), NOW.getMonth() - i, 1)
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
         annualBuckets[key] = 0
       }
-      ;(annualPay||[]).forEach((p:any) => {
-        const key = p.due_date?.slice(0,7)
-        if (annualBuckets[key] !== undefined) annualBuckets[key] += (p.amount||0)
+      ; (annualPay || []).forEach((p: any) => {
+        const key = p.due_date?.slice(0, 7)
+        if (annualBuckets[key] !== undefined) annualBuckets[key] += (p.amount || 0)
       })
       const annualArr = Object.entries(annualBuckets).map(([key, revenue]) => ({
-        month: MONTHS[parseInt(key.split('-')[1])-1],
+        month: MONTHS[parseInt(key.split('-')[1]) - 1],
         revenue
       }))
       setAnnualStats(annualArr)
-      const totalRev = annualArr.reduce((s,m) => s+m.revenue, 0)
+      const totalRev = annualArr.reduce((s, m) => s + m.revenue, 0)
       setTotalAnnualRevenue(totalRev)
-      setAvgMonthlyRevenue(Math.round(totalRev/12))
-      const best = annualArr.reduce((a,b) => b.revenue > a.revenue ? b : a, annualArr[0])
+      setAvgMonthlyRevenue(Math.round(totalRev / 12))
+      const best = annualArr.reduce((a, b) => b.revenue > a.revenue ? b : a, annualArr[0])
       setBestMonth(best?.month || '—')
 
-    } catch (err:any) {
+    } catch (err: any) {
       console.error('Reports error:', err?.message)
     } finally { setLoading(false) }
   }
@@ -154,31 +154,57 @@ export default function ReportsPage() {
   function handleExportMonthlyCSV() {
     if (!isPro) { setShowUpgradeModal(true); return }
     exportCSV('rentura-monthly-collection',
-      ['Month','Collected ($)','Overdue ($)','Pending ($)','Total ($)'],
+      ['Month', 'Collected ($)', 'Overdue ($)', 'Pending ($)', 'Total ($)'],
       monthStats.map(m => [m.month, m.collected, m.overdue, m.pending, m.total])
     )
   }
   function handleExportPropertyCSV() {
     if (!isPro) { setShowUpgradeModal(true); return }
     exportCSV('rentura-property-breakdown',
-      ['Property','Total Units','Occupied','Occupancy %','Monthly Revenue ($)'],
-      propStats.map(p => [p.name, p.units, p.occupied, p.units>0?Math.round((p.occupied/p.units)*100):0, p.revenue])
+      ['Property', 'Total Units', 'Occupied', 'Occupancy %', 'Monthly Revenue ($)'],
+      propStats.map(p => [p.name, p.units, p.occupied, p.units > 0 ? Math.round((p.occupied / p.units) * 100) : 0, p.revenue])
     )
   }
   function handleExportAnnualCSV() {
     if (!isPro) { setShowUpgradeModal(true); return }
     exportCSV('rentura-annual-revenue',
-      ['Month','Revenue ($)'],
+      ['Month', 'Revenue ($)'],
       annualStats.map(m => [m.month, m.revenue])
     )
   }
 
-  const maxBar = Math.max(...monthStats.map((m:any) => Math.max(m.total, m._ghost||0)), 1)
+  const maxBar = Math.max(...monthStats.map((m: any) => Math.max(m.total, m._ghost || 0)), 1)
   const maxAnnualBar = Math.max(...annualStats.map(m => m.revenue), 1)
-  const collectionRate = (totalCollected+totalOverdue+totalPending) > 0
-    ? Math.round((totalCollected/(totalCollected+totalOverdue+totalPending))*100) : 0
-  const resolutionRate = (openMaint+resolvedMaint) > 0
-    ? Math.round((resolvedMaint/(openMaint+resolvedMaint))*100) : 0
+  const collectionRate = (totalCollected + totalOverdue + totalPending) > 0
+    ? Math.round((totalCollected / (totalCollected + totalOverdue + totalPending)) * 100) : 0
+  const resolutionRate = (openMaint + resolvedMaint) > 0
+    ? Math.round((resolvedMaint / (openMaint + resolvedMaint)) * 100) : 0
+
+  const [unreadMessages, setUnreadMessages] = useState(0)
+
+  useEffect(() => {
+    let channel: any = null
+    const initMessages = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const fetchUnread = async () => {
+        const { count } = await supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('receiver_id', user.id)
+          .eq('read', false)
+        setUnreadMessages(count || 0)
+      }
+      await fetchUnread()
+      channel = supabase
+        .channel('sidebar-unread')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` }, fetchUnread)
+        .subscribe()
+    }
+    initMessages()
+    return () => { if (channel) createClient().removeChannel(channel) }
+  }, [])
 
   return (
     <>
@@ -363,24 +389,24 @@ export default function ReportsPage() {
       `}</style>
 
       {showUpgradeModal && (
-        <div className="umodal-overlay" onClick={()=>setShowUpgradeModal(false)}>
-          <div className="umodal" onClick={e=>e.stopPropagation()}>
+        <div className="umodal-overlay" onClick={() => setShowUpgradeModal(false)}>
+          <div className="umodal" onClick={e => e.stopPropagation()}>
             <div className="umodal-icon">📊</div>
             <div className="umodal-title">Pro Feature</div>
             <div className="umodal-sub">CSV exports, annual trends, and property comparisons are available on the Pro plan.</div>
-            <button className="umodal-btn-pro" onClick={()=>{setShowUpgradeModal(false);window.location.href='/landlord/upgrade'}}>⭐ Upgrade to Pro →</button>
-            <button className="umodal-btn-cancel" onClick={()=>setShowUpgradeModal(false)}>Maybe later</button>
+            <button className="umodal-btn-pro" onClick={() => { setShowUpgradeModal(false); window.location.href = '/landlord/upgrade' }}>⭐ Upgrade to Pro →</button>
+            <button className="umodal-btn-cancel" onClick={() => setShowUpgradeModal(false)}>Maybe later</button>
           </div>
         </div>
       )}
 
-      <div className={`sb-overlay${sidebarOpen?' open':''}`} onClick={()=>setSidebarOpen(false)}/>
+      <div className={`sb-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
 
       <div className="shell">
-        <aside className={`sidebar${sidebarOpen?' open':''}`}>
+        <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="sb-logo">
             <div className="sb-logo-icon">
-              <Image src="/icon.png" alt="Rentura Logo" width={24} height={24}/>
+              <Image src="/icon.png" alt="Rentura Logo" width={24} height={24} />
             </div>
             <span className="sb-logo-name">Rentura</span>
           </div>
@@ -395,7 +421,22 @@ export default function ReportsPage() {
             <span className="sb-section">Management</span>
             <a href="/landlord/maintenance" className="sb-item"><span className="sb-ico">🔧</span>Maintenance</a>
             <a href="/landlord/documents" className="sb-item"><span className="sb-ico">📁</span>Documents</a>
-            <a href="/landlord/messages" className="sb-item"><span className="sb-ico">💬</span>Messages</a>
+            <a href="/landlord/messages" className="sb-item" style={{ justifyContent: 'space-between' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                <span className="sb-ico">💬</span>Messages
+              </span>
+              {unreadMessages > 0 && (
+                <span style={{
+                  minWidth: 18, height: 18, borderRadius: 99,
+                  background: '#EF4444', color: '#fff',
+                  fontSize: 10, fontWeight: 800,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '0 5px', flexShrink: 0, lineHeight: 1,
+                }}>
+                  {unreadMessages > 99 ? '99+' : unreadMessages}
+                </span>
+              )}
+            </a>
             <a href="/landlord/listings" className="sb-item"><span className="sb-ico">📋</span>Listings</a>
             <span className="sb-section">Account</span>
             <a href="/landlord/settings" className="sb-item"><span className="sb-ico">⚙️</span>Settings</a>
@@ -406,7 +447,7 @@ export default function ReportsPage() {
               <div className="sb-upgrade">
                 <div className="sb-up-title">⭐ Upgrade to Pro</div>
                 <div className="sb-up-sub">Unlock full reports, CSV exports & advanced analytics.</div>
-                <button className="sb-up-btn" onClick={()=>window.location.href='/landlord/upgrade'}>See Plans →</button>
+                <button className="sb-up-btn" onClick={() => window.location.href = '/landlord/upgrade'}>See Plans →</button>
               </div>
             )}
             <div className="sb-user">
@@ -424,7 +465,7 @@ export default function ReportsPage() {
         <div className="main">
           <div className="topbar">
             <div className="tb-left">
-              <button className="hamburger" onClick={()=>setSidebarOpen(true)}>☰</button>
+              <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
               <div className="breadcrumb">Rentura &nbsp;/&nbsp; <b>Reports</b></div>
             </div>
             {/* ── FIX: Topbar export — hidden on mobile via .topbar-export-wrap */}
@@ -433,20 +474,20 @@ export default function ReportsPage() {
                 <div className="export-dropdown">
                   <button
                     className="btn-export"
-                    onClick={()=>setShowExportMenu(v=>!v)}>
+                    onClick={() => setShowExportMenu(v => !v)}>
                     📥 Export CSV ▾
                   </button>
                   {showExportMenu && (
                     <>
-                      <div style={{position:'fixed',inset:0,zIndex:199}} onClick={()=>setShowExportMenu(false)}/>
+                      <div style={{ position: 'fixed', inset: 0, zIndex: 199 }} onClick={() => setShowExportMenu(false)} />
                       <div className="export-menu">
-                        <button className="export-menu-item" onClick={()=>{handleExportMonthlyCSV();setShowExportMenu(false)}}>
+                        <button className="export-menu-item" onClick={() => { handleExportMonthlyCSV(); setShowExportMenu(false) }}>
                           📅 Monthly Collection
                         </button>
-                        <button className="export-menu-item" onClick={()=>{handleExportPropertyCSV();setShowExportMenu(false)}}>
+                        <button className="export-menu-item" onClick={() => { handleExportPropertyCSV(); setShowExportMenu(false) }}>
                           🏠 Property Breakdown
                         </button>
-                        <button className="export-menu-item" onClick={()=>{handleExportAnnualCSV();setShowExportMenu(false)}}>
+                        <button className="export-menu-item" onClick={() => { handleExportAnnualCSV(); setShowExportMenu(false) }}>
                           📈 Annual Revenue
                         </button>
                       </div>
@@ -454,8 +495,8 @@ export default function ReportsPage() {
                   )}
                 </div>
               ) : (
-                <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                  <button className="btn-export-locked" onClick={()=>setShowUpgradeModal(true)}>🔒 Export CSV</button>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button className="btn-export-locked" onClick={() => setShowUpgradeModal(true)}>🔒 Export CSV</button>
                   <a href="/landlord/upgrade" className="btn-upgrade">⭐ Pro</a>
                 </div>
               )}
@@ -465,7 +506,7 @@ export default function ReportsPage() {
           <div className="content">
             <div className="page-hd">
               <div>
-                <div className="page-title">Reports {isPro && <span style={{fontSize:13,fontWeight:700,background:'linear-gradient(135deg,#2563EB,#6366F1)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text',marginLeft:6}}>⭐ Pro</span>}</div>
+                <div className="page-title">Reports {isPro && <span style={{ fontSize: 13, fontWeight: 700, background: 'linear-gradient(135deg,#2563EB,#6366F1)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginLeft: 6 }}>⭐ Pro</span>}</div>
                 <div className="page-sub">Financial & occupancy overview · {MONTHS[NOW.getMonth()]} {NOW.getFullYear()}</div>
               </div>
             </div>
@@ -474,45 +515,45 @@ export default function ReportsPage() {
             {isPro && (
               <div
                 className="mobile-export-strip"
-                style={{gap:8,flexWrap:'wrap',marginBottom:16,padding:'12px 14px',background:'#fff',border:'1px solid #E2E8F0',borderRadius:12,boxShadow:'0 1px 4px rgba(15,23,42,.04)'}}>
-                <div style={{fontSize:12.5,fontWeight:700,color:'#374151',width:'100%',marginBottom:4}}>📥 Export Reports</div>
-                <button className="btn-export" style={{fontSize:12,padding:'7px 12px'}} onClick={handleExportMonthlyCSV}>📅 Monthly CSV</button>
-                <button className="btn-export" style={{fontSize:12,padding:'7px 12px'}} onClick={handleExportPropertyCSV}>🏠 Property CSV</button>
-                <button className="btn-export" style={{fontSize:12,padding:'7px 12px'}} onClick={handleExportAnnualCSV}>📈 Annual CSV</button>
+                style={{ gap: 8, flexWrap: 'wrap', marginBottom: 16, padding: '12px 14px', background: '#fff', border: '1px solid #E2E8F0', borderRadius: 12, boxShadow: '0 1px 4px rgba(15,23,42,.04)' }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#374151', width: '100%', marginBottom: 4 }}>📥 Export Reports</div>
+                <button className="btn-export" style={{ fontSize: 12, padding: '7px 12px' }} onClick={handleExportMonthlyCSV}>📅 Monthly CSV</button>
+                <button className="btn-export" style={{ fontSize: 12, padding: '7px 12px' }} onClick={handleExportPropertyCSV}>🏠 Property CSV</button>
+                <button className="btn-export" style={{ fontSize: 12, padding: '7px 12px' }} onClick={handleExportAnnualCSV}>📈 Annual CSV</button>
               </div>
             )}
             {!isPro && (
               <div
                 className="mobile-export-strip"
-                style={{gap:8,flexWrap:'wrap',marginBottom:16,padding:'12px 14px',background:'#F8FAFC',border:'1.5px dashed #E2E8F0',borderRadius:12}}>
-                <div style={{fontSize:12.5,fontWeight:700,color:'#94A3B8',width:'100%',marginBottom:4}}>📥 Export Reports</div>
-                <button className="btn-export-locked" onClick={()=>setShowUpgradeModal(true)}>🔒 Monthly CSV</button>
-                <button className="btn-export-locked" onClick={()=>setShowUpgradeModal(true)}>🔒 Property CSV</button>
-                <button className="btn-export-locked" onClick={()=>setShowUpgradeModal(true)}>🔒 Annual CSV</button>
-                <a href="/landlord/upgrade" className="btn-upgrade" style={{fontSize:12,padding:'7px 12px'}}>⭐ Upgrade for CSV</a>
+                style={{ gap: 8, flexWrap: 'wrap', marginBottom: 16, padding: '12px 14px', background: '#F8FAFC', border: '1.5px dashed #E2E8F0', borderRadius: 12 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#94A3B8', width: '100%', marginBottom: 4 }}>📥 Export Reports</div>
+                <button className="btn-export-locked" onClick={() => setShowUpgradeModal(true)}>🔒 Monthly CSV</button>
+                <button className="btn-export-locked" onClick={() => setShowUpgradeModal(true)}>🔒 Property CSV</button>
+                <button className="btn-export-locked" onClick={() => setShowUpgradeModal(true)}>🔒 Annual CSV</button>
+                <a href="/landlord/upgrade" className="btn-upgrade" style={{ fontSize: 12, padding: '7px 12px' }}>⭐ Upgrade for CSV</a>
               </div>
             )}
 
             {/* Summary stats */}
             <div className="summary">
               <div className="sum-card">
-                <div className="sum-top"><div className="sum-ico" style={{background:'#F0FDF4'}}>💰</div><span className="sum-tag" style={{background:'#DCFCE7',color:'#16A34A'}}>{collectionRate}%</span></div>
-                {loading?<div className="skeleton" style={{height:22,width:80,marginBottom:6}}/>:<div className="sum-val">${totalCollected.toLocaleString()}</div>}
+                <div className="sum-top"><div className="sum-ico" style={{ background: '#F0FDF4' }}>💰</div><span className="sum-tag" style={{ background: '#DCFCE7', color: '#16A34A' }}>{collectionRate}%</span></div>
+                {loading ? <div className="skeleton" style={{ height: 22, width: 80, marginBottom: 6 }} /> : <div className="sum-val">${totalCollected.toLocaleString()}</div>}
                 <div className="sum-lbl">Collected This Month</div>
               </div>
               <div className="sum-card">
-                <div className="sum-top"><div className="sum-ico" style={{background:'#FEE2E2'}}>⚠️</div><span className="sum-tag" style={{background:totalOverdue>0?'#FEE2E2':'#F1F5F9',color:totalOverdue>0?'#DC2626':'#94A3B8'}}>{totalOverdue>0?'Overdue':'Clear'}</span></div>
-                {loading?<div className="skeleton" style={{height:22,width:80,marginBottom:6}}/>:<div className="sum-val" style={{color:totalOverdue>0?'#DC2626':'#0F172A'}}>${totalOverdue.toLocaleString()}</div>}
+                <div className="sum-top"><div className="sum-ico" style={{ background: '#FEE2E2' }}>⚠️</div><span className="sum-tag" style={{ background: totalOverdue > 0 ? '#FEE2E2' : '#F1F5F9', color: totalOverdue > 0 ? '#DC2626' : '#94A3B8' }}>{totalOverdue > 0 ? 'Overdue' : 'Clear'}</span></div>
+                {loading ? <div className="skeleton" style={{ height: 22, width: 80, marginBottom: 6 }} /> : <div className="sum-val" style={{ color: totalOverdue > 0 ? '#DC2626' : '#0F172A' }}>${totalOverdue.toLocaleString()}</div>}
                 <div className="sum-lbl">Overdue This Month</div>
               </div>
               <div className="sum-card">
-                <div className="sum-top"><div className="sum-ico" style={{background:'#FEF3C7'}}>🔧</div><span className="sum-tag" style={{background:'#FEF3C7',color:'#D97706'}}>{openMaint} open</span></div>
-                {loading?<div className="skeleton" style={{height:22,width:50,marginBottom:6}}/>:<div className="sum-val">{openMaint+resolvedMaint}</div>}
+                <div className="sum-top"><div className="sum-ico" style={{ background: '#FEF3C7' }}>🔧</div><span className="sum-tag" style={{ background: '#FEF3C7', color: '#D97706' }}>{openMaint} open</span></div>
+                {loading ? <div className="skeleton" style={{ height: 22, width: 50, marginBottom: 6 }} /> : <div className="sum-val">{openMaint + resolvedMaint}</div>}
                 <div className="sum-lbl">Total Maintenance</div>
               </div>
               <div className="sum-card">
-                <div className="sum-top"><div className="sum-ico" style={{background:'#EFF6FF'}}>✅</div><span className="sum-tag" style={{background:'#EFF6FF',color:'#2563EB'}}>{resolvedMaint} resolved</span></div>
-                {loading?<div className="skeleton" style={{height:22,width:50,marginBottom:6}}/>:<div className="sum-val" style={{color:'#2563EB'}}>{resolutionRate}%</div>}
+                <div className="sum-top"><div className="sum-ico" style={{ background: '#EFF6FF' }}>✅</div><span className="sum-tag" style={{ background: '#EFF6FF', color: '#2563EB' }}>{resolvedMaint} resolved</span></div>
+                {loading ? <div className="skeleton" style={{ height: 22, width: 50, marginBottom: 6 }} /> : <div className="sum-val" style={{ color: '#2563EB' }}>{resolutionRate}%</div>}
                 <div className="sum-lbl">Resolution Rate</div>
               </div>
             </div>
@@ -543,42 +584,42 @@ export default function ReportsPage() {
                   <div><div className="card-title">Rent Collection</div><div className="card-sub">Last 6 months breakdown</div></div>
                   <span className="free-badge">✓ Free</span>
                 </div>
-                {loading?(
-                  <div style={{display:'flex',gap:6,height:130,alignItems:'flex-end'}}>
-                    {[55,40,65,45,70,90].map((h,i)=><div key={i} className="skeleton" style={{flex:1,height:`${h}%`,borderRadius:6}}/>)}
+                {loading ? (
+                  <div style={{ display: 'flex', gap: 6, height: 130, alignItems: 'flex-end' }}>
+                    {[55, 40, 65, 45, 70, 90].map((h, i) => <div key={i} className="skeleton" style={{ flex: 1, height: `${h}%`, borderRadius: 6 }} />)}
                   </div>
-                ):(
+                ) : (
                   <>
                     <div className="chart-area">
-                      {monthStats.map((m:any,i:number)=>{
-                        const isGhost=m.total===0
-                        const ch=m.total>0?Math.max(4,Math.round((m.collected/maxBar)*100)):0
-                        const oh=m.total>0?Math.max(0,Math.round((m.overdue/maxBar)*100)):0
-                        const ph=m.total>0?Math.max(0,Math.round((m.pending/maxBar)*100)):0
-                        const isCurrent=i===5
-                        return(
+                      {monthStats.map((m: any, i: number) => {
+                        const isGhost = m.total === 0
+                        const ch = m.total > 0 ? Math.max(4, Math.round((m.collected / maxBar) * 100)) : 0
+                        const oh = m.total > 0 ? Math.max(0, Math.round((m.overdue / maxBar) * 100)) : 0
+                        const ph = m.total > 0 ? Math.max(0, Math.round((m.pending / maxBar) * 100)) : 0
+                        const isCurrent = i === 5
+                        return (
                           <div key={i} className="bar-col">
-                            <div style={{width:'100%',flex:1,display:'flex',flexDirection:'column',justifyContent:'flex-end',gap:1}}>
+                            <div style={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: 1 }}>
                               {isGhost
-                                ?<div style={{width:'100%',height:'20%',minHeight:6,borderRadius:5,background:'#F1F5F9',border:'1.5px dashed #E2E8F0'}}/>
-                                :<>
-                                  {ph>0&&<div style={{width:'100%',height:`${ph}%`,minHeight:3,borderRadius:'3px 3px 0 0',background:'#FEF3C7',border:'1px solid #FDE68A'}}/>}
-                                  {oh>0&&<div style={{width:'100%',height:`${oh}%`,minHeight:3,background:'#FECACA',border:'1px solid #FCA5A5'}}/>}
-                                  {ch>0&&<div style={{width:'100%',height:`${ch}%`,minHeight:5,borderRadius:oh===0&&ph===0?'5px 5px 0 0':'0',background:isCurrent?'linear-gradient(180deg,#2563EB,#6366F1)':'linear-gradient(180deg,#93C5FD,#818CF8)'}}/>}
+                                ? <div style={{ width: '100%', height: '20%', minHeight: 6, borderRadius: 5, background: '#F1F5F9', border: '1.5px dashed #E2E8F0' }} />
+                                : <>
+                                  {ph > 0 && <div style={{ width: '100%', height: `${ph}%`, minHeight: 3, borderRadius: '3px 3px 0 0', background: '#FEF3C7', border: '1px solid #FDE68A' }} />}
+                                  {oh > 0 && <div style={{ width: '100%', height: `${oh}%`, minHeight: 3, background: '#FECACA', border: '1px solid #FCA5A5' }} />}
+                                  {ch > 0 && <div style={{ width: '100%', height: `${ch}%`, minHeight: 5, borderRadius: oh === 0 && ph === 0 ? '5px 5px 0 0' : '0', background: isCurrent ? 'linear-gradient(180deg,#2563EB,#6366F1)' : 'linear-gradient(180deg,#93C5FD,#818CF8)' }} />}
                                 </>
                               }
                             </div>
-                            <div className="bar-lbl" style={{fontWeight:isCurrent?700:400,color:isCurrent?'#0F172A':'#94A3B8'}}>{m.month}</div>
+                            <div className="bar-lbl" style={{ fontWeight: isCurrent ? 700 : 400, color: isCurrent ? '#0F172A' : '#94A3B8' }}>{m.month}</div>
                           </div>
                         )
                       })}
                     </div>
-                    <div className="chart-divider"/>
+                    <div className="chart-divider" />
                     <div className="legend">
-                      <span className="leg-item"><span className="leg-dot" style={{background:'#3B82F6'}}/>Collected</span>
-                      <span className="leg-item"><span className="leg-dot" style={{background:'#FCA5A5'}}/>Overdue</span>
-                      <span className="leg-item"><span className="leg-dot" style={{background:'#FDE68A'}}/>Pending</span>
-                      <span className="leg-item"><span className="leg-dot" style={{background:'#E2E8F0',border:'1.5px dashed #CBD5E1'}}/>No data</span>
+                      <span className="leg-item"><span className="leg-dot" style={{ background: '#3B82F6' }} />Collected</span>
+                      <span className="leg-item"><span className="leg-dot" style={{ background: '#FCA5A5' }} />Overdue</span>
+                      <span className="leg-item"><span className="leg-dot" style={{ background: '#FDE68A' }} />Pending</span>
+                      <span className="leg-item"><span className="leg-dot" style={{ background: '#E2E8F0', border: '1.5px dashed #CBD5E1' }} />No data</span>
                     </div>
                   </>
                 )}
@@ -589,32 +630,32 @@ export default function ReportsPage() {
                   <div><div className="card-title">Occupancy Rate</div><div className="card-sub">Last 6 months</div></div>
                   <span className="free-badge">✓ Free</span>
                 </div>
-                {loading?(
-                  <div style={{display:'flex',gap:6,height:110,alignItems:'flex-end'}}>
-                    {[60,65,55,70,68,75].map((h,i)=><div key={i} className="skeleton" style={{flex:1,height:`${h}%`,borderRadius:6}}/>)}
+                {loading ? (
+                  <div style={{ display: 'flex', gap: 6, height: 110, alignItems: 'flex-end' }}>
+                    {[60, 65, 55, 70, 68, 75].map((h, i) => <div key={i} className="skeleton" style={{ flex: 1, height: `${h}%`, borderRadius: 6 }} />)}
                   </div>
-                ):(
+                ) : (
                   <>
                     <div className="occ-area">
-                      {occStats.map((o,i)=>{
-                        const isCurrent=i===5
-                        const color=o.rate>=80?(isCurrent?'linear-gradient(180deg,#10B981,#34D399)':'linear-gradient(180deg,#6EE7B7,#A7F3D0)')
-                          :o.rate>=50?(isCurrent?'linear-gradient(180deg,#3B82F6,#6366F1)':'linear-gradient(180deg,#93C5FD,#A5B4FC)')
-                          :(isCurrent?'linear-gradient(180deg,#F59E0B,#FCD34D)':'linear-gradient(180deg,#FCD34D,#FDE68A)')
-                        return(
+                      {occStats.map((o, i) => {
+                        const isCurrent = i === 5
+                        const color = o.rate >= 80 ? (isCurrent ? 'linear-gradient(180deg,#10B981,#34D399)' : 'linear-gradient(180deg,#6EE7B7,#A7F3D0)')
+                          : o.rate >= 50 ? (isCurrent ? 'linear-gradient(180deg,#3B82F6,#6366F1)' : 'linear-gradient(180deg,#93C5FD,#A5B4FC)')
+                            : (isCurrent ? 'linear-gradient(180deg,#F59E0B,#FCD34D)' : 'linear-gradient(180deg,#FCD34D,#FDE68A)')
+                        return (
                           <div key={i} className="occ-col">
-                            <div className="occ-pct-lbl" style={{color:isCurrent?'#0F172A':'#94A3B8'}}>{o.rate}%</div>
-                            <div style={{width:'100%',flex:1,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
-                              <div className="occ-bar-el" style={{height:`${o.rate}%`,minHeight:5,background:color}}/>
+                            <div className="occ-pct-lbl" style={{ color: isCurrent ? '#0F172A' : '#94A3B8' }}>{o.rate}%</div>
+                            <div style={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                              <div className="occ-bar-el" style={{ height: `${o.rate}%`, minHeight: 5, background: color }} />
                             </div>
-                            <div className="occ-month" style={{fontWeight:isCurrent?700:400,color:isCurrent?'#0F172A':'#94A3B8'}}>{o.month}</div>
+                            <div className="occ-month" style={{ fontWeight: isCurrent ? 700 : 400, color: isCurrent ? '#0F172A' : '#94A3B8' }}>{o.month}</div>
                           </div>
                         )
                       })}
                     </div>
-                    <div style={{marginTop:12,padding:'10px 12px',background:'#F8FAFC',borderRadius:10,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                      <span style={{fontSize:12.5,color:'#64748B',fontWeight:500}}>Current occupancy</span>
-                      <span style={{fontSize:13.5,fontWeight:700,color:occStats[5]?.rate>=80?'#16A34A':occStats[5]?.rate>=50?'#2563EB':'#D97706'}}>{occStats[5]?.rate||0}%</span>
+                    <div style={{ marginTop: 12, padding: '10px 12px', background: '#F8FAFC', borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 12.5, color: '#64748B', fontWeight: 500 }}>Current occupancy</span>
+                      <span style={{ fontSize: 13.5, fontWeight: 700, color: occStats[5]?.rate >= 80 ? '#16A34A' : occStats[5]?.rate >= 50 ? '#2563EB' : '#D97706' }}>{occStats[5]?.rate || 0}%</span>
                     </div>
                   </>
                 )}
@@ -627,24 +668,24 @@ export default function ReportsPage() {
                   <div><div className="card-title">Property Breakdown</div><div className="card-sub">Revenue & occupancy per property</div></div>
                   <span className="free-badge">✓ Free</span>
                 </div>
-                {loading?[1,2].map(i=>(
+                {loading ? [1, 2].map(i => (
                   <div key={i} className="prop-row">
-                    <div className="skeleton" style={{width:36,height:36,borderRadius:10,flexShrink:0}}/>
-                    <div style={{flex:1}}><div className="skeleton" style={{height:12,width:'55%',marginBottom:6}}/><div className="skeleton" style={{height:6,width:'80%',borderRadius:99}}/></div>
-                    <div><div className="skeleton" style={{height:16,width:50,marginBottom:4}}/><div className="skeleton" style={{height:10,width:32}}/></div>
+                    <div className="skeleton" style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}><div className="skeleton" style={{ height: 12, width: '55%', marginBottom: 6 }} /><div className="skeleton" style={{ height: 6, width: '80%', borderRadius: 99 }} /></div>
+                    <div><div className="skeleton" style={{ height: 16, width: 50, marginBottom: 4 }} /><div className="skeleton" style={{ height: 10, width: 32 }} /></div>
                   </div>
-                )):propStats.length===0?(
-                  <div style={{textAlign:'center',padding:24,color:'#94A3B8',fontSize:13}}>No properties found</div>
-                ):propStats.map((p,i)=>{
-                  const pct=p.units>0?Math.round((p.occupied/p.units)*100):0
-                  const bgs=['linear-gradient(135deg,#2563EB,#6366F1)','linear-gradient(135deg,#10B981,#34D399)','linear-gradient(135deg,#F59E0B,#FCD34D)','linear-gradient(135deg,#EF4444,#F87171)']
-                  return(
+                )) : propStats.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 24, color: '#94A3B8', fontSize: 13 }}>No properties found</div>
+                ) : propStats.map((p, i) => {
+                  const pct = p.units > 0 ? Math.round((p.occupied / p.units) * 100) : 0
+                  const bgs = ['linear-gradient(135deg,#2563EB,#6366F1)', 'linear-gradient(135deg,#10B981,#34D399)', 'linear-gradient(135deg,#F59E0B,#FCD34D)', 'linear-gradient(135deg,#EF4444,#F87171)']
+                  return (
                     <div key={i} className="prop-row">
-                      <div className="prop-ico" style={{background:bgs[i%bgs.length]}}>🏠</div>
-                      <div style={{flex:1,minWidth:0}}>
+                      <div className="prop-ico" style={{ background: bgs[i % bgs.length] }}>🏠</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div className="prop-name">{p.name}</div>
                         <div className="prop-sub">{p.occupied} of {p.units} units occupied</div>
-                        <div className="prop-bar-bg"><div className="prop-bar-fill" style={{width:`${pct}%`}}/></div>
+                        <div className="prop-bar-bg"><div className="prop-bar-fill" style={{ width: `${pct}%` }} /></div>
                       </div>
                       <div className="prop-right">
                         <div className="prop-rev">${p.revenue.toLocaleString()}</div>
@@ -660,28 +701,28 @@ export default function ReportsPage() {
                   <div><div className="card-title">Maintenance Summary</div><div className="card-sub">All time overview</div></div>
                   <span className="free-badge">✓ Free</span>
                 </div>
-                {loading?[1,2,3].map(i=>(
+                {loading ? [1, 2, 3].map(i => (
                   <div key={i} className="maint-item">
-                    <div><div className="skeleton" style={{height:12,width:90,marginBottom:5}}/><div className="skeleton" style={{height:10,width:65}}/></div>
-                    <div className="skeleton" style={{height:20,width:36}}/>
+                    <div><div className="skeleton" style={{ height: 12, width: 90, marginBottom: 5 }} /><div className="skeleton" style={{ height: 10, width: 65 }} /></div>
+                    <div className="skeleton" style={{ height: 20, width: 36 }} />
                   </div>
-                )):(
+                )) : (
                   <>
                     <div className="maint-item">
                       <div><div className="maint-label">Open Requests</div><div className="maint-desc">Needs attention</div></div>
-                      <div className="maint-val" style={{color:openMaint>0?'#D97706':'#16A34A'}}>{openMaint}</div>
+                      <div className="maint-val" style={{ color: openMaint > 0 ? '#D97706' : '#16A34A' }}>{openMaint}</div>
                     </div>
                     <div className="maint-item">
                       <div><div className="maint-label">Resolved</div><div className="maint-desc">All time</div></div>
-                      <div className="maint-val" style={{color:'#16A34A'}}>{resolvedMaint}</div>
+                      <div className="maint-val" style={{ color: '#16A34A' }}>{resolvedMaint}</div>
                     </div>
                     <div className="maint-item">
                       <div><div className="maint-label">Resolution Rate</div><div className="maint-desc">Resolved vs total</div></div>
-                      <div className="maint-val" style={{color:'#2563EB'}}>{resolutionRate}%</div>
+                      <div className="maint-val" style={{ color: '#2563EB' }}>{resolutionRate}%</div>
                     </div>
                     <div className="prog-wrap">
-                      <div className="prog-top"><span>Resolution progress</span><span style={{color:'#0F172A'}}>{resolvedMaint}/{openMaint+resolvedMaint}</span></div>
-                      <div className="prog-bg"><div className="prog-fill" style={{width:`${resolutionRate}%`,background:resolutionRate>=70?'linear-gradient(90deg,#10B981,#34D399)':'linear-gradient(90deg,#F59E0B,#FCD34D)'}}/></div>
+                      <div className="prog-top"><span>Resolution progress</span><span style={{ color: '#0F172A' }}>{resolvedMaint}/{openMaint + resolvedMaint}</span></div>
+                      <div className="prog-bg"><div className="prog-fill" style={{ width: `${resolutionRate}%`, background: resolutionRate >= 70 ? 'linear-gradient(90deg,#10B981,#34D399)' : 'linear-gradient(90deg,#F59E0B,#FCD34D)' }} /></div>
                     </div>
                   </>
                 )}
@@ -689,48 +730,48 @@ export default function ReportsPage() {
             </div>
 
             {isPro ? (
-              <div className="card" style={{marginBottom:12}}>
+              <div className="card" style={{ marginBottom: 12 }}>
                 <div className="card-head">
                   <div><div className="card-title">Annual Revenue Trend</div><div className="card-sub">Last 12 months · collected payments</div></div>
-                  <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <span className="pro-badge-tag">⭐ Pro</span>
-                    <button className="btn-export" onClick={handleExportAnnualCSV} style={{fontSize:11.5,padding:'5px 10px'}}>📥 Export</button>
+                    <button className="btn-export" onClick={handleExportAnnualCSV} style={{ fontSize: 11.5, padding: '5px 10px' }}>📥 Export</button>
                   </div>
                 </div>
-                {loading?(
-                  <div style={{display:'flex',gap:4,height:120,alignItems:'flex-end'}}>
-                    {Array(12).fill(0).map((_,i)=><div key={i} className="skeleton" style={{flex:1,height:`${40+Math.random()*50}%`,borderRadius:4}}/>)}
+                {loading ? (
+                  <div style={{ display: 'flex', gap: 4, height: 120, alignItems: 'flex-end' }}>
+                    {Array(12).fill(0).map((_, i) => <div key={i} className="skeleton" style={{ flex: 1, height: `${40 + Math.random() * 50}%`, borderRadius: 4 }} />)}
                   </div>
-                ):(
+                ) : (
                   <>
-                    <div style={{display:'flex',alignItems:'flex-end',gap:4,height:120,marginBottom:8}}>
-                      {annualStats.map((m,i)=>{
-                        const h = maxAnnualBar > 0 ? Math.max(4, Math.round((m.revenue/maxAnnualBar)*100)) : 4
-                        const isCurrent = i === annualStats.length-1
-                        return(
-                          <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center'}}>
-                            <div style={{width:'100%',height:`${h}%`,minHeight:4,borderRadius:'4px 4px 0 0',background:m.revenue>0?(isCurrent?'linear-gradient(180deg,#2563EB,#6366F1)':'linear-gradient(180deg,#93C5FD,#818CF8)'):'#F1F5F9'}}/>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 120, marginBottom: 8 }}>
+                      {annualStats.map((m, i) => {
+                        const h = maxAnnualBar > 0 ? Math.max(4, Math.round((m.revenue / maxAnnualBar) * 100)) : 4
+                        const isCurrent = i === annualStats.length - 1
+                        return (
+                          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <div style={{ width: '100%', height: `${h}%`, minHeight: 4, borderRadius: '4px 4px 0 0', background: m.revenue > 0 ? (isCurrent ? 'linear-gradient(180deg,#2563EB,#6366F1)' : 'linear-gradient(180deg,#93C5FD,#818CF8)') : '#F1F5F9' }} />
                           </div>
                         )
                       })}
                     </div>
-                    <div style={{display:'flex',gap:4,marginBottom:12}}>
-                      {annualStats.map((m,i)=>(
-                        <div key={i} style={{flex:1,textAlign:'center',fontSize:9,color:i===annualStats.length-1?'#0F172A':'#94A3B8',fontWeight:i===annualStats.length-1?700:400}}>{m.month}</div>
+                    <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+                      {annualStats.map((m, i) => (
+                        <div key={i} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: i === annualStats.length - 1 ? '#0F172A' : '#94A3B8', fontWeight: i === annualStats.length - 1 ? 700 : 400 }}>{m.month}</div>
                       ))}
                     </div>
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
-                      <div style={{background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:10,padding:'10px 12px'}}>
-                        <div style={{fontSize:11,color:'#16A34A',fontWeight:600,marginBottom:3}}>Total 12mo</div>
-                        <div style={{fontFamily:'Fraunces,serif',fontSize:17,fontWeight:700,color:'#0F172A'}}>${totalAnnualRevenue.toLocaleString()}</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+                      <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 10, padding: '10px 12px' }}>
+                        <div style={{ fontSize: 11, color: '#16A34A', fontWeight: 600, marginBottom: 3 }}>Total 12mo</div>
+                        <div style={{ fontFamily: 'Fraunces,serif', fontSize: 17, fontWeight: 700, color: '#0F172A' }}>${totalAnnualRevenue.toLocaleString()}</div>
                       </div>
-                      <div style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:10,padding:'10px 12px'}}>
-                        <div style={{fontSize:11,color:'#2563EB',fontWeight:600,marginBottom:3}}>Monthly Avg</div>
-                        <div style={{fontFamily:'Fraunces,serif',fontSize:17,fontWeight:700,color:'#0F172A'}}>${avgMonthlyRevenue.toLocaleString()}</div>
+                      <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 10, padding: '10px 12px' }}>
+                        <div style={{ fontSize: 11, color: '#2563EB', fontWeight: 600, marginBottom: 3 }}>Monthly Avg</div>
+                        <div style={{ fontFamily: 'Fraunces,serif', fontSize: 17, fontWeight: 700, color: '#0F172A' }}>${avgMonthlyRevenue.toLocaleString()}</div>
                       </div>
-                      <div style={{background:'#FFFBEB',border:'1px solid #FDE68A',borderRadius:10,padding:'10px 12px'}}>
-                        <div style={{fontSize:11,color:'#D97706',fontWeight:600,marginBottom:3}}>Best Month</div>
-                        <div style={{fontFamily:'Fraunces,serif',fontSize:17,fontWeight:700,color:'#0F172A'}}>{bestMonth}</div>
+                      <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, padding: '10px 12px' }}>
+                        <div style={{ fontSize: 11, color: '#D97706', fontWeight: 600, marginBottom: 3 }}>Best Month</div>
+                        <div style={{ fontFamily: 'Fraunces,serif', fontSize: 17, fontWeight: 700, color: '#0F172A' }}>{bestMonth}</div>
                       </div>
                     </div>
                   </>
@@ -740,9 +781,9 @@ export default function ReportsPage() {
               <div className="pro-wrap">
                 <div className="card pro-blur">
                   <div className="card-head"><div className="card-title">Annual Revenue Trend</div></div>
-                  <div style={{display:'flex',alignItems:'flex-end',gap:4,height:110,marginBottom:8}}>
-                    {[3200,3400,3100,3600,3500,3900,3700,4200,4000,4400,4200,4600].map((v,i)=>(
-                      <div key={i} style={{flex:1,height:`${Math.round((v/5000)*100)}%`,background:i===NOW.getMonth()?'linear-gradient(180deg,#2563EB,#6366F1)':'#CBD5E1',borderRadius:'4px 4px 0 0',minHeight:4}}/>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 110, marginBottom: 8 }}>
+                    {[3200, 3400, 3100, 3600, 3500, 3900, 3700, 4200, 4000, 4400, 4200, 4600].map((v, i) => (
+                      <div key={i} style={{ flex: 1, height: `${Math.round((v / 5000) * 100)}%`, background: i === NOW.getMonth() ? 'linear-gradient(180deg,#2563EB,#6366F1)' : '#CBD5E1', borderRadius: '4px 4px 0 0', minHeight: 4 }} />
                     ))}
                   </div>
                 </div>
@@ -757,54 +798,54 @@ export default function ReportsPage() {
             )}
 
             {isPro ? (
-              <div className="card" style={{marginBottom:0}}>
+              <div className="card" style={{ marginBottom: 0 }}>
                 <div className="card-head">
                   <div><div className="card-title">Property Performance Comparison</div><div className="card-sub">Revenue & occupancy ranked</div></div>
                   <span className="pro-badge-tag">⭐ Pro</span>
                 </div>
-                {loading?(
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
-                    {[1,2,3].map(i=><div key={i} className="skeleton" style={{height:100,borderRadius:12}}/>)}
+                {loading ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+                    {[1, 2, 3].map(i => <div key={i} className="skeleton" style={{ height: 100, borderRadius: 12 }} />)}
                   </div>
-                ):propStats.length===0?(
-                  <div style={{textAlign:'center',padding:24,color:'#94A3B8',fontSize:13}}>No property data yet</div>
-                ):(
+                ) : propStats.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 24, color: '#94A3B8', fontSize: 13 }}>No property data yet</div>
+                ) : (
                   <>
-                    <div style={{display:'grid',gridTemplateColumns:`repeat(${Math.min(propStats.length,3)},1fr)`,gap:10,marginBottom:14}}>
-                      {[...propStats].sort((a,b)=>b.revenue-a.revenue).slice(0,3).map((p,i)=>{
-                        const pct=p.units>0?Math.round((p.occupied/p.units)*100):0
-                        const medals=['🥇','🥈','🥉']
-                        const bg=i===0?'linear-gradient(135deg,rgba(37,99,235,.08),rgba(99,102,241,.08))':'#F8FAFC'
-                        const border=i===0?'1px solid rgba(37,99,235,.2)':'1px solid #E2E8F0'
-                        return(
-                          <div key={i} style={{padding:14,background:bg,borderRadius:12,border}}>
-                            <div style={{fontSize:18,marginBottom:6}}>{medals[i]}</div>
-                            <div style={{fontSize:12.5,fontWeight:700,color:'#0F172A',marginBottom:6,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.name}</div>
-                            <div style={{fontFamily:'Fraunces,serif',fontSize:20,fontWeight:700,color:i===0?'#2563EB':'#0F172A'}}>${p.revenue.toLocaleString()}</div>
-                            <div style={{fontSize:11,color:'#64748B',marginTop:2}}>/month revenue</div>
-                            <div style={{marginTop:8,height:4,background:'#E2E8F0',borderRadius:99,overflow:'hidden'}}>
-                              <div style={{height:'100%',width:`${pct}%`,background:'linear-gradient(90deg,#3B82F6,#6366F1)',borderRadius:99,transition:'width .4s'}}/>
+                    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(propStats.length, 3)},1fr)`, gap: 10, marginBottom: 14 }}>
+                      {[...propStats].sort((a, b) => b.revenue - a.revenue).slice(0, 3).map((p, i) => {
+                        const pct = p.units > 0 ? Math.round((p.occupied / p.units) * 100) : 0
+                        const medals = ['🥇', '🥈', '🥉']
+                        const bg = i === 0 ? 'linear-gradient(135deg,rgba(37,99,235,.08),rgba(99,102,241,.08))' : '#F8FAFC'
+                        const border = i === 0 ? '1px solid rgba(37,99,235,.2)' : '1px solid #E2E8F0'
+                        return (
+                          <div key={i} style={{ padding: 14, background: bg, borderRadius: 12, border }}>
+                            <div style={{ fontSize: 18, marginBottom: 6 }}>{medals[i]}</div>
+                            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0F172A', marginBottom: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                            <div style={{ fontFamily: 'Fraunces,serif', fontSize: 20, fontWeight: 700, color: i === 0 ? '#2563EB' : '#0F172A' }}>${p.revenue.toLocaleString()}</div>
+                            <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>/month revenue</div>
+                            <div style={{ marginTop: 8, height: 4, background: '#E2E8F0', borderRadius: 99, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg,#3B82F6,#6366F1)', borderRadius: 99, transition: 'width .4s' }} />
                             </div>
-                            <div style={{fontSize:11,color:pct>=80?'#16A34A':pct>=50?'#2563EB':'#D97706',marginTop:4,fontWeight:700}}>{pct}% occupancy</div>
+                            <div style={{ fontSize: 11, color: pct >= 80 ? '#16A34A' : pct >= 50 ? '#2563EB' : '#D97706', marginTop: 4, fontWeight: 700 }}>{pct}% occupancy</div>
                           </div>
                         )
                       })}
                     </div>
                     {propStats.length > 1 && (
-                      <div style={{background:'#F8FAFC',borderRadius:12,padding:'12px 16px'}}>
-                        <div style={{fontSize:12,fontWeight:700,color:'#64748B',marginBottom:8,textTransform:'uppercase',letterSpacing:.5}}>Revenue Share</div>
-                        {[...propStats].sort((a,b)=>b.revenue-a.revenue).map((p,i)=>{
-                          const totalRev = propStats.reduce((s,x)=>s+x.revenue,0)
-                          const share = totalRev>0?Math.round((p.revenue/totalRev)*100):0
-                          const bgs=['#2563EB','#6366F1','#10B981','#F59E0B','#EF4444']
-                          return(
-                            <div key={i} style={{marginBottom:8}}>
-                              <div style={{display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:4}}>
-                                <span style={{fontWeight:600,color:'#0F172A'}}>{p.name}</span>
-                                <span style={{color:'#64748B'}}>{share}% · ${p.revenue.toLocaleString()}</span>
+                      <div style={{ background: '#F8FAFC', borderRadius: 12, padding: '12px 16px' }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#64748B', marginBottom: 8, textTransform: 'uppercase', letterSpacing: .5 }}>Revenue Share</div>
+                        {[...propStats].sort((a, b) => b.revenue - a.revenue).map((p, i) => {
+                          const totalRev = propStats.reduce((s, x) => s + x.revenue, 0)
+                          const share = totalRev > 0 ? Math.round((p.revenue / totalRev) * 100) : 0
+                          const bgs = ['#2563EB', '#6366F1', '#10B981', '#F59E0B', '#EF4444']
+                          return (
+                            <div key={i} style={{ marginBottom: 8 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                                <span style={{ fontWeight: 600, color: '#0F172A' }}>{p.name}</span>
+                                <span style={{ color: '#64748B' }}>{share}% · ${p.revenue.toLocaleString()}</span>
                               </div>
-                              <div style={{height:5,background:'#E2E8F0',borderRadius:99,overflow:'hidden'}}>
-                                <div style={{height:'100%',width:`${share}%`,background:bgs[i%bgs.length],borderRadius:99,transition:'width .4s'}}/>
+                              <div style={{ height: 5, background: '#E2E8F0', borderRadius: 99, overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: `${share}%`, background: bgs[i % bgs.length], borderRadius: 99, transition: 'width .4s' }} />
                               </div>
                             </div>
                           )
@@ -815,18 +856,18 @@ export default function ReportsPage() {
                 )}
               </div>
             ) : (
-              <div className="pro-wrap" style={{marginBottom:0}}>
+              <div className="pro-wrap" style={{ marginBottom: 0 }}>
                 <div className="card pro-blur">
                   <div className="card-head"><div className="card-title">Property Performance Comparison</div></div>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
-                    {['Rush Towers','Ocean View','Green Valley'].map((name,i)=>(
-                      <div key={i} style={{padding:14,background:'#F8FAFC',borderRadius:12,border:'1px solid #E2E8F0'}}>
-                        <div style={{fontSize:12.5,fontWeight:700,color:'#0F172A',marginBottom:8}}>{name}</div>
-                        <div style={{fontFamily:'Fraunces,serif',fontSize:20,fontWeight:700,color:'#2563EB'}}>${[4200,2800,3600][i].toLocaleString()}</div>
-                        <div style={{marginTop:8,height:4,background:'#E2E8F0',borderRadius:99,overflow:'hidden'}}>
-                          <div style={{height:'100%',width:`${[78,55,90][i]}%`,background:'linear-gradient(90deg,#3B82F6,#6366F1)',borderRadius:99}}/>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+                    {['Rush Towers', 'Ocean View', 'Green Valley'].map((name, i) => (
+                      <div key={i} style={{ padding: 14, background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0' }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>{name}</div>
+                        <div style={{ fontFamily: 'Fraunces,serif', fontSize: 20, fontWeight: 700, color: '#2563EB' }}>${[4200, 2800, 3600][i].toLocaleString()}</div>
+                        <div style={{ marginTop: 8, height: 4, background: '#E2E8F0', borderRadius: 99, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${[78, 55, 90][i]}%`, background: 'linear-gradient(90deg,#3B82F6,#6366F1)', borderRadius: 99 }} />
                         </div>
-                        <div style={{fontSize:11,color:'#94A3B8',marginTop:3}}>{[78,55,90][i]}% occ.</div>
+                        <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 3 }}>{[78, 55, 90][i]}% occ.</div>
                       </div>
                     ))}
                   </div>

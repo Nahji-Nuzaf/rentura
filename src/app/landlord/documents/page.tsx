@@ -290,6 +290,32 @@ export default function DocumentsPage() {
     }
   }
 
+  const [unreadMessages, setUnreadMessages] = useState(0)
+
+  useEffect(() => {
+    let channel: any = null
+    const initMessages = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const fetchUnread = async () => {
+        const { count } = await supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('receiver_id', user.id)
+          .eq('read', false)
+        setUnreadMessages(count || 0)
+      }
+      await fetchUnread()
+      channel = supabase
+        .channel('sidebar-unread')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` }, fetchUnread)
+        .subscribe()
+    }
+    initMessages()
+    return () => { if (channel) createClient().removeChannel(channel) }
+  }, [])
+
   return (
     <>
       <style>{`
@@ -551,7 +577,22 @@ export default function DocumentsPage() {
             <span className="sb-section">Management</span>
             <a href="/landlord/maintenance" className="sb-item"><span className="sb-ico">🔧</span>Maintenance</a>
             <a href="/landlord/documents" className="sb-item active"><span className="sb-ico">📁</span>Documents</a>
-            <a href="/landlord/messages" className="sb-item"><span className="sb-ico">💬</span>Messages</a>
+            <a href="/landlord/messages" className="sb-item" style={{ justifyContent: 'space-between' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                <span className="sb-ico">💬</span>Messages
+              </span>
+              {unreadMessages > 0 && (
+                <span style={{
+                  minWidth: 18, height: 18, borderRadius: 99,
+                  background: '#EF4444', color: '#fff',
+                  fontSize: 10, fontWeight: 800,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '0 5px', flexShrink: 0, lineHeight: 1,
+                }}>
+                  {unreadMessages > 99 ? '99+' : unreadMessages}
+                </span>
+              )}
+            </a>
             <a href="/landlord/listings" className="sb-item"><span className="sb-ico">📋</span>Listings</a>
             <span className="sb-section">Account</span>
             <a href="/landlord/settings" className="sb-item"><span className="sb-ico">⚙️</span>Settings</a>
