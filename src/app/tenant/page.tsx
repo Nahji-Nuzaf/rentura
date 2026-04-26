@@ -822,7 +822,7 @@ export default function TenantDashboard() {
                       })}
                     </div>
 
-                    {/* <div className="card">
+                    <div className="card">
                       <div className="card-header">
                         <div className="card-title">
                           Messages
@@ -830,7 +830,7 @@ export default function TenantDashboard() {
                         </div>
                         <a href="/tenant/messages" className="card-action">View All →</a>
                       </div>
-                      {messages.length === 0 ? (
+                      {/* {messages.length === 0 ? (
                         <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>No messages yet</div>
                       ) : messages.slice(0, 2).map(msg => (
                         <div key={msg.id} className="msg-row">
@@ -842,8 +842,8 @@ export default function TenantDashboard() {
                           </div>
                           {!msg.read && <div className="msg-unread" />}
                         </div>
-                      ))}
-                    </div> */}
+                      ))} */}
+                    </div>
                   </div>
                 </div>
               </>
