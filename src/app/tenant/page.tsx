@@ -323,7 +323,7 @@ export default function TenantDashboard() {
         .sb-item.active{background:rgba(59,130,246,.16);color:#93C5FD;font-weight:700;border:1px solid rgba(59,130,246,.22)}
         .sb-ico{font-size:16px;width:20px;text-align:center;flex-shrink:0}
         .sb-count{margin-left:auto;background:#DC2626;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px}
-        .sb-footer{border-top:1px solid rgba(255,255,255,0.07)}
+        .sb-footer{border-top:2px solid rgba(255,255,255,0.07)}
         .sb-role-wrap{position:relative;padding:12px}
         .sb-user{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;cursor:pointer;transition:background .15s}
         .sb-user:hover{background:rgba(255,255,255,.06)}
