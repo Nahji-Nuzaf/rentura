@@ -67,7 +67,6 @@ export default function RentTrackerPage() {
   const [selectedYear] = useState(NOW.getFullYear())
   const [filter, setFilter] = useState<'all' | 'paid' | 'overdue' | 'pending'>('all')
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
-  // const [isPro, setIsPro]               = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   const planLabel = isPro ? plan.toUpperCase() : 'FREE'
@@ -157,12 +156,6 @@ export default function RentTrackerPage() {
       const name = user.user_metadata?.full_name || 'User'
       setFullName(name); setUserId(user.id)
       setUserInitials(name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2))
-
-      // Check pro status
-      const { data: sub } = await supabase.from('subscriptions').select('plan,status')
-        .eq('profile_id', user.id).eq('status', 'active').single()
-      // if (sub && (sub.plan==='pro'||sub.plan==='business')) setIsPro(true)
-
       await loadRecords(user.id, MONTHS[NOW.getMonth()], NOW.getFullYear())
     }
     init()
@@ -181,8 +174,9 @@ export default function RentTrackerPage() {
       const propIds = (props || []).map((p: any) => p.id)
       if (!propIds.length) { showToast('No properties found.', 'error'); return }
 
+      // ── FIX: Also fetch lease_start and lease_end so we can gate generation
       const { data: occupiedUnits } = await supabase
-        .from('units').select('id,monthly_rent,rent_due_day,currency')
+        .from('units').select('id,monthly_rent,rent_due_day,currency,lease_start,lease_end')
         .in('property_id', propIds).eq('status', 'occupied')
       if (!occupiedUnits?.length) { showToast('No occupied units found.', 'error'); return }
 
@@ -202,16 +196,51 @@ export default function RentTrackerPage() {
         ; (occupiedUnits || []).forEach((u: any) => { unitRentMap[u.id] = u })
 
       const toInsert = occupiedUnitIds
-        .filter(uid => !existingUnitIds.has(uid) && unitTenantMap[uid])
-        .map(uid => ({
-          unit_id: uid, tenant_id: unitTenantMap[uid],
-          amount: unitRentMap[uid]?.monthly_rent || 0,
-          due_date: `${selectedYear}-${String(mi + 1).padStart(2, '0')}-${String(unitRentMap[uid]?.rent_due_day || 1).padStart(2, '0')}`,
-          status: 'pending',
-        }))
+        .filter(uid => {
+          // Skip if already has a payment this month
+          if (existingUnitIds.has(uid)) return false
+          // Skip if no tenant
+          if (!unitTenantMap[uid]) return false
+
+          const u = unitRentMap[uid]
+          const dueDay = u?.rent_due_day || 1
+          const dueDateStr = `${selectedYear}-${String(mi + 1).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`
+          const dueDate = new Date(dueDateStr)
+
+          // ── FIX: Only generate if due date falls within the lease period.
+          // If lease_start is set, due date must be on or after it.
+          // If lease_end is set, due date must be on or before it.
+          if (u?.lease_start) {
+            const leaseStart = new Date(u.lease_start)
+            leaseStart.setHours(0, 0, 0, 0)
+            if (dueDate < leaseStart) return false
+          }
+          if (u?.lease_end) {
+            const leaseEnd = new Date(u.lease_end)
+            leaseEnd.setHours(23, 59, 59, 999)
+            if (dueDate > leaseEnd) return false
+          }
+
+          return true
+        })
+        .map(uid => {
+          const u = unitRentMap[uid]
+          const dueDay = u?.rent_due_day || 1
+          return {
+            unit_id: uid, tenant_id: unitTenantMap[uid],
+            amount: u?.monthly_rent || 0,
+            due_date: `${selectedYear}-${String(mi + 1).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`,
+            status: 'pending',
+          }
+        })
 
       if (!toInsert.length) {
-        showToast(`Payments for ${selectedMonth} ${selectedYear} already exist!`, 'success')
+        // Give a helpful message — could be "already exists" or "outside lease"
+        const alreadyExists = occupiedUnitIds.every(uid => existingUnitIds.has(uid))
+        const msg = alreadyExists
+          ? `Payments for ${selectedMonth} ${selectedYear} already exist!`
+          : `No eligible units for ${selectedMonth} ${selectedYear} — check lease dates.`
+        showToast(msg, 'success')
         await loadRecords(userId, selectedMonth, selectedYear); return
       }
       const { error } = await supabase.from('rent_payments').insert(toInsert)
@@ -292,11 +321,16 @@ export default function RentTrackerPage() {
         .sb-user{padding:14px 18px;border-top:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;gap:11px}
         .sb-av{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#3B82F6,#6366F1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0}
         .sb-uname{font-size:13px;font-weight:700;color:#E2E8F0}
-        .sb-uplan{display:inline-block;font-size:10px;font-weight:700;color:#60A5FA;background:rgba(59,130,246,0.14);border:1px solid rgba(59,130,246,0.25);border-radius:5px;padding:1px 6px;margin-top:2px}
+        .sb-uplan{display:inline-block;font-size:10px;font-weight:700;border-radius:5px;padding:1px 6px;margin-top:2px}
         .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:hidden;width:calc(100% - 260px)}
-        .topbar{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:#fff;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(15,23,42,0.04);width:100%}
+
+        /* ── FIX: Topbar — clip content, never let children overflow */
+        .topbar{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:#fff;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(15,23,42,0.04);width:100%;overflow:hidden}
         .tb-left{display:flex;align-items:center;gap:8px;min-width:0;flex:1;overflow:hidden}
-        .tb-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+
+        /* ── FIX: tb-right — never wraps, truncates gracefully on small screens */
+        .tb-right{display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:0}
+
         .hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;color:#475569;padding:4px;flex-shrink:0}
         .breadcrumb{font-size:13px;color:#94A3B8;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}.breadcrumb b{color:#0F172A;font-weight:700}
         .btn-primary{padding:8px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 2px 10px rgba(37,99,235,0.28);transition:all .18s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0}
@@ -305,6 +339,7 @@ export default function RentTrackerPage() {
         .btn-export{padding:8px 14px;border-radius:10px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0;transition:all .15s}
         .btn-export:hover{border-color:#3B82F6;color:#2563EB;background:#EFF6FF}
         .btn-export-locked{padding:8px 14px;border-radius:10px;border:1.5px solid #E2E8F0;background:#F8FAFC;color:#94A3B8;font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0}
+
         .content{padding:22px 20px;flex:1;width:100%;min-width:0;overflow-x:hidden}
         .page-title{font-family:'Fraunces',serif;font-size:28px;font-weight:400;color:#0F172A;letter-spacing:-0.5px;margin-bottom:4px}
         .page-sub{font-size:13.5px;color:#94A3B8;margin-bottom:24px}
@@ -374,7 +409,10 @@ export default function RentTrackerPage() {
         .toast.success{background:linear-gradient(135deg,#16A34A,#15803D)}
         .toast.error{background:linear-gradient(135deg,#DC2626,#B91C1C)}
         @keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-        .info-banner{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#1D4ED8;display:flex;align-items:center;gap:8px}
+
+        /* ── FIX: Info banner — no inline <strong> link that wraps oddly on mobile */
+        .info-banner{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#1D4ED8;line-height:1.55}
+
         .umodal-overlay{position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:600;display:flex;align-items:center;justify-content:center;padding:20px}
         .umodal{background:#fff;border-radius:22px;padding:32px;max-width:400px;width:100%;text-align:center;box-shadow:0 24px 60px rgba(15,23,42,0.2)}
         .umodal-icon{font-size:40px;margin-bottom:14px}
@@ -382,11 +420,25 @@ export default function RentTrackerPage() {
         .umodal-sub{font-size:14px;color:#64748B;line-height:1.6;margin-bottom:20px}
         .umodal-btn-pro{width:100%;padding:13px;border-radius:11px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;margin-bottom:10px}
         .umodal-btn-cancel{background:none;border:none;color:#94A3B8;font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
+
+        /* ── Mobile generate button: shown in content area, hidden in topbar */
+        .mob-generate-btn{display:none}
+
         @media(min-width:1100px){.summary{grid-template-columns:repeat(4,1fr)}}
         @media(max-width:768px){
           .sidebar{transform:translateX(-100%)}.main{margin-left:0!important;width:100%!important}.hamburger{display:block}
-          .topbar{padding:0 14px}.content{padding:14px 14px}.summary{grid-template-columns:repeat(2,1fr)}
-          .rtable{display:none}.rent-mobile-cards{display:flex}.btn-export{display:flex}
+          .topbar{padding:0 14px}
+          .content{padding:14px 14px}
+          .summary{grid-template-columns:repeat(2,1fr)}
+          .rtable{display:none}
+          .rent-mobile-cards{display:flex}
+
+          /* ── FIX: On mobile, hide Export CSV + Generate button from topbar.
+                    Export CSV hidden entirely (no space). Generate moved to content. */
+          .tb-right{display:none!important}
+
+          /* ── FIX: Show the in-content generate button on mobile only */
+          .mob-generate-btn{display:flex;width:100%;margin-bottom:16px}
         }
         @media(max-width:480px){
           .topbar{padding:0 12px}.content{padding:12px 12px}.sum-val{font-size:18px}
@@ -436,7 +488,6 @@ export default function RentTrackerPage() {
             <a href="/landlord/upgrade" className="sb-item"><span className="sb-ico">⭐</span>Upgrade</a>
           </nav>
           <div className="sb-footer">
-            {/* ── FIX: Hide upgrade nudge for Pro users */}
             {!isPro && (
               <div className="sb-upgrade">
                 <div className="sb-up-title">⭐ Upgrade to Pro</div>
@@ -453,14 +504,6 @@ export default function RentTrackerPage() {
                 </span>
               </div>
             </div>
-            {/* <div className="sb-user">
-              <div className="sb-av">{userInitials}</div>
-              <div>
-                <div className="sb-uname">{fullName}</div>
-                ── FIX: Show real plan from usePro()
-                <span className="sb-uplan">{isPro ? 'PRO' : 'FREE'}</span>
-              </div>
-            </div> */}
           </div>
         </aside>
 
@@ -470,13 +513,14 @@ export default function RentTrackerPage() {
               <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
               <div className="breadcrumb">Rentura &nbsp;/&nbsp; <b>Rent Tracker</b></div>
             </div>
+            {/* Desktop topbar actions — hidden on mobile via .tb-right display:none */}
             <div className="tb-right">
               {isPro
-                ? <button className="btn-export" onClick={handleExportCSV}>📥 CSV</button>
+                ? <button className="btn-export" onClick={handleExportCSV}>📥 Export CSV</button>
                 : <button className="btn-export-locked" onClick={() => setShowUpgradeModal(true)}>🔒 CSV</button>
               }
               <button className="btn-primary" disabled={generating} onClick={generatePayments}>
-                {generating ? '⏳ Generating…' : `⚡ Generate Payments`}
+                {generating ? '⏳ Generating…' : `⚡ Generate ${selectedMonth} Payments`}
               </button>
             </div>
           </div>
@@ -485,10 +529,18 @@ export default function RentTrackerPage() {
             <div className="page-title">Rent Tracker</div>
             <div className="page-sub">{selectedMonth} {selectedYear} — {records.length} payment{records.length !== 1 ? 's' : ''}</div>
 
+            {/* ── FIX: Mobile-only generate button — sits cleanly in content area */}
+            <button
+              className="btn-primary mob-generate-btn"
+              disabled={generating}
+              onClick={generatePayments}>
+              {generating ? '⏳ Generating…' : `⚡ Generate ${selectedMonth} Payments`}
+            </button>
+
+            {/* ── FIX: Info banner — plain text, no inline <strong> link that wraps on mobile */}
             {records.length > 0 && (
               <div className="info-banner">
-                {/* 💡 Payments auto-generated when lease dates are set. Use <strong>Generate {selectedMonth} Payments</strong> to add missing records. */}
-                💡 Payments are auto generated when lease / rent dates are set. Use Generate Payments to add missing records.
+                💡 Payments are auto-generated when lease dates are set. Use the Generate button above to add missing records for {selectedMonth}.
               </div>
             )}
 
