@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Image from 'next/image'
 
 type Profile = {
   id: string
@@ -129,34 +130,34 @@ const PRIORITY_COLOR: Record<string, string> = {
 }
 
 const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
-  open:        { bg: '#FEE2E2', color: '#DC2626' },
+  open: { bg: '#FEE2E2', color: '#DC2626' },
   in_progress: { bg: '#FEF9C3', color: '#CA8A04' },
-  resolved:    { bg: '#DCFCE7', color: '#16A34A' },
+  resolved: { bg: '#DCFCE7', color: '#16A34A' },
 }
 
 export default function TenantDashboard() {
   const router = useRouter()
 
-  const [profile, setProfile]         = useState<Profile | null>(null)
-  const [tenantRow, setTenantRow]     = useState<TenantRow | null>(null)
-  const [unit, setUnit]               = useState<Unit | null>(null)
-  const [property, setProperty]       = useState<Property | null>(null)
-  const [landlord, setLandlord]       = useState<Profile | null>(null)
-  const [payments, setPayments]       = useState<RentPayment[]>([])
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [tenantRow, setTenantRow] = useState<TenantRow | null>(null)
+  const [unit, setUnit] = useState<Unit | null>(null)
+  const [property, setProperty] = useState<Property | null>(null)
+  const [landlord, setLandlord] = useState<Profile | null>(null)
+  const [payments, setPayments] = useState<RentPayment[]>([])
   const [maintenance, setMaintenance] = useState<MaintenanceRequest[]>([])
-  const [messages, setMessages]       = useState<Message[]>([])
-  const [loading, setLoading]         = useState(true)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [rolePopoverOpen, setRolePopoverOpen] = useState(false)
-  const [activeRole, setActiveRole]   = useState('tenant')
+  const [activeRole, setActiveRole] = useState('tenant')
   const [showPayModal, setShowPayModal] = useState(false)
 
   // ── Link new property modal ──
-  const [showLinkModal, setShowLinkModal]   = useState(false)
-  const [linkCode, setLinkCode]             = useState('')
-  const [linkError, setLinkError]           = useState('')
-  const [linkSuccess, setLinkSuccess]       = useState('')
-  const [linkLoading, setLinkLoading]       = useState(false)
+  const [showLinkModal, setShowLinkModal] = useState(false)
+  const [linkCode, setLinkCode] = useState('')
+  const [linkError, setLinkError] = useState('')
+  const [linkSuccess, setLinkSuccess] = useState('')
+  const [linkLoading, setLinkLoading] = useState(false)
 
   async function loadDashboard(userId: string) {
     const sb = createClient()
@@ -201,13 +202,13 @@ export default function TenantDashboard() {
     const senderMap: Record<string, string> = {}
     if (senderIds.length) {
       const { data: senders } = await sb.from('profiles').select('id,full_name').in('id', senderIds as string[])
-      ;(senders || []).forEach((s: any) => { senderMap[s.id] = s.full_name })
+        ; (senders || []).forEach((s: any) => { senderMap[s.id] = s.full_name })
     }
     setMessages((msgData || []).map((m: any) => ({ ...m, sender_name: senderMap[m.sender_id] || 'Unknown' })))
   }
 
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       try {
         const sb = createClient()
         const { data: { user } } = await sb.auth.getUser()
@@ -280,24 +281,24 @@ export default function TenantDashboard() {
     setLinkLoading(false)
   }
 
-  const daysLeft   = unit ? daysUntilDue(unit.rent_due_day) : null
+  const daysLeft = unit ? daysUntilDue(unit.rent_due_day) : null
   const { pct, dLeft: leaseDaysLeft } = leaseProgress(unit?.lease_start, unit?.lease_end)
   const currentPay = getCurrentMonthPayment(payments)
   const unreadCount = messages.filter(m => !m.read).length
-  const openMaint   = maintenance.filter(m => m.status !== 'resolved').length
+  const openMaint = maintenance.filter(m => m.status !== 'resolved').length
   const currentPayStatus = currentPay
     ? (isOverdue(currentPay) ? 'overdue' : currentPay.status)
     : 'none'
 
   const payStatusStyle = ({
-    paid:    { label: '✓ Paid',    bg: '#DCFCE7', color: '#16A34A' },
+    paid: { label: '✓ Paid', bg: '#DCFCE7', color: '#16A34A' },
     pending: { label: '⏳ Pending', bg: '#FEF9C3', color: '#CA8A04' },
     overdue: { label: '⚠️ Overdue', bg: '#FEE2E2', color: '#DC2626' },
-    none:    { label: '—',         bg: '#F1F5F9', color: '#64748B' },
+    none: { label: '—', bg: '#F1F5F9', color: '#64748B' },
   } as any)[currentPayStatus] ?? { label: '—', bg: '#F1F5F9', color: '#64748B' }
 
   if (loading) return (
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', fontFamily:"'Plus Jakarta Sans',sans-serif", color:'#94A3B8', fontSize:14 }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: "'Plus Jakarta Sans',sans-serif", color: '#94A3B8', fontSize: 14 }}>
       Loading your dashboard...
     </div>
   )
@@ -310,8 +311,17 @@ export default function TenantDashboard() {
         html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;overflow-x:hidden;max-width:100vw}
         .shell{display:flex;min-height:100vh;position:relative}
         .sidebar{width:260px;background:#0F172A;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:200;transition:transform .25s ease}
-        .sb-logo{display:flex;align-items:center;gap:12px;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.07)}
-        .sb-logo-icon{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#3B82F6,#6366F1);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+        .sb-logo { display:flex; align-items:center; gap:12px; padding:22px 20px 18px; border-bottom:1px solid rgba(255,255,255,0.07); }
+        .sb-logo-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 11px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
         .sb-logo-name{font-family:'Fraunces',serif;font-size:19px;font-weight:700;color:#F8FAFC}
         .sb-nav{flex:1;padding:14px 12px;overflow-y:auto}.sb-nav::-webkit-scrollbar{width:0}
         .sb-section{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#4B6587;padding:16px 10px 7px;display:block}
@@ -431,21 +441,21 @@ export default function TenantDashboard() {
         }
       `}</style>
 
-      <div className={`sb-overlay${sidebarOpen?' open':''}`} onClick={()=>setSidebarOpen(false)}/>
+      <div className={`sb-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
 
       {/* Pay Modal */}
-      <div className={`modal-overlay${showPayModal?' open':''}`} onClick={()=>setShowPayModal(false)}>
-        <div className="modal" onClick={e=>e.stopPropagation()}>
+      <div className={`modal-overlay${showPayModal ? ' open' : ''}`} onClick={() => setShowPayModal(false)}>
+        <div className="modal" onClick={e => e.stopPropagation()}>
           <div className="modal-icon">💳</div>
           <div className="modal-title">Online Payments Coming Soon</div>
           <div className="modal-sub">We're building Stripe-powered rent payments. In the meantime, please pay via your agreed method with your landlord.</div>
-          <button className="modal-cancel" onClick={()=>setShowPayModal(false)}>Got it</button>
+          <button className="modal-cancel" onClick={() => setShowPayModal(false)}>Got it</button>
         </div>
       </div>
 
       {/* Link New Property Modal */}
-      <div className={`modal-overlay${showLinkModal?' open':''}`} onClick={()=>{setShowLinkModal(false);setLinkCode('');setLinkError('');setLinkSuccess('')}}>
-        <div className="modal" onClick={e=>e.stopPropagation()}>
+      <div className={`modal-overlay${showLinkModal ? ' open' : ''}`} onClick={() => { setShowLinkModal(false); setLinkCode(''); setLinkError(''); setLinkSuccess('') }}>
+        <div className="modal" onClick={e => e.stopPropagation()}>
           <div className="modal-icon">🔑</div>
           <div className="modal-title">Link New Property</div>
           <div className="modal-sub">Enter the invite code your new landlord sent you to link your account to the new unit.</div>
@@ -464,16 +474,23 @@ export default function TenantDashboard() {
           <button className="modal-btn" disabled={linkLoading || !!linkSuccess} onClick={handleLinkProperty}>
             {linkLoading ? 'Verifying...' : 'Link Property →'}
           </button>
-          <button className="modal-cancel" onClick={()=>{setShowLinkModal(false);setLinkCode('');setLinkError('');setLinkSuccess('')}}>
+          <button className="modal-cancel" onClick={() => { setShowLinkModal(false); setLinkCode(''); setLinkError(''); setLinkSuccess('') }}>
             Cancel
           </button>
         </div>
       </div>
 
       <div className="shell">
-        <aside className={`sidebar${sidebarOpen?' open':''}`}>
+        <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="sb-logo">
-            <div className="sb-logo-icon">🏘️</div>
+            <div className="sb-logo-icon">
+              <Image
+                src="/icon.png"
+                alt="Rentura Logo"
+                width={24}
+                height={24}
+              />
+            </div>
             <span className="sb-logo-name">Rentura</span>
           </div>
           <nav className="sb-nav">
@@ -491,45 +508,55 @@ export default function TenantDashboard() {
             <a href="/tenant/settings" className="sb-item"><span className="sb-ico">⚙️</span> Settings</a>
           </nav>
           <div className="sb-footer">
-            <div className="sb-role-wrap">
+            <div className="sb-user">
+              <div className="sb-av">{profile ? initials(profile.full_name) : '?'}</div>
+              <div>
+                <div className="sb-uname">{profile?.full_name || 'Loading...'}</div>
+                <div className="sb-uemail">{profile?.email || ''}</div>
+                {/* <span className="sb-uplan" style={{ color: planColor.color, background: planColor.bg, border: `1px solid ${planColor.border}` }}>
+                  {planLabel}
+                </span> */}
+              </div>
+            </div>
+            {/* <div className="sb-role-wrap">
               {rolePopoverOpen && (
                 <div className="role-popover">
                   <div className="rp-title">Switch Role</div>
-                  {['landlord','tenant','seeker'].map(role=>(
-                    <div key={role} className="rp-item" onClick={()=>handleRoleSwitch(role)}>
-                      <span style={{fontSize:16}}>{role==='landlord'?'🏠':role==='tenant'?'🔑':'🔍'}</span>
-                      <span style={{textTransform:'capitalize'}}>{role}</span>
-                      {activeRole===role&&<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5" style={{marginLeft:'auto'}}><polyline points="20 6 9 17 4 12"/></svg>}
+                  {['landlord', 'tenant', 'seeker'].map(role => (
+                    <div key={role} className="rp-item" onClick={() => handleRoleSwitch(role)}>
+                      <span style={{ fontSize: 16 }}>{role === 'landlord' ? '🏠' : role === 'tenant' ? '🔑' : '🔍'}</span>
+                      <span style={{ textTransform: 'capitalize' }}>{role}</span>
+                      {activeRole === role && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5" style={{ marginLeft: 'auto' }}><polyline points="20 6 9 17 4 12" /></svg>}
                     </div>
                   ))}
-                  <div className="rp-divider"/>
-                  <div className="rp-item" onClick={async()=>{await createClient().auth.signOut();window.location.href='/login'}}>
-                    <span style={{fontSize:16}}>🚪</span> Sign out
+                  <div className="rp-divider" />
+                  <div className="rp-item" onClick={async () => { await createClient().auth.signOut(); window.location.href = '/login' }}>
+                    <span style={{ fontSize: 16 }}>🚪</span> Sign out
                   </div>
                 </div>
               )}
-              <div className="sb-user" onClick={()=>setRolePopoverOpen(v=>!v)}>
-                <div className="sb-av">{profile?initials(profile.full_name):'?'}</div>
+              <div className="sb-user" onClick={() => setRolePopoverOpen(v => !v)}>
+                <div className="sb-av">{profile ? initials(profile.full_name) : '?'}</div>
                 <div className="sb-uinfo">
-                  <div className="sb-uname">{profile?.full_name||'Loading...'}</div>
-                  <div className="sb-uemail">{profile?.email||''}</div>
+                  <div className="sb-uname">{profile?.full_name || 'Loading...'}</div>
+                  <div className="sb-uemail">{profile?.email || ''}</div>
                   <div className="sb-role-badge">tenant</div>
                 </div>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2"><polyline points="7 15 12 20 17 15"/><polyline points="7 9 12 4 17 9"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2"><polyline points="7 15 12 20 17 15" /><polyline points="7 9 12 4 17 9" /></svg>
               </div>
-            </div>
+            </div> */}
           </div>
         </aside>
 
         <div className="main">
           <div className="topbar">
             <div className="tb-left">
-              <button className="hamburger" onClick={()=>setSidebarOpen(true)}>☰</button>
+              <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
               <div className="breadcrumb">Rentura &nbsp;/&nbsp; <b>Dashboard</b></div>
             </div>
-            <button className="notif-btn" onClick={()=>window.location.href='/tenant/messages'}>
+            <button className="notif-btn" onClick={() => window.location.href = '/tenant/messages'}>
               🔔
-              {unreadCount>0&&<div className="notif-dot"/>}
+              {unreadCount > 0 && <div className="notif-dot" />}
             </button>
           </div>
 
@@ -540,12 +567,12 @@ export default function TenantDashboard() {
                 <div className="no-tenant-icon">🏠</div>
                 <div className="no-tenant-title">No Active Tenancy Found</div>
                 <div className="no-tenant-sub">
-                  You don't have an active tenancy linked to your account.<br/>
+                  You don't have an active tenancy linked to your account.<br />
                   Enter the invite code your landlord sent you.
                 </div>
                 <button
-                  onClick={()=>setShowLinkModal(true)}
-                  style={{marginTop:24,padding:'12px 28px',borderRadius:12,border:'none',background:'linear-gradient(135deg,#2563EB,#6366F1)',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:"'Plus Jakarta Sans',sans-serif",boxShadow:'0 4px 14px rgba(37,99,235,.3)'}}>
+                  onClick={() => setShowLinkModal(true)}
+                  style={{ marginTop: 24, padding: '12px 28px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#2563EB,#6366F1)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans',sans-serif", boxShadow: '0 4px 14px rgba(37,99,235,.3)' }}>
                   🔑 Enter Invite Code
                 </button>
               </div>
@@ -554,10 +581,10 @@ export default function TenantDashboard() {
                 {/* Link New Property Banner */}
                 <div className="link-banner">
                   <div>
-                    <div style={{fontSize:13.5,fontWeight:700,color:'#1E40AF',marginBottom:3}}>🔑 Moving to a new property?</div>
-                    <div style={{fontSize:12.5,color:'#64748B'}}>Got a new invite code from a landlord? Link your account to the new unit.</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1E40AF', marginBottom: 3 }}>🔑 Moving to a new property?</div>
+                    <div style={{ fontSize: 12.5, color: '#64748B' }}>Got a new invite code from a landlord? Link your account to the new unit.</div>
                   </div>
-                  <button className="link-btn" onClick={()=>setShowLinkModal(true)}>
+                  <button className="link-btn" onClick={() => setShowLinkModal(true)}>
                     Link New Property
                   </button>
                 </div>
@@ -566,24 +593,24 @@ export default function TenantDashboard() {
                 <div className="hero">
                   <div>
                     <div className="hero-greeting">{greeting()},</div>
-                    <div className="hero-name">{profile?.full_name||'Tenant'} 👋</div>
+                    <div className="hero-name">{profile?.full_name || 'Tenant'} 👋</div>
                     <div className="hero-chips">
-                      {property&&<span className="hero-chip">🏠 {property.name}</span>}
-                      {unit&&<span className="hero-chip">🚪 {unit.unit_number}</span>}
-                      {landlord&&<span className="hero-chip">👤 {landlord.full_name}</span>}
+                      {property && <span className="hero-chip">🏠 {property.name}</span>}
+                      {unit && <span className="hero-chip">🚪 {unit.unit_number}</span>}
+                      {landlord && <span className="hero-chip">👤 {landlord.full_name}</span>}
                     </div>
                   </div>
                   <div className="hero-right">
                     <div className="hero-rent-label">Monthly Rent</div>
-                    <div className="hero-rent">{unit?fmtCurrency(unit.monthly_rent,unit.currency):'—'}</div>
-                    <div className="hero-rent-sub">Due on the {unit?.rent_due_day||'—'}th each month</div>
-                    {daysLeft!==null&&(
+                    <div className="hero-rent">{unit ? fmtCurrency(unit.monthly_rent, unit.currency) : '—'}</div>
+                    <div className="hero-rent-sub">Due on the {unit?.rent_due_day || '—'}th each month</div>
+                    {daysLeft !== null && (
                       <div className="hero-pill" style={{
-                        background:daysLeft<=3?'rgba(220,38,38,.15)':'rgba(251,191,36,.15)',
-                        color:daysLeft<=3?'#FCA5A5':'#FCD34D',
-                        border:`1px solid ${daysLeft<=3?'rgba(220,38,38,.25)':'rgba(251,191,36,.25)'}`
+                        background: daysLeft <= 3 ? 'rgba(220,38,38,.15)' : 'rgba(251,191,36,.15)',
+                        color: daysLeft <= 3 ? '#FCA5A5' : '#FCD34D',
+                        border: `1px solid ${daysLeft <= 3 ? 'rgba(220,38,38,.25)' : 'rgba(251,191,36,.25)'}`
                       }}>
-                        {daysLeft<=0?'⚠️ Rent overdue':`⏳ Due in ${daysLeft} day${daysLeft!==1?'s':''}`}
+                        {daysLeft <= 0 ? '⚠️ Rent overdue' : `⏳ Due in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`}
                       </div>
                     )}
                   </div>
@@ -591,7 +618,7 @@ export default function TenantDashboard() {
 
                 {/* Quick actions */}
                 <div className="quick-actions">
-                  <div className="qa-card" onClick={()=>setShowPayModal(true)}>
+                  <div className="qa-card" onClick={() => setShowPayModal(true)}>
                     <div className="qa-icon">💳</div>
                     <div className="qa-label">Pay Rent</div>
                   </div>
@@ -613,49 +640,49 @@ export default function TenantDashboard() {
                 <div className="stats">
                   <div className="stat-card">
                     <div className="stat-icon">📅</div>
-                    <div className="stat-val" style={{color:daysLeft!==null&&daysLeft<=3?'#DC2626':daysLeft!==null&&daysLeft<=7?'#D97706':'#0F172A'}}>
-                      {daysLeft!==null?`${daysLeft}d`:'—'}
+                    <div className="stat-val" style={{ color: daysLeft !== null && daysLeft <= 3 ? '#DC2626' : daysLeft !== null && daysLeft <= 7 ? '#D97706' : '#0F172A' }}>
+                      {daysLeft !== null ? `${daysLeft}d` : '—'}
                     </div>
                     <div className="stat-label">Until Rent Due</div>
-                    <div className="stat-sub" style={{color:'#64748B'}}>Day {unit?.rent_due_day} of month</div>
+                    <div className="stat-sub" style={{ color: '#64748B' }}>Day {unit?.rent_due_day} of month</div>
                   </div>
                   <div className="stat-card">
                     <div className="stat-icon">💳</div>
-                    <div className="stat-val" style={{color:payStatusStyle.color}}>{payStatusStyle.label}</div>
+                    <div className="stat-val" style={{ color: payStatusStyle.color }}>{payStatusStyle.label}</div>
                     <div className="stat-label">This Month</div>
-                    <div className="stat-sub" style={{color:'#64748B'}}>{new Date().toLocaleString('en-US',{month:'long',year:'numeric'})}</div>
+                    <div className="stat-sub" style={{ color: '#64748B' }}>{new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' })}</div>
                   </div>
                   <div className="stat-card">
                     <div className="stat-icon">📋</div>
                     <div className="stat-val">{pct}%</div>
                     <div className="stat-label">Lease Complete</div>
-                    <div className="stat-sub" style={{color:'#2563EB'}}>
-                      {leaseDaysLeft!==null?`${leaseDaysLeft}d remaining`:'No lease dates'}
+                    <div className="stat-sub" style={{ color: '#2563EB' }}>
+                      {leaseDaysLeft !== null ? `${leaseDaysLeft}d remaining` : 'No lease dates'}
                     </div>
                   </div>
                   <div className="stat-card">
                     <div className="stat-icon">🔧</div>
-                    <div className="stat-val" style={{color:openMaint>0?'#D97706':'#16A34A'}}>{openMaint}</div>
+                    <div className="stat-val" style={{ color: openMaint > 0 ? '#D97706' : '#16A34A' }}>{openMaint}</div>
                     <div className="stat-label">Open Requests</div>
-                    <div className="stat-sub" style={{color:'#64748B'}}>{maintenance.length} total</div>
+                    <div className="stat-sub" style={{ color: '#64748B' }}>{maintenance.length} total</div>
                   </div>
                 </div>
 
                 {/* Bottom grid */}
                 <div className="grid2">
-                  <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                     <div className="card">
                       <div className="card-header">
                         <div className="card-title">Current Month Rent</div>
                         <a href="/tenant/rent" className="card-action">View All →</a>
                       </div>
-                      <div className="rent-amount">{unit?fmtCurrency(unit.monthly_rent,unit.currency):'—'}</div>
+                      <div className="rent-amount">{unit ? fmtCurrency(unit.monthly_rent, unit.currency) : '—'}</div>
                       <div className="rent-meta">
-                        Due day {unit?.rent_due_day} · {daysLeft!==null&&daysLeft>0?`${daysLeft} days away`:daysLeft===0?'Due today':'Overdue'}
+                        Due day {unit?.rent_due_day} · {daysLeft !== null && daysLeft > 0 ? `${daysLeft} days away` : daysLeft === 0 ? 'Due today' : 'Overdue'}
                       </div>
-                      <button className={`pay-btn${currentPayStatus==='paid'?' paid':''}`}
-                        onClick={()=>currentPayStatus!=='paid'&&setShowPayModal(true)}>
-                        {currentPayStatus==='paid'?'✓ Paid This Month':'💳 Pay Rent Now'}
+                      <button className={`pay-btn${currentPayStatus === 'paid' ? ' paid' : ''}`}
+                        onClick={() => currentPayStatus !== 'paid' && setShowPayModal(true)}>
+                        {currentPayStatus === 'paid' ? '✓ Paid This Month' : '💳 Pay Rent Now'}
                       </button>
                     </div>
 
@@ -664,52 +691,52 @@ export default function TenantDashboard() {
                         <div className="card-title">Lease Progress</div>
                         <a href="/tenant/lease" className="card-action">View Lease →</a>
                       </div>
-                      {unit?.lease_start&&unit?.lease_end ? (
+                      {unit?.lease_start && unit?.lease_end ? (
                         <>
                           <div className="lease-dates">
                             <span>{fmtDate(unit.lease_start)}</span>
                             <span>{fmtDate(unit.lease_end)}</span>
                           </div>
                           <div className="lease-bar-bg">
-                            <div className="lease-bar-fill" style={{width:`${pct}%`}}/>
+                            <div className="lease-bar-fill" style={{ width: `${pct}%` }} />
                           </div>
                           <div className="lease-pct-row">
-                            <span style={{color:'#64748B'}}>{pct}% elapsed</span>
-                            <span style={{color:'#2563EB',fontWeight:700}}>
-                              {leaseDaysLeft!==null&&leaseDaysLeft>0?`${leaseDaysLeft} days left`:'Expired'}
+                            <span style={{ color: '#64748B' }}>{pct}% elapsed</span>
+                            <span style={{ color: '#2563EB', fontWeight: 700 }}>
+                              {leaseDaysLeft !== null && leaseDaysLeft > 0 ? `${leaseDaysLeft} days left` : 'Expired'}
                             </span>
                           </div>
                           <div className="lease-status">✅ Lease is active and in good standing</div>
                         </>
                       ) : (
-                        <div style={{fontSize:13,color:'#94A3B8',fontStyle:'italic',padding:'12px 0'}}>No lease dates set yet — contact your landlord</div>
+                        <div style={{ fontSize: 13, color: '#94A3B8', fontStyle: 'italic', padding: '12px 0' }}>No lease dates set yet — contact your landlord</div>
                       )}
                     </div>
                   </div>
 
-                  <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                     <div className="card">
                       <div className="card-header">
                         <div className="card-title">Recent Payments</div>
                         <a href="/tenant/rent" className="card-action">View All →</a>
                       </div>
-                      {payments.length===0 ? (
-                        <div style={{fontSize:13,color:'#94A3B8',textAlign:'center',padding:'20px 0'}}>No payment records yet</div>
+                      {payments.length === 0 ? (
+                        <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>No payment records yet</div>
                       ) : (
                         <div className="tl">
-                          {payments.slice(0,3).map(p=>{
-                            const ds=p.status==='paid'?'paid':isOverdue(p)?'overdue':'pending'
-                            const colors={paid:{bg:'#DCFCE7',color:'#16A34A'},overdue:{bg:'#FEE2E2',color:'#DC2626'},pending:{bg:'#FEF9C3',color:'#CA8A04'}}[ds]
-                            const month=new Date(p.due_date).toLocaleString('en-US',{month:'short',year:'numeric'})
+                          {payments.slice(0, 3).map(p => {
+                            const ds = p.status === 'paid' ? 'paid' : isOverdue(p) ? 'overdue' : 'pending'
+                            const colors = { paid: { bg: '#DCFCE7', color: '#16A34A' }, overdue: { bg: '#FEE2E2', color: '#DC2626' }, pending: { bg: '#FEF9C3', color: '#CA8A04' } }[ds]
+                            const month = new Date(p.due_date).toLocaleString('en-US', { month: 'short', year: 'numeric' })
                             return (
                               <div key={p.id} className="tl-row">
-                                <div className="tl-dot" style={{background:colors.bg,color:colors.color}}>
-                                  {ds==='paid'?'✓':ds==='overdue'?'!':'○'}
+                                <div className="tl-dot" style={{ background: colors.bg, color: colors.color }}>
+                                  {ds === 'paid' ? '✓' : ds === 'overdue' ? '!' : '○'}
                                 </div>
                                 <div className="tl-month">{month}</div>
-                                <div className="tl-amount">{fmtCurrency(p.amount,unit?.currency)}</div>
-                                <span className="tl-badge" style={{background:colors.bg,color:colors.color}}>
-                                  {ds.charAt(0).toUpperCase()+ds.slice(1)}
+                                <div className="tl-amount">{fmtCurrency(p.amount, unit?.currency)}</div>
+                                <span className="tl-badge" style={{ background: colors.bg, color: colors.color }}>
+                                  {ds.charAt(0).toUpperCase() + ds.slice(1)}
                                 </span>
                               </div>
                             )
@@ -723,16 +750,16 @@ export default function TenantDashboard() {
                         <div className="card-title">Maintenance</div>
                         <a href="/tenant/maintenance" className="card-action">+ New Request</a>
                       </div>
-                      {maintenance.length===0 ? (
-                        <div style={{fontSize:13,color:'#94A3B8',textAlign:'center',padding:'20px 0'}}>No requests yet</div>
-                      ) : maintenance.slice(0,3).map(m=>{
-                        const ss=STATUS_STYLE[m.status]||STATUS_STYLE.open
+                      {maintenance.length === 0 ? (
+                        <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>No requests yet</div>
+                      ) : maintenance.slice(0, 3).map(m => {
+                        const ss = STATUS_STYLE[m.status] || STATUS_STYLE.open
                         return (
                           <div key={m.id} className="maint-row">
-                            <div className="maint-dot" style={{background:PRIORITY_COLOR[m.priority]||'#94A3B8'}}/>
+                            <div className="maint-dot" style={{ background: PRIORITY_COLOR[m.priority] || '#94A3B8' }} />
                             <div className="maint-title">{m.title}</div>
-                            <span className="maint-badge" style={{background:ss.bg,color:ss.color}}>
-                              {m.status==='in_progress'?'In Progress':m.status.charAt(0).toUpperCase()+m.status.slice(1)}
+                            <span className="maint-badge" style={{ background: ss.bg, color: ss.color }}>
+                              {m.status === 'in_progress' ? 'In Progress' : m.status.charAt(0).toUpperCase() + m.status.slice(1)}
                             </span>
                           </div>
                         )
@@ -743,21 +770,21 @@ export default function TenantDashboard() {
                       <div className="card-header">
                         <div className="card-title">
                           Messages
-                          {unreadCount>0&&<span style={{background:'#DC2626',color:'#fff',fontSize:10,fontWeight:700,padding:'1px 6px',borderRadius:99,marginLeft:6}}>{unreadCount}</span>}
+                          {unreadCount > 0 && <span style={{ background: '#DC2626', color: '#fff', fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 99, marginLeft: 6 }}>{unreadCount}</span>}
                         </div>
                         <a href="/tenant/messages" className="card-action">View All →</a>
                       </div>
-                      {messages.length===0 ? (
-                        <div style={{fontSize:13,color:'#94A3B8',textAlign:'center',padding:'20px 0'}}>No messages yet</div>
-                      ) : messages.slice(0,2).map(msg=>(
+                      {messages.length === 0 ? (
+                        <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>No messages yet</div>
+                      ) : messages.slice(0, 2).map(msg => (
                         <div key={msg.id} className="msg-row">
-                          <div className="msg-av">{initials(msg.sender_name||'U')}</div>
-                          <div style={{flex:1,minWidth:0}}>
+                          <div className="msg-av">{initials(msg.sender_name || 'U')}</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
                             <div className="msg-from">{msg.sender_name}</div>
                             <div className="msg-text">{msg.content}</div>
                             <div className="msg-time">{fmtTimeAgo(msg.created_at)}</div>
                           </div>
-                          {!msg.read&&<div className="msg-unread"/>}
+                          {!msg.read && <div className="msg-unread" />}
                         </div>
                       ))}
                     </div>
