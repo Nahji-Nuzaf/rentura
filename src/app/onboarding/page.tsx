@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
+import { CURRENCY_OPTIONS, detectCurrency, type CurrencyCode } from '@/lib/currency'
 
 // ── Field defined OUTSIDE component to prevent remount on every keystroke ──
 function Field({
@@ -63,7 +64,7 @@ export default function OnboardingPage() {
   const [propType, setPropType] = useState('apartment')
   const [units, setUnits] = useState('1')
   const [rent, setRent] = useState('0')
-  const [currency, setCurrency] = useState('USD')
+  const [currency, setCurrency] = useState<CurrencyCode>('USD')
 
   // Tenant
   const [tenantPhone, setTenantPhone] = useState('')
@@ -103,6 +104,9 @@ export default function OnboardingPage() {
       const resolvedRole = prof?.active_role || user.user_metadata?.role || 'landlord'
       setRole(resolvedRole)
       setFirstName((prof?.full_name || user.user_metadata?.full_name || '').split(' ')[0] || 'there')
+
+      // Auto-detect currency from browser locale
+      setCurrency(detectCurrency())
 
       // Check if email is already confirmed
       if (user.email_confirmed_at) {
@@ -197,6 +201,7 @@ export default function OnboardingPage() {
     const sb = createClient()
     await sb.from('profiles').update({
       phone: phone.trim(),
+      currency: currency,          // ← save selected currency to profile
       active_role: 'landlord',
       roles: ['landlord'],
     }).eq('id', userId).select()
@@ -488,6 +493,24 @@ export default function OnboardingPage() {
                   <Field label="Phone Number" id="phone" value={phone}
                     onChange={e => setPhone(e.target.value)} type="tel"
                     placeholder="+94 77 123 4567" errors={errors} />
+
+                  {/* ── Currency picker ── */}
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 7 }}>
+                      Preferred Currency
+                    </label>
+                    <select
+                      className="ob-inp"
+                      value={currency}
+                      onChange={e => setCurrency(e.target.value as CurrencyCode)}
+                    >
+                      {CURRENCY_OPTIONS.map(c => (
+                        <option key={c.code} value={c.code}>
+                          {c.symbol} — {c.name} ({c.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
                   <div className="info-box">
                     <span style={{ fontSize: 18 }}>🏠</span>
