@@ -326,9 +326,8 @@ export default function RentTrackerPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:wght@300;400;700&display=swap');
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-        html{overflow-x:hidden;width:100%}
-        html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;overflow-x:hidden;width:100%;max-width:100vw}
-        .shell{display:flex;min-height:100vh;overflow-x:hidden;width:100%}
+        html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;width:100%;max-width:100vw}
+        .shell{display:flex;min-height:100vh;overflow-x:clip;width:100%}
         .sidebar{width:260px;flex-shrink:0;background:#0F172A;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:200;box-shadow:4px 0 24px rgba(15,23,42,0.1);transition:transform .25s ease}
         .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:199}.sb-overlay.open{display:block}
         .sidebar.open{transform:translateX(0)!important}
@@ -350,7 +349,7 @@ export default function RentTrackerPage() {
         .sb-av{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#3B82F6,#6366F1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0}
         .sb-uname{font-size:13px;font-weight:700;color:#E2E8F0}
         .sb-uplan{display:inline-block;font-size:10px;font-weight:700;border-radius:5px;padding:1px 6px;margin-top:2px}
-        .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:hidden;width:calc(100% - 260px)}
+        .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:clip;width:calc(100% - 260px)}
 
         /* ── FIX: Topbar — clip content, never let children overflow */
         .topbar{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:#fff;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(15,23,42,0.04);width:100%;overflow:hidden}
@@ -431,6 +430,7 @@ export default function RentTrackerPage() {
         .e-ico{font-size:44px;margin-bottom:12px}
         .e-title{font-size:16px;font-weight:700;color:#475569;margin-bottom:6px}
         .e-sub{font-size:13.5px;color:#94A3B8;margin-bottom:20px}
+                .mobile-export-strip{display:none!important}
         @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
         .skeleton{border-radius:8px;background:linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}
         .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 20px;border-radius:12px;font-size:13.5px;font-weight:600;color:#fff;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.2);white-space:nowrap;animation:slideUp .25s ease}
@@ -460,13 +460,13 @@ export default function RentTrackerPage() {
           .summary{grid-template-columns:repeat(2,1fr)}
           .rtable{display:none}
           .rent-mobile-cards{display:flex}
-
+          .mobile-export-strip{display:flex!important}
           /* ── FIX: On mobile, hide Export CSV + Generate button from topbar.
                     Export CSV hidden entirely (no space). Generate moved to content. */
           .tb-right{display:none!important}
 
           /* ── FIX: Show the in-content generate button on mobile only */
-          .mob-generate-btn{display:flex;width:100%;margin-bottom:16px}
+          .mob-generate-btn{display:flex;width:100%; justify-content:center; margin-top:6px}
         }
         @media(max-width:480px){
           .topbar{padding:0 12px}.content{padding:12px 12px}.sum-val{font-size:18px}
@@ -560,7 +560,7 @@ export default function RentTrackerPage() {
             <div className="tb-right">
               {isPro
                 ? <button className="btn-export" onClick={handleExportCSV}>📥 Export CSV</button>
-                : <button className="btn-export-locked" onClick={() => setShowUpgradeModal(true)}>🔒 CSV</button>
+                : <button className="btn-export-locked" onClick={() => setShowUpgradeModal(true)}>🔒 Export CSV</button>
               }
               <button className="btn-primary" disabled={generating} onClick={generatePayments}>
                 {generating ? '⏳ Generating…' : `⚡ Generate ${selectedMonth} Payments`}
@@ -572,13 +572,42 @@ export default function RentTrackerPage() {
             <div className="page-title">Rent Tracker</div>
             <div className="page-sub">{selectedMonth} {selectedYear} — {records.length} payment{records.length !== 1 ? 's' : ''}</div>
 
+            {isPro && (
+              <div
+                className="mobile-export-strip"
+                style={{  gap: 8, flexWrap: 'wrap', marginBottom: 16, padding: '12px 14px', background: '#fff', border: '1px solid #E2E8F0', borderRadius: 12, boxShadow: '0 1px 4px rgba(15,23,42,.04)' }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#374151', width: '100%', marginBottom: 4 }}>📥 Export Reports</div>
+                <button className="btn-export" style={{ fontSize: 12, padding: '7px 12px' }} onClick={handleExportCSV}>📥 Export CSV</button>
+
+                <button
+                  className="btn-primary mob-generate-btn"
+                  disabled={generating}
+                  onClick={generatePayments}>
+                  {generating ? '⏳ Generating…' : `⚡ Generate ${selectedMonth} Payments`}
+                </button>
+
+              </div>
+            )}
+            {!isPro && (
+              <div
+                className="mobile-export-strip"
+                style={{ gap: 8, flexWrap: 'wrap', marginBottom: 16, padding: '12px 14px', background: '#F8FAFC', border: '1.5px dashed #E2E8F0', borderRadius: 12 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#94A3B8', width: '100%', marginBottom: 4 }}>📥 Export Reports</div>
+                <button className="btn-export-locked" onClick={() => setShowUpgradeModal(true)}>🔒 Export CSV</button>
+                <a href="/landlord/upgrade" className="btn-upgrade" style={{ fontSize: 12, padding: '7px 12px' }}>⭐ Upgrade for CSV</a>
+
+                <button
+                  className="btn-primary mob-generate-btn"
+                  disabled={generating}
+                  onClick={generatePayments}>
+                  {generating ? '⏳ Generating…' : `⚡ Generate ${selectedMonth} Payments`}
+                </button>
+
+              </div>
+            )}
+
             {/* ── FIX: Mobile-only generate button — sits cleanly in content area */}
-            <button
-              className="btn-primary mob-generate-btn"
-              disabled={generating}
-              onClick={generatePayments}>
-              {generating ? '⏳ Generating…' : `⚡ Generate ${selectedMonth} Payments`}
-            </button>
+
 
             {/* ── FIX: Info banner — plain text, no inline <strong> link that wraps on mobile */}
             {records.length > 0 && (

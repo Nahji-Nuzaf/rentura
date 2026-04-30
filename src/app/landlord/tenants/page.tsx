@@ -75,10 +75,6 @@ function fmtDate(s: string) {
   catch { return s }
 }
 
-function fmtCurrency(amount: number, currency = 'USD') {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount)
-}
-
 function isOverdue(p: RentPayment): boolean {
   return p.status === 'pending' && new Date(p.due_date) < new Date()
 }
@@ -95,7 +91,6 @@ function generateToken() {
 
 export default function TenantsPage() {
   const router = useRouter()
-  // ── FIX: Only destructure isPro — plan is unused
   const { isPro, plan } = usePro()
   const { fmtMoney } = useCurrency()
 
@@ -209,7 +204,6 @@ export default function TenantsPage() {
       setTenants(shaped)
       setLastRefreshed(new Date())
 
-      // Keep selected tenant in sync after refresh
       setSelected(prev => {
         if (!prev) return null
         return shaped.find((t: Tenant) => t.id === prev.id) || null
@@ -233,9 +227,6 @@ export default function TenantsPage() {
         setUserInitials(name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2))
         await loadTenants(user.id)
 
-        // ── REAL-TIME: Subscribe to tenants + units tables for live updates ──
-        // This fires when a tenant accepts an invite (profile_id fills in),
-        // or when lease dates / rent are updated from any device.
         const channel = sb
           .channel('tenants-realtime')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'tenants' }, () => {
@@ -253,7 +244,6 @@ export default function TenantsPage() {
       } catch (e) { console.error(e) }
     })()
 
-    // Cleanup subscription on unmount
     return () => {
       if (realtimeChannelRef.current) {
         createClient().removeChannel(realtimeChannelRef.current)
@@ -314,8 +304,6 @@ export default function TenantsPage() {
         await sb.from('rent_payments').insert(payments)
       }
 
-      // ── REAL-TIME: Optimistically update local state immediately,
-      // the subscription will also fire and do a full refresh
       setTenants(prev => prev.map(t =>
         t.id === leaseTenantId
           ? { ...t, lease_start: leaseStart, lease_end: leaseEnd, rent_amount: finalRent, currency: finalCurrency }
@@ -360,12 +348,10 @@ export default function TenantsPage() {
     ended: tenants.filter(t => t.status === 'ended').length,
   }
 
-  // ── Pro stat: total monthly revenue across active tenants
   const totalMonthlyRevenue = tenants
     .filter(t => t.status === 'active' || t.status === 'expiring')
     .reduce((s, t) => s + t.rent_amount, 0)
 
-  // ── Pro: tenants with no lease set
   const noLeaseCount = tenants.filter(t => t.profile_id && (t.lease_start === '—' || !t.lease_start)).length
 
   async function openInvite() {
@@ -538,9 +524,6 @@ export default function TenantsPage() {
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: inSheet ? 'auto' : '80%' }}>
-        {/* <div className="drawer-close-btn md:hidden" style={{ display: 'flex', justifyContent: 'end', marginRight: 10, paddingTop: 6 }}>
-          <button className="drawer-close" style={{ width: 40 }} onClick={() => setSheetOpen(false)}>✕</button>
-        </div> */}
         <div className="drawer-close-btn" style={{ justifyContent: 'end', marginRight: 10, paddingTop: 6 }}>
           <button className="drawer-close" onClick={() => setSheetOpen(false)}>✕</button>
         </div>
@@ -648,7 +631,7 @@ export default function TenantsPage() {
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
         html{overflow-x:hidden;width:100%}
         html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;overflow-x:hidden;width:100%;max-width:100vw}
-        .shell{display:flex;min-height:100vh;overflow-x:hidden;width:100%}
+        .shell{display:flex;min-height:100vh;width:100%}
         .sidebar{width:260px;flex-shrink:0;background:#0F172A;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:200;box-shadow:4px 0 24px rgba(15,23,42,.1);transition:transform .25s ease}
         .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:199}
         .sb-overlay.open{display:block}
@@ -672,14 +655,19 @@ export default function TenantsPage() {
         .sb-av{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#3B82F6,#6366F1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0}
         .sb-uname{font-size:13px;font-weight:700;color:#E2E8F0}
         .sb-uplan{display:inline-block;font-size:10px;font-weight:700;color:#60A5FA;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.25);border-radius:5px;padding:1px 6px;margin-top:2px}
-        .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:hidden;width:calc(100% - 260px)}
-        .topbar{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:#fff;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(15,23,42,.04);width:100%}
+
+        /* ── FIX 1: main uses flex column + takes full height so topbar sticky works */
+        .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;width:calc(100% - 260px);overflow-y:auto;overflow-x:hidden}
+
+        /* ── FIX 2: topbar is sticky inside .main scroll container */
+        .topbar{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:#fff;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(15,23,42,.04);width:100%;flex-shrink:0}
+
         .tb-left{display:flex;align-items:center;gap:8px;min-width:0;flex:1;overflow:hidden}
         .hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;color:#475569;padding:4px;flex-shrink:0}
         .breadcrumb{font-size:13px;color:#94A3B8;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .breadcrumb b{color:#0F172A;font-weight:700}
         .btn-primary{padding:8px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;display:flex;align-items:center;gap:6px;box-shadow:0 2px 10px rgba(37,99,235,.28);transition:all .18s;white-space:nowrap;flex-shrink:0}
-        .content{padding:22px 20px;flex:1;width:100%;min-width:0;overflow-x:hidden}
+        .content{padding:22px 20px;flex:1;width:100%;min-width:0}
         .page-title{font-family:'Fraunces',serif;font-size:26px;font-weight:400;color:#0F172A;letter-spacing:-.5px}
         .page-sub{font-size:13px;color:#94A3B8;margin-top:2px}
         .drawer-close{background:none;border:none;font-size:20px;cursor:pointer;color:#94A3B8;padding:4px 8px;border-radius:6px;}
@@ -842,6 +830,41 @@ export default function TenantsPage() {
         .umodal-btn-pro{width:100%;padding:13px;border-radius:11px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 3px 12px rgba(37,99,235,.35);margin-bottom:10px}
         .umodal-btn-cancel{background:none;border:none;color:#94A3B8;font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;padding:4px}
 
+        /* ── FIX 3: Lease modal — full proper centering, scrollable on small screens */
+        .lease-modal-overlay{
+          position:fixed;
+          inset:0;
+          background:rgba(0,0,0,0.5);
+          z-index:800;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          padding:16px;
+          overflow-y:auto;
+        }
+        .lease-modal-box{
+          background:#fff;
+          border-radius:22px;
+          padding:32px;
+          width:100%;
+          max-width:420px;
+          box-shadow:0 24px 60px rgba(15,23,42,.25);
+          position:relative;
+          margin:auto;
+        }
+        @media(max-width:480px){
+          .lease-modal-overlay{
+            align-items:flex-end;
+            padding:0;
+          }
+          .lease-modal-box{
+            border-radius:22px 22px 0 0;
+            padding:24px 20px;
+            max-height:92vh;
+            overflow-y:auto;
+          }
+        }
+
         @media(min-width:1100px){
           .stat-strip{grid-template-columns:repeat(4,1fr)}
           .mlayout{grid-template-columns:1fr 320px}
@@ -893,17 +916,17 @@ export default function TenantsPage() {
         </div>
       )}
 
-      {/* Lease Setup Modal */}
+      {/* ── FIX 3: Lease Setup Modal — now uses dedicated CSS classes for proper centering + mobile sheet */}
       {leaseModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ background: '#fff', borderRadius: 22, padding: 32, width: '100%', maxWidth: 420, boxShadow: '0 24px 60px rgba(15,23,42,.25)' }}>
+        <div className="lease-modal-overlay" onClick={() => setLeaseModal(false)}>
+          <div className="lease-modal-box" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <div>
                 <div style={{ fontFamily: 'Fraunces,serif', fontSize: 22, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>📅 Set Lease Dates</div>
                 <div style={{ fontSize: 13, color: '#64748B' }}>Setting lease for <strong style={{ color: '#0F172A' }}>{leaseTenantName}</strong></div>
               </div>
               <button onClick={() => setLeaseModal(false)}
-                style={{ width: 32, height: 32, borderRadius: '50%', background: '#F1F5F9', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: '#475569' }}>✕</button>
+                style={{ width: 32, height: 32, borderRadius: '50%', background: '#F1F5F9', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: '#475569', flexShrink: 0 }}>✕</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
               <div>
@@ -970,7 +993,7 @@ export default function TenantsPage() {
                   value={inviteUnitId} onChange={e => setInviteUnitId(e.target.value)} disabled={!invitePropId || inviteUnits.length === 0}>
                   <option value=''>— Select unit —</option>
                   {inviteUnits.map(u => (
-                    <option key={u.id} value={u.id}>{u.unit_number} — {u.currency} {u.monthly_rent.toLocaleString()}/mo</option>
+                    <option key={u.id} value={u.id}>{u.unit_number} — {u.currency} {fmtMoney(u.monthly_rent)}/mo</option>
                   ))}
                 </select>
                 {invitePropId && inviteUnits.length === 0 && (
@@ -1051,12 +1074,12 @@ export default function TenantsPage() {
                   {hStats && (
                     <div className="hd-stats">
                       <div className="hd-stat s-green">
-                        <div className="hd-stat-val">{fmtCurrency(hStats.totalPaid, hStats.currency)}</div>
+                        <div className="hd-stat-val">{fmtMoney(hStats.totalPaid)}</div>
                         <div className="hd-stat-lbl">Total Paid</div>
                         <div className="hd-stat-sub">{hStats.paid} payment{hStats.paid !== 1 ? 's' : ''}</div>
                       </div>
                       <div className={`hd-stat${hStats.overdue > 0 ? ' s-red' : ''}`}>
-                        <div className="hd-stat-val">{fmtCurrency(hStats.totalPending, hStats.currency)}</div>
+                        <div className="hd-stat-val">{fmtMoney(hStats.totalPending)}</div>
                         <div className="hd-stat-lbl">Outstanding</div>
                         <div className="hd-stat-sub">{hStats.overdue > 0 ? `${hStats.overdue} overdue` : `${hStats.pending} pending`}</div>
                       </div>
@@ -1077,7 +1100,7 @@ export default function TenantsPage() {
                           <div className={`tl-dot d-${ds}`}>{dotIcon}</div>
                           <div className="tl-card">
                             <div className="tl-card-top">
-                              <div className="tl-amount">{fmtCurrency(payment.amount, historyTenant.currency)}</div>
+                              <div className="tl-amount">{fmtMoney(payment.amount)}</div>
                               <span className={`tl-badge tb-${ds}`}>{ds.charAt(0).toUpperCase() + ds.slice(1)}</span>
                             </div>
                             <div className="tl-dates">
@@ -1139,7 +1162,6 @@ export default function TenantsPage() {
             <a href="/landlord/upgrade" className="sb-item"><span className="sb-ico">⭐</span>Upgrade</a>
           </nav>
           <div className="sb-footer">
-            {/* ── FIX: Hide upgrade nudge for Pro users */}
             {!isPro && (
               <div className="sb-upgrade">
                 <div className="sb-up-title">⭐ Upgrade to Pro</div>
@@ -1156,28 +1178,21 @@ export default function TenantsPage() {
                 </span>
               </div>
             </div>
-            {/* <div className="sb-user">
-              <div className="sb-av">{userInitials}</div>
-              <div>
-                <div className="sb-uname">{fullName}</div>
-                ── FIX: Show real plan from usePro()
-                <span className="sb-uplan">{isPro ? 'PRO' : 'FREE'}</span>
-              </div>
-            </div> */}
           </div>
         </aside>
 
+        {/* ── FIX 1+2: .main now scrolls itself, topbar is sticky inside it */}
         <div className="main"
           onClick={() => {
             setSelected(null);
-            setSheetOpen(false); // Close the sheet/sidebar too
+            setSheetOpen(false);
           }}>
           <div className="topbar">
             <div className="tb-left">
-              <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
+              <button className="hamburger" onClick={(e) => { e.stopPropagation(); setSidebarOpen(true); }}>☰</button>
               <div className="breadcrumb">Rentura &nbsp;/&nbsp; <b>Tenants</b></div>
             </div>
-            <button className="btn-primary" onClick={openInvite}>👥 Invite Tenant</button>
+            <button className="btn-primary" onClick={(e) => { e.stopPropagation(); openInvite(); }}>👥 Invite Tenant</button>
           </div>
 
           <div className="content">
@@ -1185,7 +1200,6 @@ export default function TenantsPage() {
               <div>
                 <div className="page-title">
                   Tenants
-                  {/* ── Real-time indicator — always shown, pulses while refreshing */}
                   <span className="rt-indicator">
                     <span className={`rt-dot${isRefreshing ? ' pulsing' : ''}`} />
                     {isRefreshing ? 'Updating…' : 'Live'}
@@ -1198,7 +1212,6 @@ export default function TenantsPage() {
               </div>
             </div>
 
-            {/* ── Pro: Revenue insight bar */}
             {isPro && !loading && tenants.length > 0 && (
               <div className="pro-revenue-bar">
                 <div className="prb-item">
@@ -1227,7 +1240,6 @@ export default function TenantsPage() {
               </div>
             )}
 
-            {/* ── Free: teaser for revenue insights */}
             {!isPro && !loading && tenants.length >= 2 && (
               <div className="pro-teaser">
                 <div className="pro-teaser-text">✨ <strong>Pro:</strong> See your total monthly revenue, payment health scores, and lease expiry alerts in one dashboard.</div>

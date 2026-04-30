@@ -319,7 +319,7 @@ export default function UnitsPage() {
         .sidebar{width:260px;flex-shrink:0;background:#0F172A;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:200;box-shadow:4px 0 24px rgba(15,23,42,.1);transition:transform .25s ease}
         .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:199}.sb-overlay.open{display:block}
         .sidebar.open{transform:translateX(0)!important}
-        .main{margin-left:260px;flex:1;min-height:100vh;display:flex;flex-direction:column;min-width:0;overflow-x:hidden;width:calc(100% - 260px)}
+        .main{margin-left:260px;flex:1;min-height:100vh;display:flex;flex-direction:column;min-width:0;overflow-x:hidden;overflow-y:auto;height:100vh;width:calc(100% - 260px)}
         .sb-logo{display:flex;align-items:center;gap:12px;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.07)}
         .sb-logo-icon{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center}
         .sb-logo-name{font-family:'Fraunces',serif;font-size:19px;font-weight:700;color:#F8FAFC}
@@ -373,9 +373,9 @@ export default function UnitsPage() {
         .bulk-teaser-btn{padding:7px 14px;border-radius:9px;border:none;background:linear-gradient(135deg,#7C3AED,#2563EB);color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;white-space:nowrap;flex-shrink:0}
 
         .stat-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;width:100%}
-        .sstat{background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:14px 12px;box-shadow:0 1px 4px rgba(15,23,42,.04);display:flex;align-items:center;gap:10px;min-width:0}
+        .sstat{background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:14px 12px;box-shadow:0 1px 4px rgba(15,23,42,.04);display:flex;align-items:center;gap:10px;min-width:0;overflow:hidden}
         .sstat-ico{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
-        .sstat-num{font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:#0F172A;line-height:1}
+        .sstat-num{font-family:'Fraunces',serif;font-size:clamp(13px,3.5vw,20px);font-weight:700;color:#0F172A;line-height:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:0;min-width:100%}
         .sstat-lbl{font-size:11px;color:#94A3B8;font-weight:500;margin-top:2px}
         .toolbar{display:flex;flex-direction:column;gap:10px;margin-bottom:16px;width:100%}
         .filter-row-wrap{width:100%;overflow-x:auto;scrollbar-width:none}
@@ -503,7 +503,7 @@ export default function UnitsPage() {
         }
         @media(max-width:480px){
           .topbar{padding:0 12px}.content{padding:12px 12px}.page-title{font-size:22px}
-          .sstat{padding:12px 10px;gap:8px}.sstat-ico{width:30px;height:30px;font-size:15px}.sstat-num{font-size:18px}
+          .sstat{padding:12px 10px;gap:8px}.sstat-ico{width:30px;height:30px;font-size:15px}.sstat-num{font-size:16px}
           .tb-label{display:none}
         }
       `}</style>
@@ -696,7 +696,7 @@ export default function UnitsPage() {
                 )
                 : <button className="btn-outline" onClick={() => { setBulkMode(false); setSelected(new Set()) }}>✕ <span className="tb-label">Cancel</span></button>
               }
-              <a href="/landlord/properties" className="btn-outline">← <span className="tb-label">Back</span></a>
+              {/* <a href="/landlord/properties" className="btn-outline">← <span className="tb-label">Back</span></a> */}
             </div>
           </div>
 
@@ -756,7 +756,13 @@ export default function UnitsPage() {
               <div className="sstat"><div className="sstat-ico" style={{ background: '#EFF6FF' }}>🏗️</div><div><div className="sstat-num">{counts.all}</div><div className="sstat-lbl">Total Units</div></div></div>
               <div className="sstat"><div className="sstat-ico" style={{ background: '#DCFCE7' }}>✅</div><div><div className="sstat-num">{counts.occupied}</div><div className="sstat-lbl">Occupied</div></div></div>
               <div className="sstat"><div className="sstat-ico" style={{ background: '#FEF3C7' }}>🔑</div><div><div className="sstat-num">{counts.vacant}</div><div className="sstat-lbl">Vacant</div></div></div>
-              <div className="sstat"><div className="sstat-ico" style={{ background: '#DCFCE7' }}>💰</div><div><div className="sstat-num">{fmtMoney(totalRevenue)}</div><div className="sstat-lbl">Monthly Revenue</div></div></div>
+              <div className="sstat">
+                <div className="sstat-ico" style={{ background: '#DCFCE7' }}>💰</div>
+                <div>
+                  <div className="sstat-num">{fmtMoney(totalRevenue)}</div>
+                  <div className="sstat-lbl">Monthly Revenue</div>
+                </div>
+              </div>
             </div>
 
             <div className="toolbar">

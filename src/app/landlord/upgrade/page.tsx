@@ -66,7 +66,7 @@ export default function UpgradePage() {
   const [activating, setActivating] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
-  const monthlyPrice = 9.99
+  const monthlyPrice = 20.00
   const annualPrice = parseFloat((monthlyPrice * 10 / 12).toFixed(2))
 
   function showToast(msg: string, type: 'success' | 'error' = 'success') {
@@ -216,8 +216,8 @@ export default function UpgradePage() {
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:wght@300;400;600;700&display=swap');
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
         html{overflow-x:hidden;width:100%}
-        html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;overflow-x:hidden;width:100%;max-width:100vw}
-        .shell{display:flex;min-height:100vh;overflow-x:hidden;width:100%}
+        html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;width:100%;max-width:100vw}
+        .shell{display:flex;min-height:100vh;overflow-x:clip;width:100%}
         .sidebar{width:260px;flex-shrink:0;background:#0F172A;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:200;box-shadow:4px 0 24px rgba(15,23,42,.1);transition:transform .25s ease}
         .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:199}.sb-overlay.open{display:block}
         .sidebar.open{transform:translateX(0)!important}
@@ -241,7 +241,7 @@ export default function UpgradePage() {
         .sb-uname{font-size:13px;font-weight:700;color:#E2E8F0}
         .sb-uplan{display:inline-block;font-size:10px;font-weight:700;color:#60A5FA;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.25);border-radius:5px;padding:1px 6px;margin-top:2px;text-transform:uppercase}
         .sb-uplan.pro{color:#FCD34D;background:rgba(251,191,36,.14);border-color:rgba(251,191,36,.3)}
-        .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:hidden;width:calc(100% - 260px)}
+        .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:clip;width:calc(100% - 260px)}
         .topbar{height:58px;display:flex;align-items:center;gap:10px;padding:0 20px;background:#fff;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(15,23,42,.04);width:100%}
         .hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;color:#475569;padding:4px;flex-shrink:0}
         .breadcrumb{font-size:13px;color:#94A3B8;font-weight:500}.breadcrumb b{color:#0F172A;font-weight:700}
@@ -265,10 +265,10 @@ export default function UpgradePage() {
         .pab-title{font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:#F1F5F9;margin-bottom:4px}
         .pab-sub{font-size:13px;color:#64748B}
         .pab-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:12px;font-weight:700;padding:6px 16px;border-radius:99px;box-shadow:0 4px 12px rgba(37,99,235,.3)}
-        .pab-features{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+        .pab-features{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px; justify-content:center}
         .pab-feat{font-size:12px;color:#93C5FD;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);border-radius:6px;padding:3px 10px}
 
-        .sandbox-banner{background:#FEF9C3;border:1px solid #FDE68A;border-radius:12px;padding:12px 18px;margin-bottom:24px;font-size:13px;color:#D97706;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap;max-width:960px;margin-left:auto;margin-right:auto}
+        .sandbox-banner{background:#FEF9C3; justify-content:center; border:1px solid #FDE68A;border-radius:12px;padding:12px 18px;margin-bottom:24px;font-size:13px;color:#D97706;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap;max-width:960px;margin-left:auto;margin-right:auto}
 
         .hero{text-align:center;padding:32px 20px 40px;max-width:600px;margin:0 auto}
         .hero-eyebrow{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;background:linear-gradient(135deg,rgba(37,99,235,.1),rgba(99,102,241,.1));color:#2563EB;border:1px solid rgba(37,99,235,.2);border-radius:99px;padding:5px 14px;margin-bottom:16px}
@@ -462,7 +462,7 @@ export default function UpgradePage() {
                     <div className="pab-title">You're on {currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}!</div>
                     <div className="pab-sub">All Pro features are active. Enjoy your upgraded account.</div>
                     <div className="pab-features">
-                      {['Unlimited properties', 'CSV exports', 'Advanced analytics', 'Unlimited listings'].map(f => (
+                      {['Unlimited everything', 'CSV exports', 'Advanced analytics'].map(f => (
                         <span key={f} className="pab-feat">✓ {f}</span>
                       ))}
                     </div>
@@ -481,7 +481,7 @@ export default function UpgradePage() {
             <div className="hero">
               <div className="hero-eyebrow">⭐ Simple, transparent pricing</div>
               <h1 className="hero-title">Grow your portfolio<br />with <span>Rentura Pro</span></h1>
-              <p className="hero-sub">Everything you need to manage properties like a pro — from ${billing === 'annual' ? annualPrice.toFixed(2) : monthlyPrice}/month. No hidden fees, cancel anytime.</p>
+              <p className="hero-sub">Everything you need to manage properties like a pro - from ${billing === 'annual' ? annualPrice.toFixed(2) : monthlyPrice}/month. No hidden fees, cancel anytime.</p>
             </div>
 
             {/* Billing toggle */}

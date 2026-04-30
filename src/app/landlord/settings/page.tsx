@@ -135,7 +135,7 @@ export default function SettingsPage() {
   const tabs = [
     { id: 'profile', label: 'Profile', ico: '👤' },
     { id: 'notifications', label: 'Notifications', ico: '🔔' },
-    { id: 'billing', label: 'Billing & Plan', ico: '💳' },
+    { id: 'billing', label: 'Billing', ico: '💳' },
     { id: 'security', label: 'Security', ico: '🔒' },
   ] as const
 
@@ -186,8 +186,8 @@ export default function SettingsPage() {
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:wght@300;400;700&display=swap');
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
         html{overflow-x:hidden;width:100%}
-        html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;overflow-x:hidden;width:100%;max-width:100vw}
-        .shell{display:flex;min-height:100vh;overflow-x:hidden;width:100%}
+        html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;width:100%;max-width:100vw}
+        .shell{display:flex;min-height:100vh;overflow-x:clip;width:100%}
         .sidebar{width:260px;flex-shrink:0;background:#0F172A;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:200;box-shadow:4px 0 24px rgba(15,23,42,.1);transition:transform .25s ease}
         .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:199}.sb-overlay.open{display:block}
         .sidebar.open{transform:translateX(0)!important}
@@ -210,7 +210,7 @@ export default function SettingsPage() {
         .sb-av{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#3B82F6,#6366F1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0}
         .sb-uname{font-size:13px;font-weight:700;color:#E2E8F0}
         .sb-uplan{display:inline-block;font-size:10px;font-weight:700;border-radius:5px;padding:1px 6px;margin-top:2px}
-        .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:hidden;width:calc(100% - 260px)}
+        .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:clip;width:calc(100% - 260px)}
         .topbar{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:#fff;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(15,23,42,.04);width:100%}
         .tb-left{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
         .hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;color:#475569;padding:4px;flex-shrink:0}
@@ -299,7 +299,7 @@ export default function SettingsPage() {
           .sidebar{transform:translateX(-100%)}.main{margin-left:0!important;width:100%!important}.hamburger{display:block}
           .topbar{padding:0 14px}.content{padding:14px 14px}
           .field-row{grid-template-columns:1fr}
-          .avatar-row{flex-direction:column;align-items:flex-start}
+          .avatar-row{flex-direction:row;align-items:flex-start}
         }
         @media(max-width:480px){.content{padding:12px 12px}.settings-card{padding:16px}}
       `}</style>

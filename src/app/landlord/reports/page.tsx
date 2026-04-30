@@ -213,9 +213,8 @@ export default function ReportsPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:wght@300;400;700&display=swap');
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-        html{overflow-x:hidden;width:100%}
-        html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;overflow-x:hidden;width:100%;max-width:100vw}
-        .shell{display:flex;min-height:100vh;overflow-x:hidden;width:100%}
+        html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;width:100%;max-width:100vw}
+        .shell{display:flex;min-height:100vh;overflow-x:clip;width:100%}
         .sidebar{width:260px;flex-shrink:0;background:#0F172A;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:200;transition:transform .25s ease;box-shadow:4px 0 24px rgba(15,23,42,.1)}
         .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:199}.sb-overlay.open{display:block}
         .sidebar.open{transform:translateX(0)!important}
@@ -237,7 +236,7 @@ export default function ReportsPage() {
         .sb-av{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#3B82F6,#6366F1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0}
         .sb-uname{font-size:13px;font-weight:700;color:#E2E8F0}
         .sb-uplan{display:inline-block;font-size:10px;font-weight:700;border-radius:5px;padding:1px 6px;margin-top:2px}
-        .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:hidden;width:calc(100% - 260px)}
+        .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:clip;width:calc(100% - 260px)}
         .topbar{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:#fff;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(15,23,42,.04);width:100%}
         .tb-left{display:flex;align-items:center;gap:8px;min-width:0;flex:1;overflow:hidden}
         .hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;color:#475569;padding:4px;flex-shrink:0}
@@ -508,7 +507,8 @@ export default function ReportsPage() {
           <div className="content">
             <div className="page-hd">
               <div>
-                <div className="page-title">Reports {isPro && <span style={{ fontSize: 13, fontWeight: 700, background: 'linear-gradient(135deg,#2563EB,#6366F1)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginLeft: 6 }}>⭐ Pro</span>}</div>
+                {/* {isPro && <span style={{ fontSize: 13, fontWeight: 700, background: 'linear-gradient(135deg,#2563EB,#6366F1)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginLeft: 6 }}>⭐ Pro</span>} */}
+                <div className="page-title">Reports </div>
                 <div className="page-sub">Financial & occupancy overview · {MONTHS[NOW.getMonth()]} {NOW.getFullYear()}</div>
               </div>
             </div>
@@ -762,18 +762,18 @@ export default function ReportsPage() {
                         <div key={i} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: i === annualStats.length - 1 ? '#0F172A' : '#94A3B8', fontWeight: i === annualStats.length - 1 ? 700 : 400 }}>{m.month}</div>
                       ))}
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-                      <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 10, padding: '10px 12px' }}>
-                        <div style={{ fontSize: 11, color: '#16A34A', fontWeight: 600, marginBottom: 3 }}>Total 12mo</div>
-                        <div style={{ fontFamily: 'Fraunces,serif', fontSize: 17, fontWeight: 700, color: '#0F172A' }}>{fmtMoney(totalAnnualRevenue)}</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, minWidth: 0, overflow: 'hidden' }}>
+                      <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 10, padding: '10px 12px', minWidth: 0, overflow: 'hidden' }}>
+                        <div style={{ fontSize: 10, color: '#16A34A', fontWeight: 600, marginBottom: 3 }}>Total 12mo</div>
+                        <div style={{ fontFamily: 'Fraunces,serif', fontSize: 15, fontWeight: 700, color: '#0F172A' }}>{fmtMoney(totalAnnualRevenue)}</div>
                       </div>
-                      <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 10, padding: '10px 12px' }}>
-                        <div style={{ fontSize: 11, color: '#2563EB', fontWeight: 600, marginBottom: 3 }}>Monthly Avg</div>
-                        <div style={{ fontFamily: 'Fraunces,serif', fontSize: 17, fontWeight: 700, color: '#0F172A' }}>{fmtMoney(avgMonthlyRevenue)}</div>
+                      <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 10, padding: '10px 12px', minWidth: 0, overflow: 'hidden' }}>
+                        <div style={{ fontSize: 10, color: '#2563EB', fontWeight: 600, marginBottom: 3 }}>Monthly Avg</div>
+                        <div style={{ fontFamily: 'Fraunces,serif', fontSize: 15, fontWeight: 700, color: '#0F172A' }}>{fmtMoney(avgMonthlyRevenue)}</div>
                       </div>
-                      <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, padding: '10px 12px' }}>
-                        <div style={{ fontSize: 11, color: '#D97706', fontWeight: 600, marginBottom: 3 }}>Best Month</div>
-                        <div style={{ fontFamily: 'Fraunces,serif', fontSize: 17, fontWeight: 700, color: '#0F172A' }}>{bestMonth}</div>
+                      <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, padding: '10px 12px', minWidth: 0, overflow: 'hidden' }}>
+                        <div style={{ fontSize: 10, color: '#D97706', fontWeight: 600, marginBottom: 3 }}>Best Month</div>
+                        <div style={{ fontFamily: 'Fraunces,serif', fontSize: 15, fontWeight: 700, color: '#0F172A' }}>{bestMonth}</div>
                       </div>
                     </div>
                   </>

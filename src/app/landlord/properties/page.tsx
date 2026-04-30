@@ -726,6 +726,8 @@ export default function PropertiesPage() {
         </aside>
 
         <div className="main">
+
+
           <div className="topbar">
             <div className="tb-left">
               <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
@@ -733,6 +735,8 @@ export default function PropertiesPage() {
             </div>
             <button className="btn-primary" onClick={openAdd}>+ Add Property</button>
           </div>
+
+          
 
           <div className="content">
             <div className="page-header">
