@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
 import { usePro } from '@/components/ProProvider'
+import { useCurrency } from '@/lib/useCurrency'
 
 
 type Tenant = {
@@ -96,6 +97,7 @@ export default function TenantsPage() {
   const router = useRouter()
   // ── FIX: Only destructure isPro — plan is unused
   const { isPro, plan } = usePro()
+  const { fmtMoney } = useCurrency()
 
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName] = useState('User')
@@ -572,7 +574,7 @@ export default function TenantsPage() {
             {[
               { label: 'Property', val: t.property },
               { label: 'Unit', val: t.unit },
-              { label: 'Monthly Rent', val: `$${t.rent_amount.toLocaleString()}`, blue: true },
+              { label: 'Monthly Rent', val: fmtMoney(t.rent_amount), blue: true },
               { label: 'Due Day', val: `Day ${t.rent_due_day}` },
             ].map(({ label, val, blue }) => (
               <div key={label} style={{ background: '#F8FAFC', borderRadius: 10, padding: '10px 12px' }}>
@@ -920,7 +922,7 @@ export default function TenantsPage() {
               </div>
             </div>
             <div style={{ marginBottom: 18 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Monthly Rent (USD)</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Monthly Rent</label>
               <input type="number" min="0" value={leaseRent} onChange={e => setLeaseRent(e.target.value)} placeholder="e.g. 500"
                 style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #E2E8F0', fontSize: 14, fontFamily: "'Plus Jakarta Sans',sans-serif", color: '#0F172A', outline: 'none' }}
                 onFocus={e => { e.target.style.borderColor = '#3B82F6' }}
@@ -1201,7 +1203,7 @@ export default function TenantsPage() {
               <div className="pro-revenue-bar">
                 <div className="prb-item">
                   <div className="prb-label">Monthly Revenue <span className="prb-badge">⭐ Pro</span></div>
-                  <div className="prb-val">${totalMonthlyRevenue.toLocaleString()}</div>
+                  <div className="prb-val">{fmtMoney(totalMonthlyRevenue)}</div>
                   <div className="prb-sub">from {counts.active + counts.expiring} active tenants</div>
                 </div>
                 <div className="prb-divider" />
@@ -1309,7 +1311,7 @@ export default function TenantsPage() {
                         </div>
                       </div>
                       <div className="t-right">
-                        <div className="t-rent">${t.rent_amount}/mo</div>
+                        <div className="t-rent">{fmtMoney(t.rent_amount)}/mo </div>
                         <span className="badge" style={{ background: sc.bg, color: sc.color }}>{sc.label}</span>
                         {t.profile_id && (t.lease_start === '—' || !t.lease_start) && (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, borderRadius: 6, padding: '2px 7px', background: '#FEF3C7', color: '#D97706', border: '1px solid #FCD34D' }}>

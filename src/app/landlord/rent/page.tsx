@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
 import { usePro } from '@/components/ProProvider'
+import { useCurrency } from '@/lib/useCurrency'
 
 type RentRecord = {
   id: string
@@ -55,6 +56,7 @@ function exportCSV(filename: string, headers: string[], rows: (string | number)[
 export default function RentTrackerPage() {
   const router = useRouter()
   const { isPro, plan } = usePro()
+  const { fmtMoney } = useCurrency()
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName] = useState('User')
   const [userId, setUserId] = useState('')
@@ -588,22 +590,22 @@ export default function RentTrackerPage() {
             <div className="summary">
               <div className="sum-card">
                 <div className="sum-top"><div className="sum-ico" style={{ background: '#F0FDF4' }}>💰</div><span className="sum-tag" style={{ background: '#DCFCE7', color: '#16A34A' }}>{collectionRate}%</span></div>
-                <div className="sum-val">${totalCollected.toLocaleString()}</div>
+                <div className="sum-val">{fmtMoney(totalCollected)}</div>
                 <div className="sum-lbl">Collected</div>
               </div>
               <div className="sum-card">
                 <div className="sum-top"><div className="sum-ico" style={{ background: '#FEE2E2' }}>⚠️</div><span className="sum-tag" style={{ background: '#FEE2E2', color: '#DC2626' }}>{records.filter(r => derivedStatus(r) === 'overdue').length} overdue</span></div>
-                <div className="sum-val">${totalOverdue.toLocaleString()}</div>
+                <div className="sum-val">{fmtMoney(totalOverdue)}</div>
                 <div className="sum-lbl">Overdue</div>
               </div>
               <div className="sum-card">
                 <div className="sum-top"><div className="sum-ico" style={{ background: '#FEF3C7' }}>⏳</div><span className="sum-tag" style={{ background: '#FEF3C7', color: '#D97706' }}>{records.filter(r => derivedStatus(r) === 'pending').length} pending</span></div>
-                <div className="sum-val">${totalPending.toLocaleString()}</div>
+                <div className="sum-val">{fmtMoney(totalPending)}</div>
                 <div className="sum-lbl">Pending</div>
               </div>
               <div className="sum-card">
                 <div className="sum-top"><div className="sum-ico" style={{ background: '#EFF6FF' }}>📊</div><span className="sum-tag" style={{ background: '#EFF6FF', color: '#2563EB' }}>{records.length} total</span></div>
-                <div className="sum-val">${totalExpected.toLocaleString()}</div>
+                <div className="sum-val">{fmtMoney(totalExpected)}</div>
                 <div className="sum-lbl">Expected</div>
               </div>
             </div>
@@ -615,9 +617,9 @@ export default function RentTrackerPage() {
               </div>
               <div className="coll-bar"><div className="coll-fill" style={{ width: `${collectionRate}%` }} /></div>
               <div className="coll-legend">
-                <span className="cl-item"><span className="cl-dot" style={{ background: '#2563EB' }} />Collected ${totalCollected.toLocaleString()}</span>
-                <span className="cl-item"><span className="cl-dot" style={{ background: '#DC2626' }} />Overdue ${totalOverdue.toLocaleString()}</span>
-                <span className="cl-item"><span className="cl-dot" style={{ background: '#D97706' }} />Pending ${totalPending.toLocaleString()}</span>
+                <span className="cl-item"><span className="cl-dot" style={{ background: '#2563EB' }} />Collected {fmtMoney(totalCollected)}</span>
+                <span className="cl-item"><span className="cl-dot" style={{ background: '#DC2626' }} />Overdue {fmtMoney(totalOverdue)}</span>
+                <span className="cl-item"><span className="cl-dot" style={{ background: '#D97706' }} />Pending {fmtMoney(totalPending)}</span>
               </div>
             </div>
 
@@ -687,7 +689,7 @@ export default function RentTrackerPage() {
                               <div className="t-av" style={{ background: r.color }}>{r.initials}</div>
                               <div><div className="t-name">{r.tenant}</div><div className="t-prop">{r.property} · {r.unit}</div></div>
                             </div></td>
-                            <td><span className="amt">${r.amount.toLocaleString()}</span></td>
+                            <td><span className="amt">{fmtMoney(r.amount)}</span></td>
                             <td><span className="date-txt">{r.due_date}</span></td>
                             <td><span className="date-txt">{r.paid_date || '—'}</span></td>
                             <td><span className="badge" style={{ background: sc.bg, color: sc.color }}>● {sc.label}</span></td>
@@ -721,7 +723,7 @@ export default function RentTrackerPage() {
                           </div>
                         </div>
                         <div className="rmc-right">
-                          <div className="rmc-amt">${r.amount.toLocaleString()}</div>
+                          <div className="rmc-amt">{fmtMoney(r.amount)}</div>
                           <div className="rmc-actions">
                             {r.status !== 'paid'
                               ? <button className="act-btn act-btn-green" disabled={isBusy} onClick={() => markPaid(r.id)} style={{ padding: '5px 10px', fontSize: 11.5 }}>{isBusy ? '…' : '✓ Paid'}</button>

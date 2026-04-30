@@ -552,7 +552,7 @@ export default function UnitsPage() {
           <div className="section-label">Rent & Payment</div>
           <div className="field-row">
             <div className="field">
-              <label>Monthly Rent ({fmtMoney(0)})</label>
+              <label>Monthly Rent</label>
               <input type="number" min="0" placeholder="e.g. 500" value={editForm.monthly_rent}
                 onChange={e => setEditForm(f => ({ ...f, monthly_rent: e.target.value }))} />
             </div>
@@ -574,7 +574,7 @@ export default function UnitsPage() {
                 }}>
                 <span style={{ fontSize: 18 }}>{p.icon}</span>
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: '#475569' }}>{p.label}</span>
-                <span style={{ fontSize: 10, color: '#94A3B8', marginTop: 2 }}>{fmtMoney(p.rent)}/mo</span>
+                {/* <span style={{ fontSize: 10, color: '#94A3B8', marginTop: 2 }}>{fmtMoney(p.rent)}/mo</span> */}
               </button>
             ))}
           </div>

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
 import { usePro } from '@/components/ProProvider'
+import { useCurrency } from '@/lib/useCurrency'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const NOW = new Date()
@@ -29,6 +30,7 @@ function exportCSV(filename: string, headers: string[], rows: (string | number)[
 export default function ReportsPage() {
   const router = useRouter()
   const { isPro, plan } = usePro()
+  const { fmtMoney } = useCurrency()
 
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName] = useState('User')
@@ -538,17 +540,17 @@ export default function ReportsPage() {
             <div className="summary">
               <div className="sum-card">
                 <div className="sum-top"><div className="sum-ico" style={{ background: '#F0FDF4' }}>💰</div><span className="sum-tag" style={{ background: '#DCFCE7', color: '#16A34A' }}>{collectionRate}%</span></div>
-                {loading ? <div className="skeleton" style={{ height: 22, width: 80, marginBottom: 6 }} /> : <div className="sum-val">${totalCollected.toLocaleString()}</div>}
+                {loading ? <div className="skeleton" style={{ height: 22, width: 80, marginBottom: 6 }} /> : <div className="sum-val">{fmtMoney(totalCollected)}</div>} 
                 <div className="sum-lbl">Collected This Month</div>
               </div>
               <div className="sum-card">
                 <div className="sum-top"><div className="sum-ico" style={{ background: '#FEE2E2' }}>⚠️</div><span className="sum-tag" style={{ background: totalOverdue > 0 ? '#FEE2E2' : '#F1F5F9', color: totalOverdue > 0 ? '#DC2626' : '#94A3B8' }}>{totalOverdue > 0 ? 'Overdue' : 'Clear'}</span></div>
-                {loading ? <div className="skeleton" style={{ height: 22, width: 80, marginBottom: 6 }} /> : <div className="sum-val" style={{ color: totalOverdue > 0 ? '#DC2626' : '#0F172A' }}>${totalOverdue.toLocaleString()}</div>}
+                {loading ? <div className="skeleton" style={{ height: 22, width: 80, marginBottom: 6 }} /> : <div className="sum-val" style={{ color: totalOverdue > 0 ? '#DC2626' : '#0F172A' }}>{fmtMoney(totalOverdue)}</div>}
                 <div className="sum-lbl">Overdue This Month</div>
               </div>
               <div className="sum-card">
                 <div className="sum-top"><div className="sum-ico" style={{ background: '#FEF3C7' }}>🔧</div><span className="sum-tag" style={{ background: '#FEF3C7', color: '#D97706' }}>{openMaint} open</span></div>
-                {loading ? <div className="skeleton" style={{ height: 22, width: 50, marginBottom: 6 }} /> : <div className="sum-val">{openMaint + resolvedMaint}</div>}
+                {loading ? <div className="skeleton" style={{ height: 22, width: 50, marginBottom: 6 }} /> : <div className="sum-val">{fmtMoney(openMaint + resolvedMaint)}</div>}
                 <div className="sum-lbl">Total Maintenance</div>
               </div>
               <div className="sum-card">
@@ -561,12 +563,12 @@ export default function ReportsPage() {
             {isPro && (
               <div className="pro-stats">
                 <div className="pro-stat-card">
-                  <div className="pro-stat-val">${totalAnnualRevenue.toLocaleString()}</div>
+                  <div className="pro-stat-val">{fmtMoney(totalAnnualRevenue)}</div>
                   <div className="pro-stat-lbl">Annual Revenue (12mo)</div>
                   <div className="pro-stat-trend">↑ Collected from all properties</div>
                 </div>
                 <div className="pro-stat-card">
-                  <div className="pro-stat-val">${avgMonthlyRevenue.toLocaleString()}</div>
+                  <div className="pro-stat-val">{fmtMoney(avgMonthlyRevenue)}</div>
                   <div className="pro-stat-lbl">Avg Monthly Revenue</div>
                   <div className="pro-stat-trend">Based on last 12 months</div>
                 </div>
@@ -688,7 +690,7 @@ export default function ReportsPage() {
                         <div className="prop-bar-bg"><div className="prop-bar-fill" style={{ width: `${pct}%` }} /></div>
                       </div>
                       <div className="prop-right">
-                        <div className="prop-rev">${p.revenue.toLocaleString()}</div>
+                        <div className="prop-rev">{fmtMoney(p.revenue)}</div>
                         <div className="prop-occ-lbl">{pct}% occ.</div>
                       </div>
                     </div>
@@ -763,11 +765,11 @@ export default function ReportsPage() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
                       <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 10, padding: '10px 12px' }}>
                         <div style={{ fontSize: 11, color: '#16A34A', fontWeight: 600, marginBottom: 3 }}>Total 12mo</div>
-                        <div style={{ fontFamily: 'Fraunces,serif', fontSize: 17, fontWeight: 700, color: '#0F172A' }}>${totalAnnualRevenue.toLocaleString()}</div>
+                        <div style={{ fontFamily: 'Fraunces,serif', fontSize: 17, fontWeight: 700, color: '#0F172A' }}>{fmtMoney(totalAnnualRevenue)}</div>
                       </div>
                       <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 10, padding: '10px 12px' }}>
                         <div style={{ fontSize: 11, color: '#2563EB', fontWeight: 600, marginBottom: 3 }}>Monthly Avg</div>
-                        <div style={{ fontFamily: 'Fraunces,serif', fontSize: 17, fontWeight: 700, color: '#0F172A' }}>${avgMonthlyRevenue.toLocaleString()}</div>
+                        <div style={{ fontFamily: 'Fraunces,serif', fontSize: 17, fontWeight: 700, color: '#0F172A' }}>{fmtMoney(avgMonthlyRevenue)}</div>
                       </div>
                       <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, padding: '10px 12px' }}>
                         <div style={{ fontSize: 11, color: '#D97706', fontWeight: 600, marginBottom: 3 }}>Best Month</div>
@@ -821,7 +823,7 @@ export default function ReportsPage() {
                           <div key={i} style={{ padding: 14, background: bg, borderRadius: 12, border }}>
                             <div style={{ fontSize: 18, marginBottom: 6 }}>{medals[i]}</div>
                             <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0F172A', marginBottom: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-                            <div style={{ fontFamily: 'Fraunces,serif', fontSize: 20, fontWeight: 700, color: i === 0 ? '#2563EB' : '#0F172A' }}>${p.revenue.toLocaleString()}</div>
+                            <div style={{ fontFamily: 'Fraunces,serif', fontSize: 20, fontWeight: 700, color: i === 0 ? '#2563EB' : '#0F172A' }}>{fmtMoney(p.revenue)}</div>
                             <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>/month revenue</div>
                             <div style={{ marginTop: 8, height: 4, background: '#E2E8F0', borderRadius: 99, overflow: 'hidden' }}>
                               <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg,#3B82F6,#6366F1)', borderRadius: 99, transition: 'width .4s' }} />
@@ -842,7 +844,7 @@ export default function ReportsPage() {
                             <div key={i} style={{ marginBottom: 8 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
                                 <span style={{ fontWeight: 600, color: '#0F172A' }}>{p.name}</span>
-                                <span style={{ color: '#64748B' }}>{share}% · ${p.revenue.toLocaleString()}</span>
+                                <span style={{ color: '#64748B' }}>{share}% · {fmtMoney(p.revenue)}</span>
                               </div>
                               <div style={{ height: 5, background: '#E2E8F0', borderRadius: 99, overflow: 'hidden' }}>
                                 <div style={{ height: '100%', width: `${share}%`, background: bgs[i % bgs.length], borderRadius: 99, transition: 'width .4s' }} />
@@ -863,7 +865,7 @@ export default function ReportsPage() {
                     {['Rush Towers', 'Ocean View', 'Green Valley'].map((name, i) => (
                       <div key={i} style={{ padding: 14, background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0' }}>
                         <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>{name}</div>
-                        <div style={{ fontFamily: 'Fraunces,serif', fontSize: 20, fontWeight: 700, color: '#2563EB' }}>${[4200, 2800, 3600][i].toLocaleString()}</div>
+                        <div style={{ fontFamily: 'Fraunces,serif', fontSize: 20, fontWeight: 700, color: '#2563EB' }}>{fmtMoney([4200, 2800, 3600][i])}</div>
                         <div style={{ marginTop: 8, height: 4, background: '#E2E8F0', borderRadius: 99, overflow: 'hidden' }}>
                           <div style={{ height: '100%', width: `${[78, 55, 90][i]}%`, background: 'linear-gradient(90deg,#3B82F6,#6366F1)', borderRadius: 99 }} />
                         </div>
