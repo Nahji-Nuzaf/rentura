@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
 import { usePro } from '@/components/ProProvider'
+import { useCurrency } from '@/lib/useCurrency'
 
 type Listing = {
   id: string
@@ -41,7 +42,7 @@ function fmtDate(s: string) {
 
 export default function ListingsPage() {
   const router = useRouter()
-
+  const { fmtMoney } = useCurrency()
   // ── FIX: Use ONLY isPro from usePro() — do not redeclare
   const { isPro, plan } = usePro()
   const photoInputRef = useRef<HTMLInputElement>(null)
@@ -691,7 +692,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
           </div>
           <div className="field-row">
             <div className="field">
-              <label>Rent / Month ($)</label>
+              <label>Rent / Month</label>
               <input type="number" value={form.rent_amount} onChange={e => setForm(f => ({ ...f, rent_amount: e.target.value }))} placeholder="0" />
             </div>
             <div className="field">
@@ -901,7 +902,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
                       <div className="lc-body">
                         <div className="lc-title">{l.title}</div>
                         <div className="lc-sub">📍 {l.property}{l.unit !== '—' ? ` · ${l.unit}` : ''}</div>
-                        <div className="lc-price">${l.rent_amount.toLocaleString()}<span style={{ fontSize: 12, fontFamily: 'Plus Jakarta Sans', fontWeight: 500, color: '#94A3B8' }}>/mo</span></div>
+                        <div className="lc-price">{fmtMoney(l.rent_amount)} <span style={{ fontSize: 12, fontFamily: 'Plus Jakarta Sans', fontWeight: 500, color: '#94A3B8' }}>/mo</span></div>
                         <div className="lc-facts">
                           {l.bedrooms > 0 && <span className="lc-fact">🛏 {l.bedrooms} bed</span>}
                           <span className="lc-fact">🚿 {l.bathrooms} bath</span>
