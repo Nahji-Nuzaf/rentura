@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase'
 import Image from 'next/image';
 
 import { usePro } from '@/components/ProProvider'
+import { useCurrency } from '@/lib/useCurrency'
 
 type Stats = {
   totalProperties: number
@@ -86,6 +87,7 @@ function timeAgo(str: string) {
 export default function LandlordDashboard() {
   const router = useRouter()
   const { isPro, plan } = usePro()
+  const { fmtMoney, code } = useCurrency()
   const [firstName, setFirstName] = useState('there')
   const [initials, setInitials] = useState('NN')
   const [fullName, setFullName] = useState('User')
@@ -648,17 +650,6 @@ export default function LandlordDashboard() {
                 </span>
               </div>
             </div>
-            {/* <div className="sb-user"> */}
-            {/* <div className="sb-av">{initials}</div> */}
-            {/* <div> */}
-            {/* <div className="sb-uname">{fullName}</div> */}
-            {/* Show plan badge — PRO styling for pro users, FREE for others */}
-            {/* {isPro */}
-            {/* ? <span className="sb-uplan-pro">⭐ {plan?.toUpperCase() || 'PRO'}</span> */}
-            {/* : <span className="sb-uplan">FREE</span> */}
-            {/* } */}
-            {/* </div> */}
-            {/* </div> */}
           </div>
         </aside>
 
@@ -687,7 +678,7 @@ export default function LandlordDashboard() {
                   <span className="tag tg">{stats.totalProperties} props</span>
                 </div>
                 {loading ? <div className="skeleton" style={{ height: 32, width: 60, marginBottom: 8 }} /> : (
-                  <div className="stat-num">${stats.monthlyRevenue.toLocaleString()}</div>
+                  <div className="stat-num">{fmtMoney(stats.monthlyRevenue)}</div>
                 )}
                 <div className="stat-lbl">Monthly Revenue</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
@@ -905,7 +896,7 @@ export default function LandlordDashboard() {
                           <div className="runit">{r.property_name} · {r.unit_number}</div>
                         </div>
                         <div className="rright">
-                          <div className="ramt">${r.amount.toLocaleString()}</div>
+                          <div className="ramt">{fmtMoney(r.amount)}</div>
                           <div className="rstatus" style={{ color: rs.color }}>● {rs.label}</div>
                         </div>
                       </div>

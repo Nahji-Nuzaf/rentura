@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
 import { usePro } from '@/components/ProProvider'
+import { useCurrency } from '@/lib/useCurrency'
 
 type Property = {
   id: string
@@ -47,6 +48,8 @@ export default function PropertiesPage() {
   // ── FIX: Only destructure isPro — plan is unused
   const { isPro, plan } = usePro()
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const { fmtMoney } = useCurrency()
 
   const [userId, setUserId] = useState('')
   const [userInitials, setUserInitials] = useState('NN')
@@ -827,7 +830,7 @@ export default function PropertiesPage() {
                       <div className="prop-body">
                         <div className="prop-name">{p.name}</div>
                         <div className="prop-loc">📍 {addr || '—'}</div>
-                        {p.avg_rent > 0 && <div className="avg-rent">Avg ${p.avg_rent.toLocaleString()}/mo</div>}
+                        {p.avg_rent > 0 && <div className="avg-rent">Avg ${fmtMoney(p.avg_rent)}/mo</div>}
                         <div className="prop-stats">
                           <div className="ps"><div className="ps-val">{p.total_units}</div><div className="ps-lbl">Total Units</div></div>
                           <div className="ps"><div className="ps-val" style={{ color: '#16A34A' }}>{p.occupied_count}</div><div className="ps-lbl">Occupied</div></div>
