@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
 import { usePro } from '@/components/ProProvider'
+import { useCurrency } from '@/lib/useCurrency'
 
 
 type Unit = {
@@ -51,6 +52,8 @@ export default function UnitsPage() {
 
   // ── FIX: Only destructure isPro — plan is unused
   const { isPro, plan } = usePro()
+
+  const { fmtMoney } = useCurrency()
 
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName] = useState('User')
@@ -549,7 +552,7 @@ export default function UnitsPage() {
           <div className="section-label">Rent & Payment</div>
           <div className="field-row">
             <div className="field">
-              <label>Monthly Rent (USD)</label>
+              <label>Monthly Rent ({fmtMoney(0)})</label>
               <input type="number" min="0" placeholder="e.g. 500" value={editForm.monthly_rent}
                 onChange={e => setEditForm(f => ({ ...f, monthly_rent: e.target.value }))} />
             </div>
@@ -571,7 +574,7 @@ export default function UnitsPage() {
                 }}>
                 <span style={{ fontSize: 18 }}>{p.icon}</span>
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: '#475569' }}>{p.label}</span>
-                <span style={{ fontSize: 10, color: '#94A3B8', marginTop: 2 }}>${p.rent}/mo</span>
+                <span style={{ fontSize: 10, color: '#94A3B8', marginTop: 2 }}>{fmtMoney(p.rent)}/mo</span>
               </button>
             ))}
           </div>
@@ -727,7 +730,7 @@ export default function UnitsPage() {
                 <div className="pi-divider" />
                 <div className="pi-item">
                   <div className="pi-label">Monthly Revenue</div>
-                  <div className="pi-val">${totalRevenue.toLocaleString()}</div>
+                  <div className="pi-val">{fmtMoney(totalRevenue)}</div>
                   <div className="pi-sub">from occupied units</div>
                 </div> */}
                 {/* <div className="pi-divider" /> */}
@@ -753,7 +756,7 @@ export default function UnitsPage() {
               <div className="sstat"><div className="sstat-ico" style={{ background: '#EFF6FF' }}>🏗️</div><div><div className="sstat-num">{counts.all}</div><div className="sstat-lbl">Total Units</div></div></div>
               <div className="sstat"><div className="sstat-ico" style={{ background: '#DCFCE7' }}>✅</div><div><div className="sstat-num">{counts.occupied}</div><div className="sstat-lbl">Occupied</div></div></div>
               <div className="sstat"><div className="sstat-ico" style={{ background: '#FEF3C7' }}>🔑</div><div><div className="sstat-num">{counts.vacant}</div><div className="sstat-lbl">Vacant</div></div></div>
-              <div className="sstat"><div className="sstat-ico" style={{ background: '#DCFCE7' }}>💰</div><div><div className="sstat-num">${totalRevenue.toLocaleString()}</div><div className="sstat-lbl">Monthly Revenue</div></div></div>
+              <div className="sstat"><div className="sstat-ico" style={{ background: '#DCFCE7' }}>💰</div><div><div className="sstat-num">{fmtMoney(totalRevenue)}</div><div className="sstat-lbl">Monthly Revenue</div></div></div>
             </div>
 
             <div className="toolbar">
@@ -777,7 +780,7 @@ export default function UnitsPage() {
               <div className="bulk-bar">
                 <div className="bulk-info">{selected.size} unit{selected.size > 1 ? 's' : ''} selected</div>
                 <div className="bulk-field">
-                  <span className="bulk-label">Rent $</span>
+                  <span className="bulk-label">Rent {fmtMoney(0)}</span>
                   <input className="bulk-input" type="number" placeholder="e.g. 600" value={bulkRent} onChange={e => setBulkRent(e.target.value)} />
                 </div>
                 <div className="bulk-field">
@@ -845,7 +848,7 @@ export default function UnitsPage() {
                               }
                             </td>
                             <td>
-                              <div className="rent-cell">${u.monthly_rent.toLocaleString()}</div>
+                              <div className="rent-cell">{fmtMoney(u.monthly_rent)}</div>
                               <div className="rent-sub">due day {u.rent_due_day}</div>
                             </td>
                             <td><span className="badge" style={{ background: sc.bg, color: sc.color }}>● {sc.label}</span></td>
@@ -886,7 +889,7 @@ export default function UnitsPage() {
                         <div className="uc-body">
                           <div className="uc-field">
                             <div className="uc-label">Monthly Rent</div>
-                            <div className="uc-val">${u.monthly_rent.toLocaleString()}</div>
+                            <div className="uc-val">{fmtMoney(u.monthly_rent)}</div>
                             <div className="uc-sub">due on day {u.rent_due_day}</div>
                           </div>
                           <div className="uc-field">
