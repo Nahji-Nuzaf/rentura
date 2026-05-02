@@ -43,12 +43,15 @@ export default function OnboardingPage() {
   const [firstName, setFirstName] = useState('')
 
   // ── OTP state ──
-  // 'checking' = checking session, 'verify' = needs OTP, 'done' = verified
+  // 'checking' = checking session / running signUp, 'verify' = needs OTP, 'done' = verified
   const [emailVerified, setEmailVerified] = useState<'checking' | 'verify' | 'done'>('checking')
   const [otp, setOtp] = useState('')
   const [otpError, setOtpError] = useState('')
   const [otpLoading, setOtpLoading] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
+
+  // ── If signUp itself fails we surface this instead of the OTP screen ──
+  const [signupError, setSignupError] = useState('')
 
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -85,10 +88,72 @@ export default function OnboardingPage() {
     return () => clearTimeout(t)
   }, [resendCooldown])
 
-  // ── Auth + email-verified check on mount ──
+  // ── Auth + pending signup check on mount ──
+  // NEW FLOW:
+  //   A) sessionStorage has 'pending_signup'  →  new user path:
+  //      call signUp() here, send OTP, show verify gate. DB row is created
+  //      by Supabase auth but profile upsert happens at each role's final step.
+  //   B) No pending data + active session  →  returning / Google user path (unchanged).
+  //   C) No pending data + no session  →  redirect to /login.
   useEffect(() => {
     ;(async () => {
       const sb = createClient()
+
+      // ── Path A: brand-new email/password signup ──
+      const raw = sessionStorage.getItem('pending_signup')
+      if (raw) {
+        let pending: { fullName: string; email: string; password: string; role: string }
+        try { pending = JSON.parse(raw) } catch { sessionStorage.removeItem('pending_signup'); router.push('/signup'); return }
+
+        // Always clear storage immediately so a page refresh doesn't re-run signUp
+        sessionStorage.removeItem('pending_signup')
+
+        setUserEmail(pending.email)
+        setRole(pending.role)
+        setFirstName(pending.fullName.split(' ')[0] || 'there')
+        setCurrency(detectCurrency())
+
+        // Call signUp() — this is the FIRST time the user touches the DB
+        const { data, error: signUpError } = await sb.auth.signUp({
+          email: pending.email,
+          password: pending.password,
+          options: {
+            data: { full_name: pending.fullName, role: pending.role },
+            // No emailRedirectTo — we handle OTP ourselves in this page
+          },
+        })
+
+        if (signUpError) {
+          setSignupError(signUpError.message)
+          setEmailVerified('verify') // show the card; signupError replaces the OTP UI
+          return
+        }
+
+        if (data.user) {
+          setUserId(data.user.id)
+
+          // If Supabase handed back an immediate session the email is already confirmed
+          // (can happen when email-confirm is disabled in your project settings)
+          if (data.session) {
+            // Upsert bare profile so downstream role steps can update it
+            await sb.from('profiles').upsert({
+              id: data.user.id,
+              email: pending.email,
+              full_name: pending.fullName,
+              active_role: pending.role,
+              roles: [pending.role],
+            }, { onConflict: 'id' })
+            setEmailVerified('done')
+          } else {
+            // Email confirmation required — OTP was sent automatically by Supabase on signUp
+            setEmailVerified('verify')
+            setResendCooldown(60)
+          }
+        }
+        return
+      }
+
+      // ── Path B / C: no pending signup — check for an existing session ──
       const { data: { user } } = await sb.auth.getUser()
       if (!user) { router.push('/login'); return }
 
@@ -121,6 +186,8 @@ export default function OnboardingPage() {
   }, [router])
 
   // ── Verify OTP ──
+  // CHANGED: after successful OTP verification for a new user (Path A) we also
+  // upsert the bare profile row so that subsequent role-step handlers can update it.
   const handleVerifyOtp = async () => {
     if (!otp.trim() || otp.length < 6) {
       setOtpError('Please enter the 6-digit code from your email.')
@@ -130,7 +197,7 @@ export default function OnboardingPage() {
     setOtpError('')
     const sb = createClient()
 
-    const { error } = await sb.auth.verifyOtp({
+    const { data: verifyData, error } = await sb.auth.verifyOtp({
       email: userEmail,
       token: otp.trim(),
       type: 'signup',
@@ -146,6 +213,31 @@ export default function OnboardingPage() {
       )
       setOtpLoading(false)
       return
+    }
+
+    // For new users: upsert the bare profile now that email is confirmed.
+    // We read identity from the session returned by verifyOtp.
+    if (verifyData?.user) {
+      const u = verifyData.user
+      // Only upsert if profile doesn't already exist (avoid stomping returning users)
+      const { data: existingProf } = await sb
+        .from('profiles')
+        .select('id')
+        .eq('id', u.id)
+        .maybeSingle()
+
+      if (!existingProf) {
+        await sb.from('profiles').upsert({
+          id: u.id,
+          email: u.email,
+          full_name: u.user_metadata?.full_name ?? '',
+          active_role: role,
+          roles: [role],
+        }, { onConflict: 'id' })
+      }
+
+      // Keep userId in sync in case Path A set it from signUp response
+      setUserId(u.id)
     }
 
     setEmailVerified('done')
@@ -201,7 +293,7 @@ export default function OnboardingPage() {
     const sb = createClient()
     await sb.from('profiles').update({
       phone: phone.trim(),
-      currency: currency,          // ← save selected currency to profile
+      currency: currency,
       active_role: 'landlord',
       roles: ['landlord'],
     }).eq('id', userId).select()
@@ -284,6 +376,7 @@ export default function OnboardingPage() {
     await sb.from('units').update({ status: 'occupied' }).eq('id', tenantRow.unit_id).select()
     await sb.from('profiles').update({
       phone: tenantPhone.trim(),
+      currency: currency,
       active_role: 'tenant',
       roles: ['tenant'],
     }).eq('id', userId).select()
@@ -297,6 +390,7 @@ export default function OnboardingPage() {
     const sb = createClient()
     await sb.from('profiles').update({
       phone: seekerPhone || null,
+      currency: currency,
       active_role: 'seeker',
       roles: ['seeker'],
     }).eq('id', userId).select()
@@ -389,72 +483,98 @@ export default function OnboardingPage() {
           {/* ══ EMAIL OTP VERIFICATION GATE ══ */}
           {emailVerified === 'verify' ? (
             <div className="ob-card">
-              {/* Icon */}
-              <div style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(135deg,#EFF6FF,#EEF2FF)', border: '1px solid #BFDBFE', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, marginBottom: 20 }}>
-                📧
-              </div>
 
-              <h2 style={{ fontFamily: 'Fraunces,serif', fontSize: 28, fontWeight: 400, color: '#0F172A', letterSpacing: '-.6px', marginBottom: 8 }}>
-                Verify your email
-              </h2>
-              <p style={{ color: '#64748B', fontSize: 14, lineHeight: 1.7, marginBottom: 6 }}>
-                We sent a 6-digit code to
-              </p>
-              <p style={{ color: '#0F172A', fontSize: 14, fontWeight: 700, marginBottom: 28 }}>
-                {userEmail}
-              </p>
+              {/* ── signUp() itself failed (e.g. email already registered) ── */}
+              {signupError ? (
+                <>
+                  <div style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(135deg,#FEF2F2,#FFF1F2)', border: '1px solid #FECACA', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, marginBottom: 20 }}>
+                    ❌
+                  </div>
+                  <h2 style={{ fontFamily: 'Fraunces,serif', fontSize: 26, fontWeight: 400, color: '#0F172A', letterSpacing: '-.6px', marginBottom: 10 }}>
+                    Account creation failed
+                  </h2>
+                  <div className="error-box" style={{ marginBottom: 0 }}>
+                    <span style={{ fontSize: 18 }}>⚠️</span>
+                    <p style={{ fontSize: 13, color: '#DC2626', lineHeight: 1.65 }}>{signupError}</p>
+                  </div>
+                  <button
+                    className="ob-btn"
+                    onClick={() => router.push('/signup')}
+                    style={{ marginTop: 24 }}
+                  >
+                    ← Back to Sign Up
+                  </button>
+                </>
+              ) : (
+                <>
+                  {/* ── Normal OTP entry ── */}
+                  <div style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(135deg,#EFF6FF,#EEF2FF)', border: '1px solid #BFDBFE', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, marginBottom: 20 }}>
+                    📧
+                  </div>
 
-              <div style={{ marginBottom: 8 }}>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>
-                  Verification Code
-                </label>
-                <input
-                  className={`otp-inp${otpError ? ' otp-inp-err' : ''}`}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={otp}
-                  onChange={e => { setOtp(e.target.value.replace(/\D/g, '')); setOtpError('') }}
-                  placeholder="000000"
-                  autoFocus
-                />
-              </div>
+                  <h2 style={{ fontFamily: 'Fraunces,serif', fontSize: 28, fontWeight: 400, color: '#0F172A', letterSpacing: '-.6px', marginBottom: 8 }}>
+                    Verify your email
+                  </h2>
+                  <p style={{ color: '#64748B', fontSize: 14, lineHeight: 1.7, marginBottom: 6 }}>
+                    We sent a 6-digit code to
+                  </p>
+                  <p style={{ color: '#0F172A', fontSize: 14, fontWeight: 700, marginBottom: 28 }}>
+                    {userEmail}
+                  </p>
 
-              {otpError && (
-                <div className="error-box" style={{ marginTop: 12 }}>
-                  <span style={{ fontSize: 18 }}>❌</span>
-                  <p style={{ fontSize: 13, color: '#DC2626', lineHeight: 1.65 }}>{otpError}</p>
-                </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>
+                      Verification Code
+                    </label>
+                    <input
+                      className={`otp-inp${otpError ? ' otp-inp-err' : ''}`}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={otp}
+                      onChange={e => { setOtp(e.target.value.replace(/\D/g, '')); setOtpError('') }}
+                      placeholder="000000"
+                      autoFocus
+                    />
+                  </div>
+
+                  {otpError && (
+                    <div className="error-box" style={{ marginTop: 12 }}>
+                      <span style={{ fontSize: 18 }}>❌</span>
+                      <p style={{ fontSize: 13, color: '#DC2626', lineHeight: 1.65 }}>{otpError}</p>
+                    </div>
+                  )}
+
+                  <button
+                    className="ob-btn"
+                    onClick={handleVerifyOtp}
+                    disabled={otpLoading || otp.length < 6}
+                    style={{ marginTop: 20 }}
+                  >
+                    {otpLoading ? 'Verifying...' : 'Verify & Continue →'}
+                  </button>
+
+                  {/* Resend */}
+                  <div style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: '#64748B' }}>
+                    Didn't get the code?{' '}
+                    <button
+                      className="resend-btn"
+                      onClick={handleResendOtp}
+                      disabled={resendCooldown > 0}
+                      style={{ color: resendCooldown > 0 ? '#94A3B8' : '#2563EB' }}
+                    >
+                      {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
+                    </button>
+                  </div>
+
+                  <div className="info-box" style={{ marginTop: 24, marginBottom: 0 }}>
+                    <span style={{ fontSize: 18 }}>💡</span>
+                    <p style={{ fontSize: 13, color: '#1D4ED8', lineHeight: 1.65 }}>
+                      Check your spam folder if you don't see it. The code expires in 10 minutes.
+                    </p>
+                  </div>
+                </>
               )}
-
-              <button
-                className="ob-btn"
-                onClick={handleVerifyOtp}
-                disabled={otpLoading || otp.length < 6}
-                style={{ marginTop: 20 }}
-              >
-                {otpLoading ? 'Verifying...' : 'Verify & Continue →'}
-              </button>
-
-              {/* Resend */}
-              <div style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: '#64748B' }}>
-                Didn't get the code?{' '}
-                <button
-                  className="resend-btn"
-                  onClick={handleResendOtp}
-                  disabled={resendCooldown > 0}
-                  style={{ color: resendCooldown > 0 ? '#94A3B8' : '#2563EB' }}
-                >
-                  {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
-                </button>
-              </div>
-
-              <div className="info-box" style={{ marginTop: 24, marginBottom: 0 }}>
-                <span style={{ fontSize: 18 }}>💡</span>
-                <p style={{ fontSize: 13, color: '#1D4ED8', lineHeight: 1.65 }}>
-                  Check your spam folder if you don't see it. The code expires in 10 minutes.
-                </p>
-              </div>
             </div>
           ) : (
             <>
@@ -626,6 +746,24 @@ export default function OnboardingPage() {
                     onChange={e => setTenantPhone(e.target.value)} type="tel"
                     placeholder="+94 77 123 4567" errors={errors} />
 
+                  {/* ── Currency picker ── */}
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 7 }}>
+                      Preferred Currency
+                    </label>
+                    <select
+                      className="ob-inp"
+                      value={currency}
+                      onChange={e => setCurrency(e.target.value as CurrencyCode)}
+                    >
+                      {CURRENCY_OPTIONS.map(c => (
+                        <option key={c.code} value={c.code}>
+                          {c.symbol} — {c.name} ({c.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div style={{ marginBottom: 16 }}>
                     <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 7 }}>
                       Invite Code
@@ -708,6 +846,24 @@ export default function OnboardingPage() {
                   <Field label="Phone Number" id="seekerPhone" value={seekerPhone}
                     onChange={e => setSeekerPhone(e.target.value)} type="tel"
                     placeholder="+94 77 123 4567" optional errors={errors} />
+
+                  {/* ── Currency picker ── */}
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 7 }}>
+                      Preferred Currency
+                    </label>
+                    <select
+                      className="ob-inp"
+                      value={currency}
+                      onChange={e => setCurrency(e.target.value as CurrencyCode)}
+                    >
+                      {CURRENCY_OPTIONS.map(c => (
+                        <option key={c.code} value={c.code}>
+                          {c.symbol} — {c.name} ({c.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     <div style={{ marginBottom: 16 }}>

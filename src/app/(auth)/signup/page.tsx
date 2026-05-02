@@ -56,47 +56,43 @@ export default function SignupPage() {
     return true
   }
 
+  // ── CHANGED: Store signup data in sessionStorage, redirect to onboarding.
+  //    No DB writes happen here at all. The actual auth.signUp() call is
+  //    deferred to the onboarding page so the user only lands in the DB
+  //    after they have verified their email and completed onboarding.
   const handleSignup = async () => {
     setError('')
     if (!validate()) return
     setLoading(true)
 
+    // Check if email is already registered before storing anything
     const sb = createClient()
+    const { data: existing } = await sb
+      .from('profiles')
+      .select('id')
+      .eq('email', email.trim().toLowerCase())
+      .maybeSingle()
 
-    // 1. Sign up the user
-    const { data, error: signUpError } = await sb.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        // Use full_name and role in metadata so they are available even before profile upsert
-        data: { full_name: fullName.trim(), role },
-        emailRedirectTo: `${window.location.origin}/auth/callback?role=${role}`,
-      },
-    })
-
-    if (signUpError) {
-      setError(signUpError.message)
+    if (existing) {
+      setError('An account with this email already exists. Please log in instead.')
       setLoading(false)
       return
     }
 
-    // 2. If session is immediate (email confirm off), upsert profile
-    if (data.user && data.session) {
-      await sb.from('profiles').upsert({
-        id: data.user.id,
-        email: email.trim(),
-        full_name: fullName.trim(),
-        active_role: role,
-        roles: [role],
-      }, { onConflict: 'id' })
-
-      router.push('/onboarding')
-    } else {
-      // 3. If email confirmation is required
-      router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`)
-    }
+    // Store the pending signup payload in sessionStorage.
+    // The onboarding page reads this on mount and calls signUp() there.
+    sessionStorage.setItem(
+      'pending_signup',
+      JSON.stringify({
+        fullName: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+        role,
+      })
+    )
 
     setLoading(false)
+    router.push('/onboarding')
   }
 
   const handleGoogleButtonClick = () => {
@@ -174,7 +170,7 @@ export default function SignupPage() {
             width: 38px;
             height: 38px;
             border-radius: 11px;
-            background: rgba(255, 255, 255, 0.05); /* Very subtle white */
+            background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
             display: flex;
             align-items: center;
@@ -422,7 +418,7 @@ export default function SignupPage() {
               )}
 
               <button className="submit" onClick={handleSignup} disabled={loading}>
-                {loading ? 'Creating account...' : 'Create Account →'}
+                {loading ? 'Checking...' : 'Create Account →'}
               </button>
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 14, fontSize: 11.5, color: '#C4C4BC' }}>
