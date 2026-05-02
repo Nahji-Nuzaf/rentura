@@ -31,7 +31,6 @@ interface Listing {
 
 export default function SeekerDashboard() {
   const router = useRouter()
-  // With this:
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -43,51 +42,63 @@ export default function SeekerDashboard() {
   const [recentListings, setRecentListings] = useState<Listing[]>([])
   const [savedIds, setSavedIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState<'recommended' | 'recent'>('recommended')
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        if (userError) throw userError
+        if (!user) { router.push('/login'); return }
 
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('full_name, preferred_city, budget, preferred_type, active_role')
-        .eq('id', user.id)
-        .single()
+        const { data: prof, error: profError } = await supabase
+          .from('profiles')
+          .select('full_name, preferred_city, budget, preferred_type, active_role')
+          .eq('id', user.id)
+          .single()
 
-      if (!prof || prof.active_role !== 'seeker') { router.push('/login'); return }
-      setProfile(prof)
+        if (profError) throw profError
+        if (!prof || prof.active_role !== 'seeker') { router.push('/login'); return }
+        setProfile(prof)
 
-      // Recommended: filter by seeker's saved preferences
-      let recQuery = supabase
-        .from('listings')
-        .select('id, title, price, city, property_type, bedrooms, bathrooms, images, created_at')
-        .eq('status', 'active')
-      if (prof.preferred_city) recQuery = recQuery.ilike('city', `%${prof.preferred_city}%`)
-      if (prof.budget) recQuery = recQuery.lte('price', prof.budget)
-      if (prof.preferred_type) recQuery = recQuery.eq('property_type', prof.preferred_type)
-      const { data: recData } = await recQuery.limit(6)
-      setRecommended(recData || [])
+        // Recommended: filter by seeker's preferences
+        let recQuery = supabase
+          .from('listings')
+          .select('id, title, price, city, property_type, bedrooms, bathrooms, images, created_at')
+          .eq('status', 'active')
+        if (prof.preferred_city) recQuery = recQuery.ilike('city', `%${prof.preferred_city}%`)
+        if (prof.budget)         recQuery = recQuery.lte('price', prof.budget)
+        if (prof.preferred_type) recQuery = recQuery.eq('property_type', prof.preferred_type)
+        const { data: recData, error: recError } = await recQuery.limit(6)
+        if (recError) throw recError
+        setRecommended(recData || [])
 
-      // Recent: newest listings overall
-      const { data: recentData } = await supabase
-        .from('listings')
-        .select('id, title, price, city, property_type, bedrooms, bathrooms, images, created_at')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(6)
-      setRecentListings(recentData || [])
+        // Recent: newest listings overall
+        const { data: recentData, error: recentError } = await supabase
+          .from('listings')
+          .select('id, title, price, city, property_type, bedrooms, bathrooms, images, created_at')
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(6)
+        if (recentError) throw recentError
+        setRecentListings(recentData || [])
 
-      // Saved listing IDs for this user
-      const { data: savedData } = await supabase
-        .from('saved_listings')
-        .select('listing_id')
-        .eq('user_id', user.id)
-      setSavedIds((savedData || []).map((s: any) => s.listing_id))
+        // Saved listing IDs
+        const { data: savedData, error: savedError } = await supabase
+          .from('saved_listings')
+          .select('listing_id')
+          .eq('user_id', user.id)
+        if (savedError) throw savedError
+        setSavedIds((savedData || []).map((s: any) => s.listing_id))
 
-      setLoading(false)
+      } catch (err: any) {
+        console.error('Dashboard load error:', err)
+        setError(err?.message || 'Something went wrong loading your dashboard.')
+      } finally {
+        setLoading(false)
+      }
     }
     load()
   }, [])
@@ -121,6 +132,22 @@ export default function SeekerDashboard() {
     )
   }
 
+  // ─── Error screen ──────────────────────────────────────────────────────────
+  if (error) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#F4F6FA', gap: 16 }}>
+        <span style={{ fontSize: 40 }}>⚠️</span>
+        <p style={{ fontFamily: 'sans-serif', fontSize: 16, color: '#EF4444', maxWidth: 400, textAlign: 'center' }}>{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          style={{ background: '#2563EB', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 10, cursor: 'pointer', fontFamily: 'sans-serif', fontSize: 14, fontWeight: 600 }}
+        >
+          Try again
+        </button>
+      </div>
+    )
+  }
+
   const firstName = profile?.full_name?.split(' ')[0] || 'there'
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
@@ -139,11 +166,11 @@ export default function SeekerDashboard() {
         </div>
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
-          <NavLink href="/seeker" active label="Dashboard" icon="home" />
-          <NavLink href="/seeker/listings" label="Browse Listings" icon="search" />
-          <NavLink href="/seeker/saved" label="Saved" icon="heart" badge={savedIds.length} />
-          <NavLink href="/seeker/messages" label="Messages" icon="message" />
-          <NavLink href="/seeker/settings" label="Settings" icon="settings" />
+          <NavLink href="/seeker"          active label="Dashboard"       icon="home"     />
+          <NavLink href="/seeker/listings"        label="Browse Listings" icon="search"   />
+          <NavLink href="/seeker/saved"           label="Saved"           icon="heart"    badge={savedIds.length} />
+          <NavLink href="/seeker/messages"        label="Messages"        icon="message"  />
+          <NavLink href="/seeker/settings"        label="Settings"        icon="settings" />
         </nav>
 
         <div style={S.sidebarFooter}>
@@ -253,10 +280,10 @@ function NavLink({ href, label, icon, active, badge }: {
   return (
     <a href={href} className={`nav-link${active ? ' active' : ''}`}>
       <span style={{ display: 'flex', flexShrink: 0, width: 17 }}>
-        {icon === 'home' && <IHome />}
-        {icon === 'search' && <ISearch />}
-        {icon === 'heart' && <IHeart />}
-        {icon === 'message' && <IMessage />}
+        {icon === 'home'     && <IHome />}
+        {icon === 'search'   && <ISearch />}
+        {icon === 'heart'    && <IHeart />}
+        {icon === 'message'  && <IMessage />}
         {icon === 'settings' && <ISettings />}
       </span>
       <span style={{ flex: 1 }}>{label}</span>
@@ -286,7 +313,6 @@ function ListingCard({ listing, isSaved, onSave, fmtMoney, delay, onClick }: {
   const img = listing.images?.[0]
   return (
     <div className="listing-card" style={{ animationDelay: `${delay}s` }}>
-      {/* Image zone */}
       <div
         style={{ position: 'relative', height: 184, background: '#F1F5F9', overflow: 'hidden', cursor: 'pointer' }}
         onClick={onClick}
@@ -295,11 +321,9 @@ function ListingCard({ listing, isSaved, onSave, fmtMoney, delay, onClick }: {
           ? <img src={img} alt={listing.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 38 }}>🏠</div>
         }
-        {/* Type badge */}
         <span style={{ position: 'absolute', top: 10, left: 10, background: '#fff', borderRadius: 7, padding: '3px 9px', fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 11, fontWeight: 700, color: '#0F172A', boxShadow: '0 1px 6px rgba(0,0,0,0.12)' }}>
           {listing.property_type || 'Apartment'}
         </span>
-        {/* Save button */}
         <button
           className="save-btn"
           style={{ position: 'absolute', top: 9, right: 9 }}
@@ -309,7 +333,6 @@ function ListingCard({ listing, isSaved, onSave, fmtMoney, delay, onClick }: {
           <IHeart filled={isSaved} size={15} color={isSaved ? '#EF4444' : '#64748B'} />
         </button>
       </div>
-      {/* Info */}
       <div style={{ padding: '14px 16px 16px', cursor: 'pointer' }} onClick={onClick}>
         <p style={{ fontFamily: 'Fraunces,serif', fontSize: 16, fontWeight: 600, color: '#0F172A', marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {listing.title}
@@ -342,7 +365,6 @@ function GlobalStyles() {
       @keyframes fadeUp { from { opacity: 0; transform: translateY(14px) } to { opacity: 1; transform: translateY(0) } }
       .fade-up { animation: fadeUp 0.42s ease both; }
 
-      /* Sidebar nav links */
       .nav-link {
         display: flex; align-items: center; gap: 10px; padding: 9px 12px;
         border-radius: 10px; color: #94A3B8;
@@ -352,7 +374,6 @@ function GlobalStyles() {
       .nav-link:hover  { background: rgba(255,255,255,0.07); color: #CBD5E1; }
       .nav-link.active { background: rgba(37,99,235,0.22); color: #fff; }
 
-      /* Search */
       .s-input {
         flex: 1; padding: 13px 16px 13px 44px; border: 1.5px solid #E2E8F0;
         border-radius: 12px; font-family: 'Plus Jakarta Sans', sans-serif;
@@ -368,7 +389,6 @@ function GlobalStyles() {
       }
       .s-btn:hover { background: #1D4ED8; }
 
-      /* Tabs */
       .tab {
         padding: 8px 15px; border-radius: 8px; border: none; cursor: pointer;
         font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; font-weight: 600;
@@ -377,7 +397,6 @@ function GlobalStyles() {
       .tab:hover  { background: #E9EEF5; color: #0F172A; }
       .tab.active { background: #EFF6FF; color: #2563EB; }
 
-      /* Listing cards */
       .listing-card {
         background: #fff; border-radius: 16px; border: 1px solid #E2E8F0;
         overflow: hidden; animation: fadeUp 0.38s ease both;
@@ -385,7 +404,6 @@ function GlobalStyles() {
       }
       .listing-card:hover { transform: translateY(-4px); box-shadow: 0 10px 28px rgba(37,99,235,0.10); }
 
-      /* Save button */
       .save-btn {
         background: #fff; border: none; border-radius: 8px; padding: 6px;
         cursor: pointer; display: flex; align-items: center; justify-content: center;
