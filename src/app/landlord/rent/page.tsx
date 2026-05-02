@@ -56,7 +56,7 @@ function exportCSV(filename: string, headers: string[], rows: (string | number)[
 export default function RentTrackerPage() {
   const router = useRouter()
   const { isPro, plan } = usePro()
-  const { fmtMoney } = useCurrency()
+  const { fmtMoney, code } = useCurrency()
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName] = useState('User')
   const [userId, setUserId] = useState('')
@@ -272,7 +272,7 @@ export default function RentTrackerPage() {
     if (!isPro) { setShowUpgradeModal(true); return }
     exportCSV(
       `rent-tracker-${selectedMonth}-${selectedYear}`,
-      ['Tenant', 'Property', 'Unit', 'Amount ($)', 'Due Date', 'Paid Date', 'Status'],
+      ['Tenant', 'Property', 'Unit', `Amount (${code})`, 'Due Date', 'Paid Date', 'Status'],
       records.map(r => [
         r.tenant, r.property, r.unit, r.amount,
         r.due_date, r.paid_date || '—', derivedStatus(r)

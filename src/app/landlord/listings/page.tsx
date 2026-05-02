@@ -22,11 +22,12 @@ type Listing = {
   available_from: string
   status: 'active' | 'pending' | 'taken' | 'draft'
   photos: string[]
+  tags: string[]
   created_at: string
 }
 
 type PropertyOption = { id: string; name: string; city?: string; type?: string }
-type UnitOption = { id: string; unit_number: string; monthly_rent: number }
+type UnitOption = { id: string; unit_number: string; monthly_rent: number; status?: string }
 
 const STATUS_CFG: Record<string, { label: string, bg: string, color: string }> = {
   active: { label: 'Active', bg: '#DCFCE7', color: '#16A34A' },
@@ -34,6 +35,12 @@ const STATUS_CFG: Record<string, { label: string, bg: string, color: string }> =
   pending: { label: 'Pending', bg: '#FEF3C7', color: '#D97706' },
   taken: { label: 'Taken', bg: '#EFF6FF', color: '#2563EB' },
 }
+
+const SUGGESTED_TAGS = [
+  'Air Conditioned', 'Solar Panel', 'Parking', 'Furnished', 'Pet Friendly',
+  'Swimming Pool', 'Security Guard', 'Generator', 'Water Heater', 'CCTV',
+  'Balcony', 'Garden', 'Gym', 'Internet Included', 'Washing Machine',
+]
 
 function fmtDate(s: string) {
   if (!s) return ''
@@ -43,7 +50,6 @@ function fmtDate(s: string) {
 export default function ListingsPage() {
   const router = useRouter()
   const { fmtMoney } = useCurrency()
-  // ── FIX: Use ONLY isPro from usePro() — do not redeclare
   const { isPro, plan } = usePro()
   const photoInputRef = useRef<HTMLInputElement>(null)
   const [userInitials, setUserInitials] = useState('NN')
@@ -76,6 +82,11 @@ export default function ListingsPage() {
   const [aiError, setAiError] = useState('')
   const [aiSuccess, setAiSuccess] = useState(false)
 
+  // Tags/features state
+  const [tags, setTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState('')
+  const [showTagInput, setShowTagInput] = useState(false)
+
   const planLabel = isPro ? plan.toUpperCase() : 'FREE'
   const planColor = isPro
     ? { color: '#FCD34D', bg: 'rgba(251,191,36,.14)', border: 'rgba(251,191,36,.3)' }
@@ -101,14 +112,14 @@ export default function ListingsPage() {
       if (!propIds.length) { setListings([]); setLoading(false); return }
 
       const { data: unitsData } = await sb
-        .from('units').select('id,unit_number,property_id,monthly_rent').in('property_id', propIds)
+        .from('units').select('id,unit_number,property_id,monthly_rent,status').in('property_id', propIds)
       const um: Record<string, string> = {}
         ; (unitsData || []).forEach((u: any) => { um[u.id] = u.unit_number })
       setUnitMap(um)
 
       const { data, error } = await sb
         .from('listings')
-        .select('id,title,description,property_id,unit_id,bedrooms,bathrooms,rent_amount,currency,available_from,status,photos,created_at')
+        .select('id,title,description,property_id,unit_id,bedrooms,bathrooms,rent_amount,currency,available_from,status,photos,tags,created_at')
         .eq('landlord_id', uid)
         .order('created_at', { ascending: false })
       if (error) throw error
@@ -120,7 +131,7 @@ export default function ListingsPage() {
         bedrooms: row.bedrooms || 0, bathrooms: row.bathrooms || 1,
         rent_amount: row.rent_amount || 0, currency: row.currency || 'USD',
         available_from: row.available_from || '', status: row.status || 'draft',
-        photos: row.photos || [], created_at: row.created_at || '',
+        photos: row.photos || [], tags: row.tags || [], created_at: row.created_at || '',
       })))
     } catch (e: any) { console.error(e?.message) }
     finally { setLoading(false) }
@@ -138,11 +149,16 @@ export default function ListingsPage() {
     })()
   }, [router])
 
-  async function loadUnitsForProperty(propId: string) {
+  // ── LOAD UNITS — filter out occupied units (unless editing that listing's unit) ──
+  async function loadUnitsForProperty(propId: string, currentUnitId?: string) {
     if (!propId) { setUnits([]); return }
     const sb = createClient()
-    const { data } = await sb.from('units').select('id,unit_number,monthly_rent').eq('property_id', propId)
-    setUnits(data || [])
+    const { data } = await sb.from('units').select('id,unit_number,monthly_rent,status').eq('property_id', propId)
+    // Show unit if: not occupied, OR it's the unit currently assigned to this listing
+    const available = (data || []).filter((u: any) =>
+      u.status !== 'occupied' || u.id === currentUnitId
+    )
+    setUnits(available)
   }
 
   // ── AI LISTING WRITER ─────────────────────────────────────
@@ -162,6 +178,7 @@ export default function ListingsPage() {
     const avail = form.available_from
       ? new Date(form.available_from).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
       : 'immediately'
+    const tagList = tags.length ? tags.join(', ') : 'none specified'
 
     const prompt = `You are a professional real estate copywriter. Write a compelling rental listing for the following property.
 
@@ -174,6 +191,7 @@ Property details:
 - Bathrooms: ${baths}
 - Monthly rent: $${rent}
 - Available from: ${avail}
+- Special features: ${tagList}
 
 Write ONLY a JSON object (no markdown, no backticks) with exactly two keys:
 - "title": A compelling listing title (max 60 characters). Make it specific and attractive.
@@ -250,6 +268,24 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
     return urls
   }
 
+  // ── TAG HANDLING ────────────────────────────────────────
+  function addTag(tag: string) {
+    const trimmed = tag.trim()
+    if (!trimmed || tags.includes(trimmed)) return
+    setTags(prev => [...prev, trimmed])
+    setTagInput('')
+    setShowTagInput(false)
+  }
+
+  function removeTag(tag: string) {
+    setTags(prev => prev.filter(t => t !== tag))
+  }
+
+  function handleTagKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') { e.preventDefault(); addTag(tagInput) }
+    if (e.key === 'Escape') { setShowTagInput(false); setTagInput('') }
+  }
+
   // ── SAVE ─────────────────────────────────────────────────
   async function handleSave() {
     if (!form.title || !form.property_id) { alert('Please fill in title and property.'); return }
@@ -271,12 +307,10 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
         bathrooms: parseInt(form.bathrooms) || 1,
         rent_amount: parseFloat(form.rent_amount) || 0,
         currency: 'USD',
-        // ── FIX: available_from — only include if user actually set a date.
-        // If empty string, omit the key entirely so DB uses its own default,
-        // preventing the NOT NULL constraint violation.
         ...(form.available_from ? { available_from: form.available_from } : {}),
         status: form.status,
         photos: allPhotos,
+        tags: tags,
       }
       if (drawer === 'add') {
         const { error } = await sb.from('listings').insert(payload)
@@ -287,6 +321,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
       }
       await loadAll(userId)
       setDrawer(null); setPhotoFiles([]); setPhotoPreviews([]); setExistingPhotos([])
+      setTags([]); setTagInput(''); setShowTagInput(false)
     } catch (e: any) { alert('Error: ' + (e?.message || 'Failed to save')) }
     finally { setSaving(false); setUploadingPhotos(false) }
   }
@@ -308,7 +343,6 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
   }
 
   function openAdd() {
-    // ── Pro check: free users limited to 2 active listings
     const activeCount = listings.filter(l => l.status === 'active').length
     if (!isPro && activeCount >= 2) { setShowUpgradeModal(true); return }
     setForm({
@@ -317,6 +351,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
     })
     if (properties[0]?.id) loadUnitsForProperty(properties[0].id)
     setPhotoFiles([]); setPhotoPreviews([]); setExistingPhotos([])
+    setTags([]); setTagInput(''); setShowTagInput(false)
     setAiError(''); setAiSuccess(false)
     setEditing(null); setDrawer('add')
   }
@@ -327,8 +362,9 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
       unit_id: l.unit_id, bedrooms: String(l.bedrooms), bathrooms: String(l.bathrooms),
       rent_amount: String(l.rent_amount), available_from: l.available_from, status: l.status
     })
-    loadUnitsForProperty(l.property_id)
+    loadUnitsForProperty(l.property_id, l.unit_id)
     setPhotoFiles([]); setPhotoPreviews([]); setExistingPhotos(l.photos || [])
+    setTags(l.tags || []); setTagInput(''); setShowTagInput(false)
     setAiError(''); setAiSuccess(false)
     setEditing(l); setDrawer('edit')
   }
@@ -382,14 +418,16 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
     return () => { if (channel) createClient().removeChannel(channel) }
   }, [])
 
+  // Suggestions filtered out already-added tags
+  const filteredSuggestions = SUGGESTED_TAGS.filter(t => !tags.includes(t))
+
   return (
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:wght@300;400;700&display=swap');
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-        html{overflow-x:hidden;width:100%}
-        html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;overflow-x:hidden;width:100%;max-width:100vw}
-        .shell{display:flex;min-height:100vh;width:100%;position:relative;overflow-x:hidden}
+        html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;width:100%;max-width:100vw}
+        .shell{display:flex;min-height:100vh;overflow-x:clip;width:100%}
 
         .sidebar{width:260px;flex-shrink:0;background:#0F172A;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:200;transition:transform .25s ease}
         .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:199}.sb-overlay.open{display:block}
@@ -422,8 +460,9 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
         .sb-uname{font-size:13px;font-weight:700;color:#E2E8F0}
         .sb-uplan{display:inline-block;font-size:10px;font-weight:700;color:#60A5FA;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.25);border-radius:5px;padding:1px 6px;margin-top:2px}
 
-        .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:hidden;width:calc(100% - 260px)}
-        .topbar{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:#fff;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(15,23,42,.04);width:100%}
+        .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:clip;width:calc(100% - 260px)}
+        /* ── FIX 1: Sticky topbar ── */
+        .topbar{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:#fff;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(15,23,42,.04);width:100%}
         .tb-left{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
         .hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;color:#475569;padding:4px;flex-shrink:0}
         .breadcrumb{font-size:13px;color:#94A3B8;font-weight:500;white-space:nowrap}.breadcrumb b{color:#0F172A;font-weight:700}
@@ -461,6 +500,8 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
         .lc-price{font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:#0F172A;margin-bottom:6px}
         .lc-facts{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
         .lc-fact{font-size:11px;color:#475569;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:3px 7px;font-weight:500}
+        .lc-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+        .lc-tag{font-size:10.5px;color:#7C3AED;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.18);border-radius:99px;padding:2px 8px;font-weight:600}
         .lc-desc{font-size:12px;color:#64748B;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
         .lc-footer{padding:10px 14px;border-top:1px solid #F1F5F9;display:flex;gap:5px;flex-wrap:wrap;align-items:center}
         .lf-btn{padding:5px 10px;border-radius:8px;font-size:11.5px;font-weight:600;cursor:pointer;border:1.5px solid #E2E8F0;background:#F8FAFC;color:#475569;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;white-space:nowrap}
@@ -481,6 +522,21 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
         .ai-success{background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:10px 13px;font-size:13px;color:#16A34A;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:12px}
         .ai-error{background:#FEE2E2;border:1px solid #FECACA;border-radius:10px;padding:10px 13px;font-size:13px;color:#DC2626;font-weight:600;margin-bottom:12px}
         .ai-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;background:linear-gradient(135deg,#7C3AED,#2563EB);color:#fff;padding:2px 8px;border-radius:99px;margin-left:6px;vertical-align:middle}
+
+        /* TAGS SECTION */
+        .tags-wrap{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center}
+        .tag-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#7C3AED;background:rgba(124,58,237,.08);border:1.5px solid rgba(124,58,237,.2);border-radius:99px;padding:4px 10px;cursor:default}
+        .tag-chip-del{background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:13px;line-height:1;padding:0;display:flex;align-items:center;transition:color .15s}
+        .tag-chip-del:hover{color:#DC2626}
+        .tag-add-btn{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:#2563EB;background:#EFF6FF;border:1.5px dashed #BFDBFE;border-radius:99px;padding:4px 12px;cursor:pointer;transition:all .15s}
+        .tag-add-btn:hover{background:#DBEAFE;border-color:#93C5FD}
+        .tag-input-row{display:flex;gap:8px;margin-bottom:10px;align-items:center}
+        .tag-input{flex:1;padding:8px 12px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;color:#0F172A;outline:none;transition:border .15s}
+        .tag-input:focus{border-color:#7C3AED;box-shadow:0 0 0 3px rgba(124,58,237,.08)}
+        .tag-input-add{padding:8px 14px;border-radius:10px;border:none;background:linear-gradient(135deg,#7C3AED,#2563EB);color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;white-space:nowrap}
+        .tag-suggestions{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
+        .tag-sug{font-size:11.5px;font-weight:600;color:#64748B;background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:99px;padding:3px 10px;cursor:pointer;transition:all .15s}
+        .tag-sug:hover{background:#EFF6FF;border-color:#BFDBFE;color:#2563EB}
 
         /* SHARE MODAL */
         .share-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;align-items:center;justify-content:center;padding:16px}
@@ -533,6 +589,9 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
         .photo-upload-zone{border:2px dashed #E2E8F0;border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:all .15s;font-size:12.5px;color:#94A3B8;line-height:1.6}
         .photo-upload-zone:hover{border-color:#3B82F6;background:#F0F9FF;color:#2563EB}
         .photo-warn{font-size:12px;color:#DC2626;font-weight:600;margin-top:8px;padding:8px 12px;background:#FEE2E2;border-radius:8px}
+
+        .section-divider{border-top:1px solid #F1F5F9;padding-top:14px;margin-top:4px;margin-bottom:14px}
+        .section-divider-label{font-size:11.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px;display:flex;align-items:center;gap:6px}
 
         .del-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:400;align-items:center;justify-content:center}.del-overlay.open{display:flex}
         .del-box{background:#fff;border-radius:18px;padding:32px;max-width:380px;width:90%;text-align:center}
@@ -600,7 +659,23 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
         </div>
         <div className="dr-body">
 
-          {/* ── AI WRITER ── */}
+          {/* ── FIX 2: Content (Title + Description) moved to TOP ── */}
+          <div className="section-divider" style={{ borderTop: 'none', paddingTop: 0, marginTop: 0 }}>
+            <div className="section-divider-label">
+              Content
+              {aiSuccess && <span style={{ fontSize: 10, fontWeight: 700, color: '#7C3AED', background: 'rgba(124,58,237,.1)', padding: '1px 7px', borderRadius: 99 }}>✨ AI Generated</span>}
+            </div>
+            <div className="field">
+              <label>Title *</label>
+              <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Bright 2BR in Colombo 03" />
+            </div>
+            <div className="field">
+              <label>Description</label>
+              <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Describe the property — or use AI to generate below..." style={{ minHeight: 110 }} />
+            </div>
+          </div>
+
+          {/* ── AI WRITER (now below content) ── */}
           <div style={{ background: 'linear-gradient(135deg,rgba(124,58,237,.06),rgba(37,99,235,.06))', border: '1.5px solid rgba(124,58,237,.15)', borderRadius: 14, padding: '14px 16px', marginBottom: 18 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#4C1D95', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
               ✨ AI Listing Writer
@@ -617,14 +692,14 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
               {aiLoading ? '✨ Writing your listing...' : '✨ Generate with AI'}
             </button>
             {aiSuccess && (
-              <div className="ai-success">✓ Title and description generated! Review and edit below.</div>
+              <div className="ai-success">✓ Title and description generated! Review and edit above.</div>
             )}
             {aiError && (
               <div className="ai-error">⚠️ {aiError}</div>
             )}
           </div>
 
-          {/* Photos */}
+          {/* ── Photos ── */}
           <div style={{ marginBottom: 16 }}>
             <div className="photo-section-label">
               <span>Photos</span>
@@ -660,71 +735,121 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
             )}
           </div>
 
-          <div className="field">
-            <label>Property *</label>
-            <select value={form.property_id} onChange={e => {
-              setForm(f => ({ ...f, property_id: e.target.value, unit_id: '' }))
-              loadUnitsForProperty(e.target.value)
-            }}>
-              <option value="">Select property</option>
-              {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </div>
-          <div className="field">
-            <label>Unit</label>
-            <select value={form.unit_id} onChange={e => {
-              const u = units.find(u => u.id === e.target.value)
-              setForm(f => ({ ...f, unit_id: e.target.value, rent_amount: u ? String(u.monthly_rent) : f.rent_amount }))
-            }}>
-              <option value="">Select unit (optional)</option>
-              {units.map(u => <option key={u.id} value={u.id}>{u.unit_number} — ${u.monthly_rent}/mo</option>)}
-            </select>
-          </div>
-          <div className="field-row">
+          {/* ── Property & Unit ── */}
+          <div className="section-divider">
+            <div className="section-divider-label">Property Details</div>
             <div className="field">
-              <label>Bedrooms</label>
-              <input type="number" min="0" value={form.bedrooms} onChange={e => setForm(f => ({ ...f, bedrooms: e.target.value }))} />
+              <label>Property *</label>
+              <select value={form.property_id} onChange={e => {
+                setForm(f => ({ ...f, property_id: e.target.value, unit_id: '' }))
+                loadUnitsForProperty(e.target.value)
+              }}>
+                <option value="">Select property</option>
+                {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            {/* ── FIX 3: Unit dropdown shows only available units (occupied filtered out) ── */}
+            <div className="field">
+              <label>Unit</label>
+              <select value={form.unit_id} onChange={e => {
+                const u = units.find(u => u.id === e.target.value)
+                setForm(f => ({ ...f, unit_id: e.target.value, rent_amount: u ? String(u.monthly_rent) : f.rent_amount }))
+              }}>
+                <option value="">Select unit (optional)</option>
+                {units.map(u => (
+                  <option key={u.id} value={u.id}>
+                    {u.unit_number} — {u.monthly_rent}/mo
+                  </option>
+                ))}
+              </select>
+              {form.property_id && units.length === 0 && (
+                <div style={{ fontSize: 11.5, color: '#94A3B8', marginTop: 5, fontStyle: 'italic' }}>
+                  No available units for this property
+                </div>
+              )}
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Bedrooms</label>
+                <input type="number" min="0" value={form.bedrooms} onChange={e => setForm(f => ({ ...f, bedrooms: e.target.value }))} />
+              </div>
+              <div className="field">
+                <label>Bathrooms</label>
+                <input type="number" min="1" value={form.bathrooms} onChange={e => setForm(f => ({ ...f, bathrooms: e.target.value }))} />
+              </div>
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Rent / Month</label>
+                <input type="number" value={form.rent_amount} onChange={e => setForm(f => ({ ...f, rent_amount: e.target.value }))} placeholder="0" />
+              </div>
+              <div className="field">
+                <label>Available From <span style={{ fontWeight: 400, color: '#94A3B8', textTransform: 'none', letterSpacing: 0 }}>(optional)</span></label>
+                <input type="date" value={form.available_from} onChange={e => setForm(f => ({ ...f, available_from: e.target.value }))} />
+              </div>
             </div>
             <div className="field">
-              <label>Bathrooms</label>
-              <input type="number" min="1" value={form.bathrooms} onChange={e => setForm(f => ({ ...f, bathrooms: e.target.value }))} />
+              <label>Status</label>
+              <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as Listing['status'] }))}>
+                <option value="active">Active</option>
+                <option value="draft">Draft</option>
+                <option value="pending">Pending</option>
+                <option value="taken">Taken</option>
+              </select>
             </div>
-          </div>
-          <div className="field-row">
-            <div className="field">
-              <label>Rent / Month</label>
-              <input type="number" value={form.rent_amount} onChange={e => setForm(f => ({ ...f, rent_amount: e.target.value }))} placeholder="0" />
-            </div>
-            <div className="field">
-              {/* ── FIX: label clarifies field is optional to guide users */}
-              <label>Available From <span style={{ fontWeight: 400, color: '#94A3B8', textTransform: 'none', letterSpacing: 0 }}>(optional)</span></label>
-              <input type="date" value={form.available_from} onChange={e => setForm(f => ({ ...f, available_from: e.target.value }))} />
-            </div>
-          </div>
-          <div className="field">
-            <label>Status</label>
-            <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as Listing['status'] }))}>
-              <option value="active">Active</option>
-              <option value="draft">Draft</option>
-              <option value="pending">Pending</option>
-              <option value="taken">Taken</option>
-            </select>
           </div>
 
-          {/* Title + Description AFTER AI can fill them */}
-          <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: 14, marginTop: 4 }}>
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-              Content
-              {aiSuccess && <span style={{ fontSize: 10, fontWeight: 700, color: '#7C3AED', background: 'rgba(124,58,237,.1)', padding: '1px 7px', borderRadius: 99 }}>✨ AI Generated</span>}
+          {/* ── FIX 4: Special Tags / Features ── */}
+          <div className="section-divider">
+            <div className="section-divider-label">
+              ✨ Features & Amenities
             </div>
-            <div className="field">
-              <label>Title *</label>
-              <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Bright 2BR in Colombo 03" />
-            </div>
-            <div className="field">
-              <label>Description</label>
-              <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Describe the property — or use AI to generate above..." style={{ minHeight: 110 }} />
-            </div>
+
+            {/* Added tags */}
+            {tags.length > 0 && (
+              <div className="tags-wrap" style={{ marginBottom: 10 }}>
+                {tags.map(tag => (
+                  <span key={tag} className="tag-chip">
+                    {tag}
+                    <button className="tag-chip-del" onClick={() => removeTag(tag)}>✕</button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Suggestions (show only tags not yet added) */}
+            {filteredSuggestions.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 6, fontWeight: 600 }}>QUICK ADD</div>
+                <div className="tag-suggestions">
+                  {filteredSuggestions.slice(0, 8).map(t => (
+                    <button key={t} className="tag-sug" onClick={() => addTag(t)}>{t}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Custom tag input */}
+            {showTagInput ? (
+              <div className="tag-input-row">
+                <input
+                  autoFocus
+                  className="tag-input"
+                  placeholder="e.g. Rooftop Access"
+                  value={tagInput}
+                  onChange={e => setTagInput(e.target.value)}
+                  onKeyDown={handleTagKeyDown}
+                />
+                <button className="tag-input-add" onClick={() => addTag(tagInput)}>Add</button>
+                <button
+                  onClick={() => { setShowTagInput(false); setTagInput('') }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', fontSize: 18, padding: '0 4px' }}>✕</button>
+              </div>
+            ) : (
+              <button className="tag-add-btn" onClick={() => setShowTagInput(true)}>
+                <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Add custom feature
+              </button>
+            )}
           </div>
 
         </div>
@@ -797,7 +922,6 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
             <a href="/landlord/upgrade" className="sb-item"><span className="sb-ico">⭐</span>Upgrade</a>
           </nav>
           <div className="sb-footer">
-            {/* ── Pro users don't need the upgrade nudge */}
             {!isPro && (
               <div className="sb-upgrade">
                 <div className="sb-up-title">⭐ Upgrade to Pro</div>
@@ -814,11 +938,6 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
                 </span>
               </div>
             </div>
-            {/* <div className="sb-user">
-              <div className="sb-av">{userInitials}</div>
-              ── FIX: show real plan from usePro()
-              <div><div className="sb-uname">{fullName}</div><span className="sb-uplan">{isPro ? 'PRO' : 'FREE'}</span></div>
-            </div> */}
           </div>
         </aside>
 
@@ -908,6 +1027,16 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
                           <span className="lc-fact">🚿 {l.bathrooms} bath</span>
                           {l.available_from && <span className="lc-fact">📅 {fmtDate(l.available_from)}</span>}
                         </div>
+                        {l.tags && l.tags.length > 0 && (
+                          <div className="lc-tags">
+                            {l.tags.slice(0, 3).map(tag => (
+                              <span key={tag} className="lc-tag">{tag}</span>
+                            ))}
+                            {l.tags.length > 3 && (
+                              <span className="lc-tag">+{l.tags.length - 3} more</span>
+                            )}
+                          </div>
+                        )}
                         {l.description && <div className="lc-desc">{l.description}</div>}
                       </div>
                       <div className="lc-footer">

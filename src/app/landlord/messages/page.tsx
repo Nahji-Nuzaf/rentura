@@ -426,7 +426,7 @@ export default function MessagesPage() {
             <span className="sb-section">Management</span>
             <a href="/landlord/maintenance" className="sb-item"><span className="sb-ico">🔧</span>Maintenance</a>
             <a href="/landlord/documents" className="sb-item"><span className="sb-ico">📁</span>Documents</a>
-            <a href="/landlord/messages" className="sb-item" style={{ justifyContent: 'space-between' }}>
+            <a href="/landlord/messages" className="sb-item active" style={{ justifyContent: 'space-between' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                 <span className="sb-ico">💬</span>Messages
               </span>

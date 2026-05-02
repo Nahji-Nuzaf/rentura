@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
+import { useCurrency } from '@/lib/useCurrency'
 
 type Profile = {
   id: string
@@ -69,9 +70,9 @@ function initials(name: string) {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
-function fmtCurrency(amount: number, currency = 'USD') {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount)
-}
+// function fmtCurrency(amount: number, currency = 'USD') {
+//   return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount)
+// }
 
 function fmtDate(s?: string) {
   if (!s) return '—'
@@ -151,6 +152,7 @@ export default function TenantDashboard() {
   const [rolePopoverOpen, setRolePopoverOpen] = useState(false)
   const [activeRole, setActiveRole] = useState('tenant')
   const [showPayModal, setShowPayModal] = useState(false)
+  const { fmtMoney } = useCurrency()
 
   // ── Link new property modal ──
   const [showLinkModal, setShowLinkModal] = useState(false)
@@ -658,7 +660,7 @@ export default function TenantDashboard() {
                   </div>
                   <div className="hero-right">
                     <div className="hero-rent-label">Monthly Rent</div>
-                    <div className="hero-rent">{unit ? fmtCurrency(unit.monthly_rent, unit.currency) : '—'}</div>
+                    <div className="hero-rent">{unit ? fmtMoney(unit.monthly_rent) : '—'}</div>
                     <div className="hero-rent-sub">Due on the {unit?.rent_due_day || '—'}th each month</div>
                     {daysLeft !== null && (
                       <div className="hero-pill" style={{
@@ -732,7 +734,7 @@ export default function TenantDashboard() {
                         <div className="card-title">Current Month Rent</div>
                         <a href="/tenant/rent" className="card-action">View All →</a>
                       </div>
-                      <div className="rent-amount">{unit ? fmtCurrency(unit.monthly_rent, unit.currency) : '—'}</div>
+                      <div className="rent-amount">{unit ? fmtMoney(unit.monthly_rent) : '—'}</div>
                       <div className="rent-meta">
                         Due day {unit?.rent_due_day} · {daysLeft !== null && daysLeft > 0 ? `${daysLeft} days away` : daysLeft === 0 ? 'Due today' : 'Overdue'}
                       </div>
@@ -790,7 +792,7 @@ export default function TenantDashboard() {
                                   {ds === 'paid' ? '✓' : ds === 'overdue' ? '!' : '○'}
                                 </div>
                                 <div className="tl-month">{month}</div>
-                                <div className="tl-amount">{fmtCurrency(p.amount, unit?.currency)}</div>
+                                <div className="tl-amount">{fmtMoney(p.amount)}</div>
                                 <span className="tl-badge" style={{ background: colors.bg, color: colors.color }}>
                                   {ds.charAt(0).toUpperCase() + ds.slice(1)}
                                 </span>

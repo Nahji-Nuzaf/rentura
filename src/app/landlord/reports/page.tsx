@@ -30,7 +30,7 @@ function exportCSV(filename: string, headers: string[], rows: (string | number)[
 export default function ReportsPage() {
   const router = useRouter()
   const { isPro, plan } = usePro()
-  const { fmtMoney } = useCurrency()
+  const { fmtMoney, code } = useCurrency()
 
   const [userInitials, setUserInitials] = useState('NN')
   const [fullName, setFullName] = useState('User')
@@ -156,21 +156,23 @@ export default function ReportsPage() {
   function handleExportMonthlyCSV() {
     if (!isPro) { setShowUpgradeModal(true); return }
     exportCSV('rentura-monthly-collection',
-      ['Month', 'Collected ($)', 'Overdue ($)', 'Pending ($)', 'Total ($)'],
+      ['Month', `Collected (${code})`, `Overdue (${code})`, `Pending (${code})`, `Total (${code})`],
       monthStats.map(m => [m.month, m.collected, m.overdue, m.pending, m.total])
     )
   }
+
   function handleExportPropertyCSV() {
     if (!isPro) { setShowUpgradeModal(true); return }
     exportCSV('rentura-property-breakdown',
-      ['Property', 'Total Units', 'Occupied', 'Occupancy %', 'Monthly Revenue ($)'],
+      ['Property', 'Total Units', 'Occupied', 'Occupancy %', `Monthly Revenue (${code})`],
       propStats.map(p => [p.name, p.units, p.occupied, p.units > 0 ? Math.round((p.occupied / p.units) * 100) : 0, p.revenue])
     )
   }
+
   function handleExportAnnualCSV() {
     if (!isPro) { setShowUpgradeModal(true); return }
     exportCSV('rentura-annual-revenue',
-      ['Month', 'Revenue ($)'],
+      ['Month', `Revenue (${code})`],
       annualStats.map(m => [m.month, m.revenue])
     )
   }
