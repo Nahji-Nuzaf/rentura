@@ -18,12 +18,12 @@ interface Profile {
 interface Listing {
   id: string
   title: string
-  price: number
+  rent_amount: number
   city: string
   property_type: string
   bedrooms: number
   bathrooms: number
-  images: string[]
+  photos: string[]
   created_at: string
 }
 
@@ -66,24 +66,24 @@ export default function SeekerDashboard() {
         // Recommended: filter by seeker's preferences
         let recQuery = supabase
           .from('listings')
-          .select('id, title, rent_amount as price, city, property_type, bedrooms, bathrooms, photos as images, created_at')
+          .select('id, title, rent_amount, city, property_type, bedrooms, bathrooms, photos, created_at')
           .eq('status', 'active')
         if (prof.preferred_city) recQuery = recQuery.ilike('city', `%${prof.preferred_city}%`)
-        if (prof.budget)         recQuery = recQuery.lte('price', prof.budget)
+        if (prof.budget)         recQuery = recQuery.lte('rent_amount', prof.budget)
         if (prof.preferred_type) recQuery = recQuery.eq('property_type', prof.preferred_type)
         const { data: recData, error: recError } = await recQuery.limit(6)
         if (recError) throw recError
-        setRecommended((recData as unknown as Listing[]) || [])
+        setRecommended((recData as Listing[]) || [])
 
         // Recent: newest listings overall
         const { data: recentData, error: recentError } = await supabase
           .from('listings')
-          .select('id, title, rent_amount as price, city, property_type, bedrooms, bathrooms, photos as images, created_at')
+          .select('id, title, rent_amount, city, property_type, bedrooms, bathrooms, photos, created_at')
           .eq('status', 'active')
           .order('created_at', { ascending: false })
           .limit(6)
         if (recentError) throw recentError
-        setRecentListings((recentData as unknown as Listing[]) || [])
+        setRecentListings((recentData as Listing[]) || [])
 
         // Saved listing IDs
         const { data: savedData, error: savedError } = await supabase
@@ -310,7 +310,7 @@ function ListingCard({ listing, isSaved, onSave, fmtMoney, delay, onClick }: {
   listing: Listing; isSaved: boolean; onSave: () => void
   fmtMoney: (n: number) => string; delay: number; onClick: () => void
 }) {
-  const img = listing.images?.[0]
+  const img = listing.photos?.[0]
   return (
     <div className="listing-card" style={{ animationDelay: `${delay}s` }}>
       <div
@@ -342,7 +342,7 @@ function ListingCard({ listing, isSaved, onSave, fmtMoney, delay, onClick }: {
         </p>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 16, fontWeight: 700, color: '#2563EB' }}>
-            {fmtMoney(listing.price)}<span style={{ fontSize: 11, fontWeight: 400, color: '#94A3B8' }}>/mo</span>
+            {fmtMoney(listing.rent_amount)}<span style={{ fontSize: 11, fontWeight: 400, color: '#94A3B8' }}>/mo</span>
           </span>
           <span style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 12, color: '#64748B' }}>
             {listing.bedrooms}bd · {listing.bathrooms}ba
