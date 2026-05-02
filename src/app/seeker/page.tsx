@@ -66,24 +66,24 @@ export default function SeekerDashboard() {
         // Recommended: filter by seeker's preferences
         let recQuery = supabase
           .from('listings')
-          .select('id, title, price, city, property_type, bedrooms, bathrooms, images, created_at')
+          .select('id, title, rent_amount as price, city, property_type, bedrooms, bathrooms, photos as images, created_at')
           .eq('status', 'active')
         if (prof.preferred_city) recQuery = recQuery.ilike('city', `%${prof.preferred_city}%`)
         if (prof.budget)         recQuery = recQuery.lte('price', prof.budget)
         if (prof.preferred_type) recQuery = recQuery.eq('property_type', prof.preferred_type)
         const { data: recData, error: recError } = await recQuery.limit(6)
         if (recError) throw recError
-        setRecommended(recData || [])
+        setRecommended((recData as unknown as Listing[]) || [])
 
         // Recent: newest listings overall
         const { data: recentData, error: recentError } = await supabase
           .from('listings')
-          .select('id, title, price, city, property_type, bedrooms, bathrooms, images, created_at')
+          .select('id, title, rent_amount as price, city, property_type, bedrooms, bathrooms, photos as images, created_at')
           .eq('status', 'active')
           .order('created_at', { ascending: false })
           .limit(6)
         if (recentError) throw recentError
-        setRecentListings(recentData || [])
+        setRecentListings((recentData as unknown as Listing[]) || [])
 
         // Saved listing IDs
         const { data: savedData, error: savedError } = await supabase
