@@ -59,10 +59,10 @@ const AVATAR_GRADIENTS = [
 
 const CITY_PHOTOS: Record<string, string> = {
   'Colombo': 'https://images.unsplash.com/photo-1586096899244-9b947c4e36e7?w=600&q=80',
-  'Kandy':   'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80',
-  'Galle':   'https://images.unsplash.com/photo-1560969184-10fe8719e047?w=600&q=80',
+  'Kandy': 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80',
+  'Galle': 'https://images.unsplash.com/photo-1560969184-10fe8719e047?w=600&q=80',
   'Negombo': 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&q=80',
-  'Jaffna':  'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=600&q=80',
+  'Jaffna': 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=600&q=80',
   'default': 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=600&q=80',
 }
 
@@ -100,46 +100,46 @@ export default function SeekerMarketplace() {
   const { fmtMoney } = useCurrency()
 
   // Auth
-  const [userId, setUserId]           = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
   const [userInitials, setUserInitials] = useState('')
-  const [userRole, setUserRole]       = useState<UserRole>(null)
+  const [userRole, setUserRole] = useState<UserRole>(null)
   const [authChecked, setAuthChecked] = useState(false)
-  const [savedIds, setSavedIds]       = useState<Set<string>>(new Set())
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [userInterests, setUserInterests] = useState<{ tags: string[]; cities: string[] }>({ tags: [], cities: [] })
 
   // Data
-  const [allListings, setAllListings]         = useState<Listing[]>([])
+  const [allListings, setAllListings] = useState<Listing[]>([])
   const [featuredListings, setFeaturedListings] = useState<Listing[]>([])
   const [availableListings, setAvailableListings] = useState<Listing[]>([])
-  const [cityCards, setCityCards]             = useState<CityCard[]>([])
-  const [cities, setCities]                   = useState<string[]>([])
-  const [loading, setLoading]                 = useState(true)
-  const [savingId, setSavingId]               = useState<string | null>(null)
+  const [cityCards, setCityCards] = useState<CityCard[]>([])
+  const [cities, setCities] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+  const [savingId, setSavingId] = useState<string | null>(null)
 
   // Stats
   const [stats, setStats] = useState({ total: 0, cities: 0, minRent: 0, landlords: 0 })
 
   // UI state
-  const [scrolled, setScrolled]             = useState(false)
+  const [scrolled, setScrolled] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [filterOpen, setFilterOpen]         = useState(false)
+  const [filterOpen, setFilterOpen] = useState(false)
 
   // Modals
-  const [detail, setDetail]         = useState<Listing | null>(null)
+  const [detail, setDetail] = useState<Listing | null>(null)
   const [detailPhoto, setDetailPhoto] = useState(0)
-  const [authGateOpen, setAuthGateOpen]   = useState(false)
+  const [authGateOpen, setAuthGateOpen] = useState(false)
   const [authGateAction, setAuthGateAction] = useState<'save' | 'contact'>('save')
   const [listModalOpen, setListModalOpen] = useState(false)  // "List your property" seeker modal
 
   // Filters
-  const [searchQuery, setSearchQuery]   = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   const [selectedType, setSelectedType] = useState('All')
   const [selectedCity, setSelectedCity] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [priceMin, setPriceMin]         = useState('')
-  const [priceMax, setPriceMax]         = useState('')
-  const [bedrooms, setBedrooms]         = useState('Any')
-  const [view, setView]                 = useState<'grid' | 'list'>('grid')
+  const [priceMin, setPriceMin] = useState('')
+  const [priceMax, setPriceMax] = useState('')
+  const [bedrooms, setBedrooms] = useState('Any')
+  const [view, setView] = useState<'grid' | 'list'>('grid')
   const [browsedListings, setBrowsedListings] = useState<Listing[]>([])
 
   // ── Scroll ───────────────────────────────────────────────────────────────
@@ -151,7 +151,7 @@ export default function SeekerMarketplace() {
 
   // ── Auth ─────────────────────────────────────────────────────────────────
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       try {
         const sb = createClient()
         const { data: { user } } = await sb.auth.getUser()
@@ -178,14 +178,14 @@ export default function SeekerMarketplace() {
           // Derive interest from saved listings
           const tagCounts: Record<string, number> = {}
           const cityCounts: Record<string, number> = {}
-          ;(savedRows || []).forEach((s: any) => {
-            const l = s.listings
-            if (!l) return
-            ;(l.tags || []).forEach((t: string) => { tagCounts[t] = (tagCounts[t] || 0) + 1 })
-            if (l.city) cityCounts[l.city] = (cityCounts[l.city] || 0) + 1
-          })
-          const topTags = Object.entries(tagCounts).sort((a,b) => b[1]-a[1]).slice(0,3).map(e => e[0])
-          const topCities = Object.entries(cityCounts).sort((a,b) => b[1]-a[1]).slice(0,2).map(e => e[0])
+            ; (savedRows || []).forEach((s: any) => {
+              const l = s.listings
+              if (!l) return
+                ; (l.tags || []).forEach((t: string) => { tagCounts[t] = (tagCounts[t] || 0) + 1 })
+              if (l.city) cityCounts[l.city] = (cityCounts[l.city] || 0) + 1
+            })
+          const topTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0])
+          const topCities = Object.entries(cityCounts).sort((a, b) => b[1] - a[1]).slice(0, 2).map(e => e[0])
           setUserInterests({ tags: topTags, cities: topCities })
         }
       } catch { /* guest */ }
@@ -195,7 +195,7 @@ export default function SeekerMarketplace() {
 
   // ── Load Listings ─────────────────────────────────────────────────────────
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       setLoading(true)
       try {
         const sb = createClient()
@@ -210,7 +210,7 @@ export default function SeekerMarketplace() {
         const profileMap: Record<string, string> = {}
         if (landlordIds.length > 0) {
           const { data: pArr } = await sb.from('profiles').select('id,full_name').in('id', landlordIds)
-          ;(pArr || []).forEach((p: any) => { profileMap[p.id] = p.full_name || 'Landlord' })
+            ; (pArr || []).forEach((p: any) => { profileMap[p.id] = p.full_name || 'Landlord' })
         }
 
         const mapped: Listing[] = (rows || []).map((r: any) => {
@@ -234,7 +234,7 @@ export default function SeekerMarketplace() {
         mapped.forEach(l => { if (l.city) cityMap[l.city] = (cityMap[l.city] || 0) + 1 })
         setCities(Object.keys(cityMap))
         setCityCards(
-          Object.entries(cityMap).sort((a,b) => b[1]-a[1]).slice(0,6)
+          Object.entries(cityMap).sort((a, b) => b[1] - a[1]).slice(0, 6)
             .map(([city, count]) => ({ city, count, photo: CITY_PHOTOS[city] || CITY_PHOTOS.default }))
         )
 
@@ -359,9 +359,10 @@ export default function SeekerMarketplace() {
         .nav{position:fixed;top:0;left:0;right:0;z-index:500;transition:all .3s ease}
         .nav.scrolled{background:rgba(255,255,255,.97);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 1px 0 rgba(15,23,42,.08),0 4px 24px rgba(15,23,42,.06)}
         .nav-inner{max-width:1320px;margin:0 auto;padding:0 24px;height:68px;display:flex;align-items:center;gap:16px}
-        .nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none;flex-shrink:0}
-        .nav-logo-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#2563EB,#6366F1);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(37,99,235,.35);flex-shrink:0}
-        .nav-logo-name{font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:#0F172A;letter-spacing:-.3px;transition:color .2s}
+        .nav-logo{display:flex;align-items:center;gap:12px;padding:22px 20px 18px; text-decoration:none}
+        .nav-logo-icon{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center}
+        .nav-logo-name{font-family:'Fraunces',serif;font-size:22px;font-weight:700;color:#0F172A;letter-spacing:-.3px;transition:color .2s; text-decoration:none}
+        
         .nav.transparent .nav-logo-name{color:#fff}
         /* Nav search — hidden in transparent mode, shown when scrolled */
         .nav-search-wrap{flex:1;max-width:420px;display:none;position:relative;align-items:center}
@@ -387,7 +388,7 @@ export default function SeekerMarketplace() {
         .nav.transparent .hamburger{color:#fff}
 
         /* ── MOBILE MENU ── */
-        .mm-overlay{display:none;position:fixed;inset:0;z-index:490}
+        .mm-overlay{display:none;position:fixed;inset:0;z-index:1000;}
         .mm-overlay.open{display:flex}
         .mm-bg{position:absolute;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(4px)}
         .mm-panel{position:absolute;top:0;right:0;bottom:0;width:min(300px,88vw);background:#fff;padding:24px 20px;display:flex;flex-direction:column;gap:4px;box-shadow:-8px 0 40px rgba(0,0,0,.12)}
@@ -444,7 +445,7 @@ export default function SeekerMarketplace() {
         .hero-hint-tag:hover{background:rgba(255,255,255,.14);color:#fff}
 
         /* Hero stats bar */
-        .hero-stats{position:relative;z-index:2;width:100%;background:rgba(255,255,255,.05);border-top:1px solid rgba(255,255,255,.08);margin-top:36px}
+        .hero-stats{position:relative;z-index:2;width:100%;background:rgba(255,255,255,.05);border-top:1px solid rgba(255,255,255,.08);margin-top:36px; border-radius:12px}
         .hero-stats-inner{max-width:1320px;margin:0 auto;padding:18px 24px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:0}
         .hstat{display:flex;align-items:center;gap:10px;padding:6px 28px}
         .hstat+.hstat{border-left:1px solid rgba(255,255,255,.1)}
@@ -715,11 +716,11 @@ export default function SeekerMarketplace() {
           .nav-link,.nav-list-btn{display:none}
           .nav-search-wrap{display:none!important}
           .hero{padding:80px 16px 0;min-height:auto}
-          .hero-title{font-size:clamp(30px,8vw,44px)}
+          .hero-title{font-size:clamp(42px,8vw,44px)}
           .hero-search{flex-wrap:wrap;padding:8px;border-radius:16px;gap:6px}
           .hs-sep{display:none}
           .hs-select{max-width:none;flex:1;min-width:80px;font-size:12.5px}
-          .hs-btn{width:100%;padding:11px}
+          .hs-btn{width:96%;padding:12px}
           .hstat{padding:8px 16px}
           .hero-stats-inner{justify-content:flex-start}
           .city-grid{grid-template-columns:repeat(2,1fr)}
@@ -908,7 +909,7 @@ export default function SeekerMarketplace() {
         <div className="nav-inner">
           <a href="/" className="nav-logo">
             <div className="nav-logo-icon">
-              <Image src="/icon.png" alt="Rentura" width={22} height={22} />
+              <Image src="/icon.png" alt="Rentura" width={24} height={24} />
             </div>
             <span className="nav-logo-name">Rentura</span>
           </a>
@@ -954,7 +955,7 @@ export default function SeekerMarketplace() {
         <div className="hero-grid" />
 
         {/* Fix 3 — floating property preview cards */}
-        {HERO_PREVIEW_CARDS.map((card, i) => (
+        {/* {HERO_PREVIEW_CARDS.map((card, i) => (
           <div
             key={i}
             className="hero-preview-card"
@@ -968,7 +969,7 @@ export default function SeekerMarketplace() {
             <div className="hpc-meta">📍 {card.city} · {card.beds} bed</div>
             <span className="hpc-tag">{card.tag}</span>
           </div>
-        ))}
+        ))} */}
 
         <div className="hero-content">
           <div className="hero-eyebrow">
@@ -979,7 +980,7 @@ export default function SeekerMarketplace() {
             <strong>home, faster.</strong>
           </h1>
           <p className="hero-sub">
-            Browse verified rentals from trusted landlords — no signup required.
+            Browse verified rentals from trusted landlords, no signup required.
           </p>
 
           {/* Fix 2 — wider, more prominent search */}
@@ -1037,14 +1038,14 @@ export default function SeekerMarketplace() {
             </div>
             <div className="hstat">
               <div>
-                <div className="hstat-num">{loading ? '…' : (stats.minRent > 0 ? fmtMoney(stats.minRent) : '—')}</div>
-                <div className="hstat-lbl">Starting from / mo</div>
+                <div className="hstat-num">{loading ? '…' : stats.landlords}</div>
+                <div className="hstat-lbl">Verified landlords</div>
               </div>
             </div>
             <div className="hstat">
               <div>
-                <div className="hstat-num">{loading ? '…' : stats.landlords}</div>
-                <div className="hstat-lbl">Verified landlords</div>
+                <div className="hstat-num">{loading ? '…' : (stats.minRent > 0 ? fmtMoney(stats.minRent) : '—')}</div>
+                <div className="hstat-lbl">Starting from / mo</div>
               </div>
             </div>
           </div>
@@ -1139,7 +1140,7 @@ export default function SeekerMarketplace() {
                 <div className="sec-title">{userId && userInterests.tags.length > 0 ? <>Based on your <em>interests</em></> : <><em>Featured</em> listings</>}</div>
                 <div className="sec-sub">
                   {userId && userInterests.tags.length > 0
-                    ? `Matched to: ${userInterests.tags.slice(0,2).join(', ')}${userInterests.cities.length > 0 ? `, ${userInterests.cities[0]}` : ''}`
+                    ? `Matched to: ${userInterests.tags.slice(0, 2).join(', ')}${userInterests.cities.length > 0 ? `, ${userInterests.cities[0]}` : ''}`
                     : 'Hand-picked properties with verified details'
                   }
                 </div>
