@@ -8,7 +8,7 @@
 // Shares the same design system as seeker/page.tsx
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
@@ -82,7 +82,7 @@ const ALL_TAGS = ['Air Conditioned', 'Parking', 'Furnished', 'Pet Friendly', 'Po
 const PAGE_SIZE = 12
 
 // ── Component ──────────────────────────────────────────────────────────────────
-export default function SeekerListings() {
+function SeekerListingsInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { fmtMoney } = useCurrency()
@@ -762,5 +762,17 @@ export default function SeekerListings() {
         </div>
       </div>
     </>
+  )
+}
+
+export default function SeekerListings() {
+  return (
+    <Suspense fallback={
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'sans-serif', color: '#94A3B8' }}>
+        Loading…
+      </div>
+    }>
+      <SeekerListingsInner />
+    </Suspense>
   )
 }
