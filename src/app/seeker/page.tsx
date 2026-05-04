@@ -98,7 +98,8 @@ function isAvailableSoon(s: string) {
 export default function SeekerMarketplace() {
   const router = useRouter()
   const { fmtMoney } = useCurrency()
-
+  const blockInvalidChar = (e: React.KeyboardEvent<HTMLInputElement>) =>
+    ['e', 'E', '-', '+'].includes(e.key) && e.preventDefault();
   // Auth
   const [userId, setUserId] = useState<string | null>(null)
   const [userInitials, setUserInitials] = useState('')
@@ -430,7 +431,7 @@ export default function SeekerMarketplace() {
 
         /* Fix 2 — wider search bar */
         .hero-search{background:rgba(255,255,255,.97);border-radius:20px;padding:10px 10px 10px 14px;display:flex;align-items:center;gap:0;box-shadow:0 12px 48px rgba(0,0,0,.3);max-width:780px;width:100%;margin:0 auto 26px}
-        .hs-input-wrap{flex:1;min-width:0;position:relative;display:flex;align-items:center}
+        .hs-input-wrap{flex:1;min-width:0;position:relative;display:flex;align-items:center }
         .hs-ico{position:absolute;left:0;font-size:15px;color:#94A3B8;pointer-events:none}
         .hs-input{width:100%;padding:10px 10px 10px 26px;border:none;outline:none;font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;color:#0F172A;background:transparent}
         .hs-input::placeholder{color:#94A3B8}
@@ -445,8 +446,8 @@ export default function SeekerMarketplace() {
         .hero-hint-tag:hover{background:rgba(255,255,255,.14);color:#fff}
 
         /* Hero stats bar */
-        .hero-stats{position:relative;z-index:2;width:100%;background:rgba(255,255,255,.05);border-top:1px solid rgba(255,255,255,.08);margin-top:36px; border-radius:12px}
-        .hero-stats-inner{max-width:1320px;margin:0 auto;padding:18px 24px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:0}
+        .hero-stats{position:relative;z-index:2;width:100%;background:rgba(255,255,255,.05);border-top:1px solid rgba(255,255,255,.08);margin-top:36px; margin-bottom: 15px; border-radius:12px}
+        .hero-stats-inner{max-width:1320px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:0}
         .hstat{display:flex;align-items:center;gap:10px;padding:6px 28px}
         .hstat+.hstat{border-left:1px solid rgba(255,255,255,.1)}
         .hstat-num{font-family:'Fraunces',serif;font-size:24px;font-weight:700;color:#F1F5F9;line-height:1}
@@ -679,17 +680,17 @@ export default function SeekerMarketplace() {
         .lm-cancel:hover{background:#F8FAFC}
 
         /* ══ FOOTER ══════════════════════════════════════════════════════════ */
-        .footer{background:#fff;border-top:1px solid #E2E8F0;padding:48px 0 24px}
+        .footer{background:#0F172A;border-top:1px solid #E2E8F0;padding:48px 0 24px}
         .footer-inner{max-width:1320px;margin:0 auto;padding:0 24px}
         .footer-top{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:36px;margin-bottom:36px}
         .footer-logo{display:flex;align-items:center;gap:9px;margin-bottom:12px}
         .footer-logo-icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#2563EB,#6366F1);display:flex;align-items:center;justify-content:center}
-        .footer-logo-name{font-family:'Fraunces',serif;font-size:18px;font-weight:700;color:#0F172A}
+        .footer-logo-name{font-family:'Fraunces',serif;font-size:22px;font-weight:700;color:#FFF}
         .footer-tagline{font-size:13px;color:#94A3B8;line-height:1.65;max-width:210px}
-        .footer-col-title{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#374151;margin-bottom:14px}
-        .footer-link{display:block;font-size:13.5px;color:#64748B;text-decoration:none;margin-bottom:9px;transition:color .15s}
-        .footer-link:hover{color:#0F172A}
-        .footer-bottom{border-top:1px solid #F1F5F9;padding-top:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+        .footer-col-title{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#F8FAFC;margin-bottom:14px}
+        .footer-link{display:block;font-size:13.5px;color:#94A3B8;text-decoration:none;margin-bottom:9px;transition:color .15s}
+        .footer-link:hover{color:#F8FAFC}
+        .footer-bottom{border-top:1px solid #94A3B8;padding-top:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
         .footer-copy{font-size:13px;color:#94A3B8}
         .footer-legal{display:flex;gap:16px}
         .footer-legal a{font-size:13px;color:#94A3B8;text-decoration:none}
@@ -719,7 +720,7 @@ export default function SeekerMarketplace() {
           .hero-title{font-size:clamp(42px,8vw,44px)}
           .hero-search{flex-wrap:wrap;padding:8px;border-radius:16px;gap:6px}
           .hs-sep{display:none}
-          .hs-select{max-width:none;flex:1;min-width:80px;font-size:12.5px}
+          .hs-select{max-width:none;flex:1;max-width:100px;font-size:12.5px}
           .hs-btn{width:96%;padding:12px}
           .hstat{padding:8px 16px}
           .hero-stats-inner{justify-content:flex-start}
@@ -750,14 +751,15 @@ export default function SeekerMarketplace() {
           .trust-btn-p,.trust-btn-s{text-align:center}
           .modal-hd{flex-direction:column;gap:8px}
           .modal-price-col{text-align:left}
-          .hstat-num{font-size:20px}
+          .hstat-num{font-size:18px}
           .lm-options{grid-template-columns:1fr}
           .hero-hints{display:none}
           .hero-eyebrow{font-size:10.5px;padding:5px 12px}
           .fp-grid{grid-template-columns:1fr}
           .nav-inner{padding:0 14px}
-          .hero-stats-inner{padding:12px 14px}
+          .hero-stats-inner{padding:10px 12px}
           .hero-search{max-width:100%}
+          .footer-bottom{border-top:1px solid #94A3B8;padding-top:20px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px}
         }
       `}</style>
 
@@ -929,6 +931,7 @@ export default function SeekerMarketplace() {
           <div className="nav-spacer" />
 
           <div className="nav-actions">
+            <a href="/seeker" className="nav-link">Home</a>
             <a href="/seeker/listings" className="nav-link">Listings</a>
             <a href="/seeker/map" className="nav-link">Map</a>
             {/* Fix 4 — smart List Your Property */}
@@ -1055,6 +1058,15 @@ export default function SeekerMarketplace() {
       {/* ══ CATEGORY BAR ══ */}
       <div className="cat-bar">
         <div className="cat-inner">
+
+          <button
+            className={`cat-filter-btn${hasActiveFilters ? ' active' : ''}`}
+            onClick={() => setFilterOpen(v => !v)}
+          >
+            ⚡ Filters {hasActiveFilters && <span className="flt-dot" />}
+          </button>
+          <div className="cat-sep" />
+
           {PROPERTY_TYPES.map(type => (
             <button
               key={type}
@@ -1064,13 +1076,7 @@ export default function SeekerMarketplace() {
               {CATEGORY_ICONS[type]} {type}
             </button>
           ))}
-          <div className="cat-sep" />
-          <button
-            className={`cat-filter-btn${hasActiveFilters ? ' active' : ''}`}
-            onClick={() => setFilterOpen(v => !v)}
-          >
-            ⚡ Filters {hasActiveFilters && <span className="flt-dot" />}
-          </button>
+
         </div>
 
         {filterOpen && (
@@ -1086,11 +1092,28 @@ export default function SeekerMarketplace() {
                 </div>
                 <div className="fp-field">
                   <label className="fp-label">Min Price</label>
-                  <input className="fp-input" type="number" placeholder="0" value={priceMin} onChange={e => setPriceMin(e.target.value)} />
+                  <input
+                    className="fp-input"
+                    type="number"
+                    placeholder="0"
+                    min="0"
+                    value={priceMin}
+                    onKeyDown={blockInvalidChar} // This blocks the physical key press
+                    onChange={e => setPriceMin(e.target.value)}
+                  />
                 </div>
+
                 <div className="fp-field">
                   <label className="fp-label">Max Price</label>
-                  <input className="fp-input" type="number" placeholder="Any" value={priceMax} onChange={e => setPriceMax(e.target.value)} />
+                  <input
+                    className="fp-input"
+                    type="number"
+                    placeholder="Any"
+                    min="0"
+                    value={priceMax}
+                    onKeyDown={blockInvalidChar} // Apply it here too
+                    onChange={e => setPriceMax(e.target.value)}
+                  />
                 </div>
                 <div className="fp-field">
                   <label className="fp-label">Bedrooms</label>
@@ -1141,7 +1164,7 @@ export default function SeekerMarketplace() {
                 <div className="sec-sub">
                   {userId && userInterests.tags.length > 0
                     ? `Matched to: ${userInterests.tags.slice(0, 2).join(', ')}${userInterests.cities.length > 0 ? `, ${userInterests.cities[0]}` : ''}`
-                    : 'Hand-picked properties with verified details'
+                    : 'Properties with verified details'
                   }
                 </div>
               </div>
@@ -1380,11 +1403,12 @@ export default function SeekerMarketplace() {
           <div className="footer-top">
             <div>
               <div className="footer-logo">
-                <div className="footer-logo-icon">
-                  <Image src="/icon.png" alt="Rentura" width={18} height={18} />
+                <div className="nav-logo-icon">
+                  <Image src="/icon.png" alt="Rentura" width={24} height={24} />
                 </div>
                 <span className="footer-logo-name">Rentura</span>
               </div>
+
               <p className="footer-tagline">The smarter way to find and list rental homes in Sri Lanka.</p>
             </div>
             <div>
@@ -1395,7 +1419,8 @@ export default function SeekerMarketplace() {
             </div>
             <div>
               <div className="footer-col-title">Landlords</div>
-              <button style={{ all: 'unset', display: 'block', fontSize: '13.5px', color: '#64748B', cursor: 'pointer', marginBottom: 9, fontFamily: 'inherit', transition: 'color .15s' }} onClick={handleListProperty}>List Your Property</button>
+              {/* <button style={{ all: 'unset', display: 'block', fontSize: '13.5px', color: '#64748B', cursor: 'pointer', marginBottom: 9, fontFamily: 'inherit', transition: 'color .15s' }} onClick={handleListProperty}>List Your Property</button> */}
+              <a href="/landlord" onClick={handleListProperty} className="footer-link">List Your Property</a>
               <a href="/landlord" className="footer-link">Landlord Dashboard</a>
               <a href="/onboarding" className="footer-link">Get Started</a>
             </div>
