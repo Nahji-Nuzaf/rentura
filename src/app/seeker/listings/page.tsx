@@ -1,14 +1,23 @@
 'use client'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Rentura — Seeker Listings Page  (/app/seeker/listings/page.tsx)
+// Rentura — Full Listings Page  /src/app/seeker/listings/page.tsx
 //
-// A full listings browse page with advanced filters, map-split view toggle,
-// infinite scroll pagination, and a rich filter sidebar.
-// Shares the same design system as seeker/page.tsx
+// Features:
+//  • Full-width sticky sidebar filter panel (desktop) / bottom-sheet (mobile)
+//  • Advanced filtering: city, type, bedrooms, bathrooms, price range, area sqft,
+//    availability, amenity tags, sort order
+//  • Grid / List / Map-preview view toggle
+//  • Detailed listing cards with photo galleries, landlord info, tag pills
+//  • Animated skeleton loaders
+//  • Active filter chips with individual clear
+//  • Result count + sort toolbar
+//  • Infinite-scroll-ready pagination
+//  • Fully responsive: desktop sidebar, tablet 2-col, mobile 1-col + drawer
+//  • Matches Rentura brand: Fraunces serif + Plus Jakarta Sans, dark navy palette
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useRef, useState, useCallback, Suspense } from 'react'
+import { useEffect, useCallback, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
@@ -19,7 +28,6 @@ type Listing = {
   id: string
   title: string
   description: string
-  property_id: string
   landlord_id: string
   landlord_name: string
   landlord_initials: string
@@ -28,30 +36,20 @@ type Listing = {
   rent_amount: number
   currency: string
   available_from: string
-  status: string
   photos: string[]
   tags: string[]
   city: string
   property_type: string
   area_sqft: number | null
   saved: boolean
+  created_at: string
 }
 
-type Filters = {
-  query: string
-  city: string
-  min_price: string
-  max_price: string
-  bedrooms: string
-  property_type: string
-  tags: string[]
-  sort: 'newest' | 'price_asc' | 'price_desc'
-  available_before: string
-  min_area: string
-  max_area: string
-}
+type UserRole = 'landlord' | 'seeker' | 'agent' | null
+type ViewMode = 'grid' | 'list' | 'compact'
+type SortKey = 'newest' | 'price_asc' | 'price_desc' | 'area_desc' | 'beds_desc'
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 const AVATAR_GRADIENTS = [
   'linear-gradient(135deg,#6366F1,#8B5CF6)',
   'linear-gradient(135deg,#0EA5E9,#38BDF8)',
@@ -61,183 +59,240 @@ const AVATAR_GRADIENTS = [
   'linear-gradient(135deg,#EC4899,#F9A8D4)',
 ]
 
+const PROPERTY_TYPES = ['House', 'Apartment', 'Studio', 'Villa', 'Room', 'Office']
+const BEDROOM_OPTIONS = ['1', '2', '3', '4', '5+']
+const BATHROOM_OPTIONS = ['1', '2', '3', '4+']
+const AMENITY_TAGS = [
+  'Furnished', 'Semi-Furnished', 'Unfurnished',
+  'Pet Friendly', 'Parking', 'Air Conditioned',
+  'Pool', 'Gym', 'Security', 'Generator',
+  'Solar Panel', 'Water 24/7', 'CCTV',
+  'Balcony', 'Garden', 'Rooftop',
+]
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'newest', label: 'Newest first' },
+  { key: 'price_asc', label: 'Price: Low → High' },
+  { key: 'price_desc', label: 'Price: High → Low' },
+  { key: 'area_desc', label: 'Largest area' },
+  { key: 'beds_desc', label: 'Most bedrooms' },
+]
+const TYPE_ICONS: Record<string, string> = {
+  House: '🏡', Apartment: '🏢', Studio: '🛋️', Villa: '🏰', Room: '🚪', Office: '🏗️',
+}
+const PAGE_SIZE = 18
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function initials(name: string) {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
-
 function fmtDate(s: string) {
   if (!s) return ''
   return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
-
 function isAvailableSoon(s: string) {
   if (!s) return false
   const diff = new Date(s).getTime() - Date.now()
   return diff >= 0 && diff < 14 * 86400000
 }
+function isNew(s: string) {
+  if (!s) return false
+  return Date.now() - new Date(s).getTime() < 7 * 86400000
+}
+function sortListings(listings: Listing[], sort: SortKey): Listing[] {
+  const arr = [...listings]
+  switch (sort) {
+    case 'price_asc': return arr.sort((a, b) => a.rent_amount - b.rent_amount)
+    case 'price_desc': return arr.sort((a, b) => b.rent_amount - a.rent_amount)
+    case 'area_desc': return arr.sort((a, b) => (b.area_sqft || 0) - (a.area_sqft || 0))
+    case 'beds_desc': return arr.sort((a, b) => b.bedrooms - a.bedrooms)
+    default: return arr.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }
+}
 
-const PROPERTY_TYPES = ['All', 'House', 'Apartment', 'Studio', 'Villa', 'Room', 'Office']
-const BEDROOM_OPTIONS = ['Any', '1', '2', '3', '4', '5+']
-const ALL_TAGS = ['Air Conditioned', 'Parking', 'Furnished', 'Pet Friendly', 'Pool', 'Gym', 'Solar Panel', 'Garden', 'Security', 'Internet', 'Laundry', 'Balcony']
-const PAGE_SIZE = 12
-
-// ── Component ──────────────────────────────────────────────────────────────────
-function SeekerListingsInner() {
+// ── Component ─────────────────────────────────────────────────────────────────
+export default function ListingsPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { fmtMoney } = useCurrency()
 
   // Auth
-  const [userId, setUserId] = useState('')
-  const [userInitials, setUserInitials] = useState('ME')
-  const [fullName, setFullName] = useState('Seeker')
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [unreadMessages, setUnreadMessages] = useState(0)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [userInitials, setUserInitials] = useState('')
+  const [userRole, setUserRole] = useState<UserRole>(null)
+  const [authChecked, setAuthChecked] = useState(false)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
+  const [savingId, setSavingId] = useState<string | null>(null)
 
   // Data
-  const [listings, setListings] = useState<Listing[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [hasMore, setHasMore] = useState(true)
-  const [page, setPage] = useState(0)
-  const [savingId, setSavingId] = useState<string | null>(null)
+  const [allListings, setAllListings] = useState<Listing[]>([])
   const [cities, setCities] = useState<string[]>([])
-  const [totalCount, setTotalCount] = useState(0)
+  const [loading, setLoading] = useState(true)
 
-  // Filters & view
-  const [filters, setFilters] = useState<Filters>({
-    query: searchParams.get('q') || '',
-    city: searchParams.get('city') || '',
-    min_price: '', max_price: '',
-    bedrooms: 'Any', property_type: 'All',
-    tags: [], sort: 'newest',
-    available_before: '', min_area: '', max_area: '',
-  })
-  const [filterPanelOpen, setFilterPanelOpen] = useState(true)
-  const [view, setView] = useState<'grid' | 'list'>('grid')
-  const [activeTag, setActiveTag] = useState<string>('')
+  // UI
+  const [scrolled, setScrolled] = useState(false)
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
+  const [listModalOpen, setListModalOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  // Infinite scroll
-  const sentinelRef = useRef<HTMLDivElement>(null)
+  // Detail modal
+  const [detail, setDetail] = useState<Listing | null>(null)
+  const [detailPhoto, setDetailPhoto] = useState(0)
+  const [authGateOpen, setAuthGateOpen] = useState(false)
+  const [authGateAction, setAuthGateAction] = useState<'save' | 'contact'>('save')
 
-  // ── Load Auth ────────────────────────────────────────────────────────────────
+  // View + sort
+  const [view, setView] = useState<ViewMode>('grid')
+  const [sort, setSort] = useState<SortKey>('newest')
+  const [page, setPage] = useState(1)
+
+  // Filters
+  const [search, setSearch] = useState('')
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([])
+  const [selectedCity, setSelectedCity] = useState('')
+  const [priceMin, setPriceMin] = useState('')
+  const [priceMax, setPriceMax] = useState('')
+  const [bedsMin, setBedsMin] = useState('')
+  const [bathsMin, setBathsMin] = useState('')
+  const [areaMin, setAreaMin] = useState('')
+  const [areaMax, setAreaMax] = useState('')
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [availableOnly, setAvailableOnly] = useState(false)
+  const [newOnly, setNewOnly] = useState(false)
+  const [hasPhotos, setHasPhotos] = useState(false)
+
+  // Scroll
+  useEffect(() => {
+    const fn = () => setScrolled(window.scrollY > 50)
+    window.addEventListener('scroll', fn, { passive: true })
+    return () => window.removeEventListener('scroll', fn)
+  }, [])
+
+  // Auth
   useEffect(() => {
     ;(async () => {
-      const sb = createClient()
-      const { data: { user } } = await sb.auth.getUser()
-      if (!user) { router.push('/login'); return }
-      const name = user.user_metadata?.full_name || 'Seeker'
-      setFullName(name); setUserInitials(initials(name)); setUserId(user.id)
-
-      const { data: savedRows } = await sb.from('saved_listings').select('listing_id').eq('seeker_id', user.id)
-      setSavedIds(new Set((savedRows || []).map((s: any) => s.listing_id)))
-
-      const { count } = await sb.from('messages').select('id', { count: 'exact', head: true }).eq('receiver_id', user.id).eq('read', false)
-      setUnreadMessages(count || 0)
-    })()
-  }, [router])
-
-  // ── Build query ───────────────────────────────────────────────────────────────
-  const buildQuery = useCallback((sb: any, from: number) => {
-    let q = sb.from('listings')
-      .select('id,title,description,property_id,landlord_id,bedrooms,bathrooms,rent_amount,currency,available_from,status,photos,tags,city,property_type,area_sqft', { count: 'exact' })
-      .eq('status', 'active')
-      .range(from, from + PAGE_SIZE - 1)
-
-    if (filters.city) q = q.ilike('city', `%${filters.city}%`)
-    if (filters.min_price) q = q.gte('rent_amount', parseFloat(filters.min_price))
-    if (filters.max_price) q = q.lte('rent_amount', parseFloat(filters.max_price))
-    if (filters.bedrooms !== 'Any') {
-      if (filters.bedrooms === '5+') q = q.gte('bedrooms', 5)
-      else q = q.eq('bedrooms', parseInt(filters.bedrooms))
-    }
-    if (filters.property_type !== 'All') q = q.ilike('property_type', filters.property_type)
-    if (filters.available_before) q = q.lte('available_from', filters.available_before)
-    if (filters.min_area) q = q.gte('area_sqft', parseFloat(filters.min_area))
-    if (filters.max_area) q = q.lte('area_sqft', parseFloat(filters.max_area))
-
-    if (filters.sort === 'price_asc') q = q.order('rent_amount', { ascending: true })
-    else if (filters.sort === 'price_desc') q = q.order('rent_amount', { ascending: false })
-    else q = q.order('created_at', { ascending: false })
-
-    return q
-  }, [filters])
-
-  // ── Load listings ─────────────────────────────────────────────────────────────
-  const loadListings = useCallback(async (uid: string, reset = true) => {
-    if (reset) { setLoading(true); setPage(0) }
-    else setLoadingMore(true)
-
-    const from = reset ? 0 : page * PAGE_SIZE
-    try {
-      const sb = createClient()
-      const { data: rows, count } = await buildQuery(sb, from)
-
-      // Landlord names
-      const landlordIds = [...new Set((rows || []).map((r: any) => r.landlord_id).filter(Boolean))]
-      const profileMap: Record<string, string> = {}
-      if (landlordIds.length > 0) {
-        const { data: pArr } = await sb.from('profiles').select('id,full_name').in('id', landlordIds)
-        ;(pArr || []).forEach((p: any) => { profileMap[p.id] = p.full_name || 'Landlord' })
-      }
-
-      if (reset) {
-        const { data: cityRows } = await sb.from('listings').select('city').eq('status', 'active')
-        setCities([...new Set((cityRows || []).map((r: any) => r.city).filter(Boolean))] as string[])
-      }
-
-      let mapped: Listing[] = (rows || []).map((r: any) => {
-        const lName = profileMap[r.landlord_id] || 'Landlord'
-        return {
-          id: r.id, title: r.title || 'Untitled', description: r.description || '',
-          property_id: r.property_id || '', landlord_id: r.landlord_id || '',
-          landlord_name: lName, landlord_initials: initials(lName),
-          bedrooms: r.bedrooms || 0, bathrooms: r.bathrooms || 1,
-          rent_amount: r.rent_amount || 0, currency: r.currency || 'USD',
-          available_from: r.available_from || '', status: r.status || 'active',
-          photos: r.photos || [], tags: r.tags || [],
-          city: r.city || '', property_type: r.property_type || 'House',
-          area_sqft: r.area_sqft || null, saved: savedIds.has(r.id),
+      try {
+        const sb = createClient()
+        const { data: { user } } = await sb.auth.getUser()
+        if (user) {
+          setUserId(user.id)
+          setUserInitials(initials(user.user_metadata?.full_name || 'U'))
+          const { data: profile } = await sb.from('profiles').select('role').eq('id', user.id).single()
+          setUserRole((profile?.role as UserRole) || 'seeker')
+          const { data: savedRows } = await sb.from('saved_listings').select('listing_id').eq('seeker_id', user.id)
+          setSavedIds(new Set((savedRows || []).map((s: any) => s.listing_id)))
         }
-      })
+      } catch { /* guest */ }
+      finally { setAuthChecked(true) }
+    })()
+  }, [])
 
-      // Client-side text + tag filter
-      if (filters.query) {
-        const q = filters.query.toLowerCase()
-        mapped = mapped.filter(l => l.title.toLowerCase().includes(q) || l.description.toLowerCase().includes(q) || l.city.toLowerCase().includes(q))
-      }
-      if (filters.tags.length > 0) {
-        mapped = mapped.filter(l => filters.tags.every(t => l.tags.includes(t)))
-      }
-
-      setTotalCount(count || 0)
-      setHasMore((from + PAGE_SIZE) < (count || 0))
-      if (reset) setListings(mapped)
-      else setListings(prev => [...prev, ...mapped])
-      if (!reset) setPage(p => p + 1)
-    } catch (e) { console.error(e) }
-    finally { setLoading(false); setLoadingMore(false) }
-  }, [filters, buildQuery, savedIds, page])
-
-  useEffect(() => { if (userId) loadListings(userId, true) }, [userId, filters])
-
-  // ── Infinite scroll ───────────────────────────────────────────────────────────
+  // Load listings
   useEffect(() => {
-    if (!sentinelRef.current) return
-    const obs = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting && hasMore && !loadingMore && !loading && userId) {
-        loadListings(userId, false)
-      }
-    }, { threshold: 0.1 })
-    obs.observe(sentinelRef.current)
-    return () => obs.disconnect()
-  }, [hasMore, loadingMore, loading, userId, loadListings])
+    ;(async () => {
+      setLoading(true)
+      try {
+        const sb = createClient()
+        const { data: rows } = await sb
+          .from('listings')
+          .select('id,title,description,landlord_id,bedrooms,bathrooms,rent_amount,currency,available_from,photos,tags,city,property_type,area_sqft,created_at')
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(300)
 
-  // ── Save/Unsave ───────────────────────────────────────────────────────────────
+        const landlordIds = [...new Set((rows || []).map((r: any) => r.landlord_id).filter(Boolean))]
+        const profileMap: Record<string, string> = {}
+        if (landlordIds.length > 0) {
+          const { data: pArr } = await sb.from('profiles').select('id,full_name').in('id', landlordIds)
+          ;(pArr || []).forEach((p: any) => { profileMap[p.id] = p.full_name || 'Landlord' })
+        }
+
+        const mapped: Listing[] = (rows || []).map((r: any) => {
+          const lName = profileMap[r.landlord_id] || 'Landlord'
+          return {
+            id: r.id, title: r.title || 'Untitled', description: r.description || '',
+            landlord_id: r.landlord_id || '', landlord_name: lName, landlord_initials: initials(lName),
+            bedrooms: r.bedrooms || 0, bathrooms: r.bathrooms || 1,
+            rent_amount: r.rent_amount || 0, currency: r.currency || 'LKR',
+            available_from: r.available_from || '',
+            photos: r.photos || [], tags: r.tags || [],
+            city: r.city || '', property_type: r.property_type || 'House',
+            area_sqft: r.area_sqft || null, saved: false,
+            created_at: r.created_at || new Date().toISOString(),
+          }
+        })
+
+        setAllListings(mapped)
+        setCities([...new Set(mapped.map(l => l.city).filter(Boolean))].sort())
+      } catch (e) { console.error(e) }
+      finally { setLoading(false) }
+    })()
+  }, [])
+
+  // Filtered + sorted listings
+  const filtered = useCallback(() => {
+    let result = allListings
+    if (search) {
+      const q = search.toLowerCase()
+      result = result.filter(l =>
+        l.title.toLowerCase().includes(q) || l.city.toLowerCase().includes(q) || l.description.toLowerCase().includes(q) || l.property_type.toLowerCase().includes(q)
+      )
+    }
+    if (selectedTypes.length > 0) result = result.filter(l => selectedTypes.includes(l.property_type))
+    if (selectedCity) result = result.filter(l => l.city === selectedCity)
+    if (priceMin) result = result.filter(l => l.rent_amount >= parseFloat(priceMin))
+    if (priceMax) result = result.filter(l => l.rent_amount <= parseFloat(priceMax))
+    if (bedsMin) {
+      const n = bedsMin === '5+' ? 5 : parseInt(bedsMin)
+      result = result.filter(l => bedsMin === '5+' ? l.bedrooms >= 5 : l.bedrooms >= n)
+    }
+    if (bathsMin) {
+      const n = bathsMin === '4+' ? 4 : parseInt(bathsMin)
+      result = result.filter(l => bathsMin === '4+' ? l.bathrooms >= 4 : l.bathrooms >= n)
+    }
+    if (areaMin) result = result.filter(l => l.area_sqft !== null && l.area_sqft >= parseFloat(areaMin))
+    if (areaMax) result = result.filter(l => l.area_sqft !== null && l.area_sqft <= parseFloat(areaMax))
+    if (selectedTags.length > 0) result = result.filter(l => selectedTags.every(t => l.tags.includes(t)))
+    if (availableOnly) result = result.filter(l => isAvailableSoon(l.available_from))
+    if (newOnly) result = result.filter(l => isNew(l.created_at))
+    if (hasPhotos) result = result.filter(l => l.photos.length > 0)
+    return sortListings(result, sort)
+  }, [allListings, search, selectedTypes, selectedCity, priceMin, priceMax, bedsMin, bathsMin, areaMin, areaMax, selectedTags, availableOnly, newOnly, hasPhotos, sort])
+
+  const results = filtered()
+  const paginated = results.slice(0, page * PAGE_SIZE)
+  const hasMore = paginated.length < results.length
+
+  const activeFilterCount = [
+    selectedTypes.length > 0,
+    !!selectedCity,
+    !!priceMin || !!priceMax,
+    !!bedsMin,
+    !!bathsMin,
+    !!areaMin || !!areaMax,
+    selectedTags.length > 0,
+    availableOnly,
+    newOnly,
+    hasPhotos,
+  ].filter(Boolean).length
+
+  function clearAll() {
+    setSearch(''); setSelectedTypes([]); setSelectedCity(''); setPriceMin(''); setPriceMax('')
+    setBedsMin(''); setBathsMin(''); setAreaMin(''); setAreaMax(''); setSelectedTags([])
+    setAvailableOnly(false); setNewOnly(false); setHasPhotos(false); setPage(1)
+  }
+
+  function toggleTag(tag: string) {
+    setSelectedTags(ts => ts.includes(tag) ? ts.filter(t => t !== tag) : [...ts, tag])
+    setPage(1)
+  }
+  function toggleType(type: string) {
+    setSelectedTypes(ts => ts.includes(type) ? ts.filter(t => t !== type) : [...ts, type])
+    setPage(1)
+  }
+
   async function toggleSave(listingId: string, e: React.MouseEvent) {
     e.stopPropagation()
-    if (!userId || savingId) return
+    if (!userId) { setAuthGateAction('save'); setAuthGateOpen(true); return }
+    if (savingId) return
     setSavingId(listingId)
     try {
       const sb = createClient()
@@ -249,530 +304,976 @@ function SeekerListingsInner() {
         await sb.from('saved_listings').insert({ seeker_id: userId, listing_id: listingId })
         setSavedIds(prev => new Set([...prev, listingId]))
       }
-      setListings(prev => prev.map(l => l.id === listingId ? { ...l, saved: !already } : l))
     } catch (e) { console.error(e) }
     finally { setSavingId(null) }
   }
 
-  const activeFiltersCount = [
-    filters.city, filters.min_price, filters.max_price,
-    filters.bedrooms !== 'Any' ? '1' : '',
-    filters.property_type !== 'All' ? '1' : '',
-    filters.available_before, filters.min_area, filters.max_area,
-    ...filters.tags,
-  ].filter(Boolean).length
+  function contactLandlord(landlordId: string, e?: React.MouseEvent) {
+    e?.stopPropagation()
+    if (!userId) { setAuthGateAction('contact'); setAuthGateOpen(true); return }
+    router.push(`/seeker/messages?to=${landlordId}`)
+  }
 
-  const clearFilters = () => setFilters({
-    query: '', city: '', min_price: '', max_price: '',
-    bedrooms: 'Any', property_type: 'All', tags: [],
-    sort: filters.sort, available_before: '', min_area: '', max_area: '',
-  })
+  function handleListProperty(e: React.MouseEvent) {
+    e.preventDefault()
+    if (!authChecked) return
+    if (!userId) { router.push('/signup'); return }
+    if (userRole === 'landlord' || userRole === 'agent') { router.push('/landlord/listings'); return }
+    setListModalOpen(true)
+  }
+
+  // Active chips data
+  type Chip = { label: string; onRemove: () => void }
+  const activeChips: Chip[] = [
+    ...(search ? [{ label: `"${search}"`, onRemove: () => { setSearch(''); setPage(1) } }] : []),
+    ...(selectedTypes.map(t => ({ label: t, onRemove: () => { toggleType(t) } }))),
+    ...(selectedCity ? [{ label: `📍 ${selectedCity}`, onRemove: () => { setSelectedCity(''); setPage(1) } }] : []),
+    ...((priceMin || priceMax) ? [{ label: `LKR ${priceMin || '0'} – ${priceMax || '∞'}`, onRemove: () => { setPriceMin(''); setPriceMax(''); setPage(1) } }] : []),
+    ...(bedsMin ? [{ label: `${bedsMin}+ beds`, onRemove: () => { setBedsMin(''); setPage(1) } }] : []),
+    ...(bathsMin ? [{ label: `${bathsMin}+ baths`, onRemove: () => { setBathsMin(''); setPage(1) } }] : []),
+    ...((areaMin || areaMax) ? [{ label: `${areaMin || '0'} – ${areaMax || '∞'} sqft`, onRemove: () => { setAreaMin(''); setAreaMax(''); setPage(1) } }] : []),
+    ...(selectedTags.map(t => ({ label: t, onRemove: () => toggleTag(t) }))),
+    ...(availableOnly ? [{ label: '🟢 Available soon', onRemove: () => { setAvailableOnly(false); setPage(1) } }] : []),
+    ...(newOnly ? [{ label: '🆕 New listings', onRemove: () => { setNewOnly(false); setPage(1) } }] : []),
+    ...(hasPhotos ? [{ label: '📷 Has photos', onRemove: () => { setHasPhotos(false); setPage(1) } }] : []),
+  ]
+
+  const FilterSidebar = () => (
+    <aside className="sidebar">
+      <div className="sb-hd">
+        <div className="sb-title">Filters</div>
+        {activeFilterCount > 0 && (
+          <button className="sb-clear-all" onClick={clearAll}>Clear all ({activeFilterCount})</button>
+        )}
+      </div>
+
+      {/* Search */}
+      <div className="sb-section">
+        <div className="sb-sec-label">Keyword</div>
+        <div className="sb-search-wrap">
+          <span className="sb-s-ico">🔍</span>
+          <input
+            className="sb-s-input"
+            placeholder="Title, city, keyword…"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1) }}
+          />
+          {search && <button className="sb-s-clear" onClick={() => { setSearch(''); setPage(1) }}>✕</button>}
+        </div>
+      </div>
+
+      {/* Property type */}
+      <div className="sb-section">
+        <div className="sb-sec-label">Property type</div>
+        <div className="sb-type-grid">
+          {PROPERTY_TYPES.map(type => (
+            <button
+              key={type}
+              className={`sb-type-btn${selectedTypes.includes(type) ? ' active' : ''}`}
+              onClick={() => toggleType(type)}
+            >
+              <span>{TYPE_ICONS[type]}</span>
+              <span>{type}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* City */}
+      <div className="sb-section">
+        <div className="sb-sec-label">City</div>
+        <select className="sb-select" value={selectedCity} onChange={e => { setSelectedCity(e.target.value); setPage(1) }}>
+          <option value="">All cities</option>
+          {cities.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+
+      {/* Price */}
+      <div className="sb-section">
+        <div className="sb-sec-label">Monthly rent (LKR)</div>
+        <div className="sb-range-row">
+          <input className="sb-input" type="number" placeholder="Min" value={priceMin} onChange={e => { setPriceMin(e.target.value); setPage(1) }} />
+          <span className="sb-range-sep">–</span>
+          <input className="sb-input" type="number" placeholder="Max" value={priceMax} onChange={e => { setPriceMax(e.target.value); setPage(1) }} />
+        </div>
+        <div className="sb-quick-prices">
+          {[['Under 50k', '', '50000'], ['50k–100k', '50000', '100000'], ['100k–200k', '100000', '200000'], ['200k+', '200000', '']].map(([label, min, max]) => (
+            <button
+              key={label}
+              className={`sb-quick-price${priceMin === min && priceMax === max ? ' active' : ''}`}
+              onClick={() => { setPriceMin(min); setPriceMax(max); setPage(1) }}
+            >{label}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Bedrooms */}
+      <div className="sb-section">
+        <div className="sb-sec-label">Minimum bedrooms</div>
+        <div className="sb-option-row">
+          <button className={`sb-opt-btn${bedsMin === '' ? ' active' : ''}`} onClick={() => { setBedsMin(''); setPage(1) }}>Any</button>
+          {BEDROOM_OPTIONS.map(b => (
+            <button key={b} className={`sb-opt-btn${bedsMin === b ? ' active' : ''}`} onClick={() => { setBedsMin(b); setPage(1) }}>{b}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Bathrooms */}
+      <div className="sb-section">
+        <div className="sb-sec-label">Minimum bathrooms</div>
+        <div className="sb-option-row">
+          <button className={`sb-opt-btn${bathsMin === '' ? ' active' : ''}`} onClick={() => { setBathsMin(''); setPage(1) }}>Any</button>
+          {BATHROOM_OPTIONS.map(b => (
+            <button key={b} className={`sb-opt-btn${bathsMin === b ? ' active' : ''}`} onClick={() => { setBathsMin(b); setPage(1) }}>{b}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Area */}
+      <div className="sb-section">
+        <div className="sb-sec-label">Area (sqft)</div>
+        <div className="sb-range-row">
+          <input className="sb-input" type="number" placeholder="Min" value={areaMin} onChange={e => { setAreaMin(e.target.value); setPage(1) }} />
+          <span className="sb-range-sep">–</span>
+          <input className="sb-input" type="number" placeholder="Max" value={areaMax} onChange={e => { setAreaMax(e.target.value); setPage(1) }} />
+        </div>
+      </div>
+
+      {/* Quick toggles */}
+      <div className="sb-section">
+        <div className="sb-sec-label">Quick filters</div>
+        <div className="sb-toggles">
+          {[
+            { label: '🟢 Available soon', val: availableOnly, set: (v: boolean) => { setAvailableOnly(v); setPage(1) } },
+            { label: '🆕 New this week', val: newOnly, set: (v: boolean) => { setNewOnly(v); setPage(1) } },
+            { label: '📷 Has photos', val: hasPhotos, set: (v: boolean) => { setHasPhotos(v); setPage(1) } },
+          ].map(({ label, val, set }) => (
+            <label key={label} className="sb-toggle">
+              <input type="checkbox" checked={val} onChange={e => set(e.target.checked)} />
+              <span className="sb-toggle-track"><span className="sb-toggle-thumb" /></span>
+              <span className="sb-toggle-label">{label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Amenities */}
+      <div className="sb-section">
+        <div className="sb-sec-label">Amenities & features</div>
+        <div className="sb-amenity-grid">
+          {AMENITY_TAGS.map(tag => (
+            <button
+              key={tag}
+              className={`sb-amenity${selectedTags.includes(tag) ? ' active' : ''}`}
+              onClick={() => toggleTag(tag)}
+            >{tag}</button>
+          ))}
+        </div>
+      </div>
+    </aside>
+  )
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;1,9..144,300&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,300;1,9..144,400&display=swap');
+
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-        html,body{font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;width:100%;max-width:100vw}
+        html{scroll-behavior:smooth}
+        body{font-family:'Plus Jakarta Sans',sans-serif;background:#F7F8FC;color:#0F172A;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+        ::-webkit-scrollbar{width:5px;height:5px}
+        ::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:99px}
 
-        /* ── SHELL ── */
-        .sk-shell{display:flex;min-height:100vh;width:100%}
+        /* ═══ NAVBAR ══════════════════════════════════════════════════════════ */
+        .nav{position:fixed;top:0;left:0;right:0;z-index:500;transition:all .3s ease;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 1px 0 rgba(15,23,42,.08),0 4px 24px rgba(15,23,42,.06)}
+        .nav-inner{max-width:1440px;margin:0 auto;padding:0 24px;height:68px;display:flex;align-items:center;gap:14px}
+        .nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none;flex-shrink:0}
+        .nav-logo-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#2563EB,#6366F1);display:flex;align-items:center;justify-content:center}
+        .nav-logo-name{font-family:'Fraunces',serif;font-size:21px;font-weight:700;color:#0F172A;letter-spacing:-.3px}
+        .nav-breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:#94A3B8;margin-left:4px}
+        .nav-breadcrumb a{color:#94A3B8;text-decoration:none;transition:color .15s}
+        .nav-breadcrumb a:hover{color:#0F172A}
+        .nav-bc-sep{color:#CBD5E1}
+        .nav-bc-current{color:#0F172A;font-weight:600}
+        .nav-search-wrap{flex:1;max-width:380px;position:relative;display:flex;align-items:center}
+        .nav-s-ico{position:absolute;left:12px;font-size:14px;color:#94A3B8;pointer-events:none}
+        .nav-s-input{width:100%;padding:9px 12px 9px 36px;border-radius:12px;border:1.5px solid #E2E8F0;background:#F8FAFC;font-size:13.5px;font-family:'Plus Jakarta Sans',sans-serif;color:#0F172A;outline:none;transition:all .2s}
+        .nav-s-input::placeholder{color:#94A3B8}
+        .nav-s-input:focus{border-color:#3B82F6;background:#fff;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+        .nav-spacer{flex:1}
+        .nav-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+        .nav-link{font-size:13.5px;font-weight:600;color:#475569;padding:8px 12px;border-radius:10px;text-decoration:none;transition:all .15s;white-space:nowrap;background:none;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
+        .nav-link:hover{color:#0F172A;background:#F1F5F9}
+        .nav-link.active{color:#2563EB;background:#EFF6FF}
+        .nav-list-btn{font-size:13px;font-weight:700;padding:8px 16px;border-radius:10px;border:1.5px solid #BFDBFE;background:#EFF6FF;color:#2563EB;text-decoration:none;transition:all .15s;white-space:nowrap;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
+        .nav-list-btn:hover{background:#DBEAFE;border-color:#93C5FD}
+        .nav-signin{font-size:13px;font-weight:700;color:#fff;padding:8px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);text-decoration:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 2px 10px rgba(37,99,235,.3);transition:all .15s;white-space:nowrap}
+        .nav-signin:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(37,99,235,.4)}
+        .nav-avatar{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#0EA5E9,#6366F1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;flex-shrink:0;border:2px solid rgba(255,255,255,.4)}
+        .hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;padding:4px;color:#475569;flex-shrink:0}
 
-        /* ── SIDEBAR ── */
-        .sidebar{width:260px;flex-shrink:0;background:#0F172A;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:200;box-shadow:4px 0 24px rgba(15,23,42,.1);transition:transform .25s ease}
-        .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:199}.sb-overlay.open{display:block}
-        .sidebar.open{transform:translateX(0)!important}
-        .sb-logo{display:flex;align-items:center;gap:12px;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.07)}
-        .sb-logo-icon{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center}
-        .sb-logo-name{font-family:'Fraunces',serif;font-size:19px;font-weight:700;color:#F8FAFC}
-        .sb-nav{flex:1;padding:14px 12px;overflow-y:auto}.sb-nav::-webkit-scrollbar{width:0}
-        .sb-section{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#4B6587;padding:16px 10px 7px;display:block}
-        .sb-item{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;color:#94A3B8;font-size:13.5px;font-weight:500;cursor:pointer;transition:all .15s;margin-bottom:2px;text-decoration:none}
-        .sb-item:hover{background:rgba(255,255,255,.07);color:#CBD5E1}
-        .sb-item.active{background:rgba(59,130,246,.16);color:#93C5FD;font-weight:700;border:1px solid rgba(59,130,246,.22)}
-        .sb-ico{font-size:16px;width:20px;text-align:center;flex-shrink:0}
-        .sb-badge{margin-left:auto;background:#EF4444;color:#fff;font-size:10px;font-weight:700;border-radius:99px;padding:1px 7px}
-        .sb-footer{border-top:1px solid rgba(255,255,255,.07)}
-        .sb-user{padding:14px 18px;display:flex;align-items:center;gap:11px}
-        .sb-av{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#0EA5E9,#6366F1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0}
-        .sb-uname{font-size:13px;font-weight:700;color:#E2E8F0}
-        .sb-urole{display:inline-block;font-size:10px;font-weight:700;color:#34D399;background:rgba(16,185,129,.14);border:1px solid rgba(16,185,129,.25);border-radius:5px;padding:1px 6px;margin-top:2px}
+        /* ═══ PAGE LAYOUT ═════════════════════════════════════════════════════ */
+        .page-layout{display:flex;max-width:1440px;margin:0 auto;padding:88px 24px 48px;gap:0;min-height:100vh;align-items:flex-start}
 
-        /* ── MAIN ── */
-        .sk-main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;width:calc(100% - 260px)}
-        .topbar{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:#fff;border-bottom:1px solid #E2E8F0;position:fixed;top:0;left:260px;right:0;z-index:150;box-shadow:0 1px 4px rgba(15,23,42,.04)}
-        .tb-left{display:flex;align-items:center;gap:8px;min-width:0;flex:1;overflow:hidden}
-        .hamburger{display:none;background:none;border:none;font-size:20px;cursor:pointer;color:#475569;padding:4px}
-        .breadcrumb{font-size:13px;color:#94A3B8;font-weight:500;white-space:nowrap}.breadcrumb b{color:#0F172A;font-weight:700}
-        .tb-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
-        .tb-btn{position:relative;width:36px;height:36px;border-radius:10px;background:#F8FAFC;border:1.5px solid #E2E8F0;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;text-decoration:none;transition:all .15s;flex-shrink:0}
-        .tb-btn:hover{background:#EFF6FF;border-color:#BFDBFE}
-        .tb-dot{position:absolute;top:4px;right:4px;width:8px;height:8px;background:#EF4444;border-radius:50%;border:1.5px solid #fff}
+        /* ═══ SIDEBAR ═════════════════════════════════════════════════════════ */
+        .sidebar{width:292px;flex-shrink:0;background:#fff;border:1px solid #E2E8F0;border-radius:20px;overflow:hidden;position:sticky;top:84px;max-height:calc(100vh - 104px);overflow-y:auto;margin-right:24px;box-shadow:0 2px 12px rgba(15,23,42,.05)}
+        .sidebar::-webkit-scrollbar{width:4px}
+        .sidebar::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:99px}
+        .sb-hd{display:flex;align-items:center;justify-content:space-between;padding:18px 18px 0;margin-bottom:4px}
+        .sb-title{font-family:'Fraunces',serif;font-size:18px;font-weight:600;color:#0F172A}
+        .sb-clear-all{font-size:12px;font-weight:700;color:#EF4444;background:none;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;padding:4px 0}
+        .sb-clear-all:hover{text-decoration:underline}
+        .sb-section{padding:14px 18px;border-bottom:1px solid #F1F5F9}
+        .sb-section:last-child{border-bottom:none}
+        .sb-sec-label{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#94A3B8;margin-bottom:10px}
+        .sb-search-wrap{position:relative;display:flex;align-items:center}
+        .sb-s-ico{position:absolute;left:10px;font-size:13px;color:#94A3B8;pointer-events:none}
+        .sb-s-input{width:100%;padding:9px 32px 9px 32px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;color:#0F172A;outline:none;transition:all .2s;background:#F8FAFC}
+        .sb-s-input::placeholder{color:#94A3B8}
+        .sb-s-input:focus{border-color:#3B82F6;background:#fff;box-shadow:0 0 0 3px rgba(59,130,246,.08)}
+        .sb-s-clear{position:absolute;right:10px;background:none;border:none;color:#94A3B8;cursor:pointer;font-size:12px;padding:2px}
+        .sb-type-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+        .sb-type-btn{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border:1.5px solid #E2E8F0;border-radius:10px;background:#fff;cursor:pointer;font-size:11.5px;font-weight:600;color:#475569;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;line-height:1}
+        .sb-type-btn span:first-child{font-size:18px}
+        .sb-type-btn:hover{border-color:#CBD5E1;background:#F8FAFC}
+        .sb-type-btn.active{border-color:#2563EB;background:#EFF6FF;color:#2563EB}
+        .sb-select{width:100%;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;color:#0F172A;outline:none;transition:border .15s;background:#fff;cursor:pointer}
+        .sb-select:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.08)}
+        .sb-range-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+        .sb-range-sep{color:#CBD5E1;font-weight:600;flex-shrink:0}
+        .sb-input{flex:1;padding:9px 10px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;color:#0F172A;outline:none;transition:border .15s;background:#fff;min-width:0}
+        .sb-input:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.08)}
+        .sb-quick-prices{display:flex;gap:5px;flex-wrap:wrap}
+        .sb-quick-price{font-size:11px;font-weight:600;padding:4px 10px;border:1.5px solid #E2E8F0;border-radius:99px;background:#fff;color:#475569;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s}
+        .sb-quick-price:hover{border-color:#CBD5E1;background:#F8FAFC}
+        .sb-quick-price.active{border-color:#2563EB;background:#EFF6FF;color:#2563EB}
+        .sb-option-row{display:flex;gap:5px;flex-wrap:wrap}
+        .sb-opt-btn{font-size:12px;font-weight:700;padding:6px 12px;border:1.5px solid #E2E8F0;border-radius:9px;background:#fff;color:#475569;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;flex-shrink:0}
+        .sb-opt-btn:hover{border-color:#CBD5E1;background:#F8FAFC}
+        .sb-opt-btn.active{border-color:#0F172A;background:#0F172A;color:#fff}
+        .sb-toggles{display:flex;flex-direction:column;gap:10px}
+        .sb-toggle{display:flex;align-items:center;gap:10px;cursor:pointer}
+        .sb-toggle input{display:none}
+        .sb-toggle-track{width:36px;height:20px;border-radius:99px;background:#E2E8F0;position:relative;transition:background .2s;flex-shrink:0}
+        .sb-toggle input:checked + .sb-toggle-track{background:#2563EB}
+        .sb-toggle-thumb{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.18)}
+        .sb-toggle input:checked + .sb-toggle-track .sb-toggle-thumb{transform:translateX(16px)}
+        .sb-toggle-label{font-size:13px;color:#374151;font-weight:500;user-select:none}
+        .sb-amenity-grid{display:flex;flex-wrap:wrap;gap:6px}
+        .sb-amenity{font-size:11.5px;font-weight:600;padding:5px 11px;border:1.5px solid #E2E8F0;border-radius:99px;background:#fff;color:#475569;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s}
+        .sb-amenity:hover{border-color:#CBD5E1;background:#F8FAFC}
+        .sb-amenity.active{border-color:#7C3AED;background:rgba(124,58,237,.07);color:#7C3AED}
 
-        /* ── LAYOUT ── */
-        .listings-layout{display:flex;gap:0;padding-top:58px;min-height:100vh}
+        /* ═══ MAIN CONTENT ════════════════════════════════════════════════════ */
+        .main{flex:1;min-width:0}
 
-        /* ── FILTER SIDEBAR ── */
-        .filter-sidebar{width:280px;flex-shrink:0;background:#fff;border-right:1px solid #E2E8F0;padding:20px 18px;overflow-y:auto;height:calc(100vh - 58px);position:sticky;top:58px;transition:width .25s ease,opacity .25s ease}
-        .filter-sidebar.collapsed{width:0;padding:0;overflow:hidden;opacity:0;border:none}
-        .fs-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
-        .fs-title{font-size:14px;font-weight:800;color:#0F172A;display:flex;align-items:center;gap:7px}
-        .fs-count{background:#2563EB;color:#fff;font-size:10px;font-weight:700;border-radius:99px;padding:1px 7px}
-        .fs-clear{font-size:11.5px;color:#2563EB;font-weight:600;cursor:pointer;background:none;border:none;font-family:'Plus Jakarta Sans',sans-serif;padding:4px 8px;border-radius:6px;transition:all .15s}
-        .fs-clear:hover{background:#EFF6FF}
-        .fs-group{margin-bottom:20px}
-        .fs-group-title{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#94A3B8;margin-bottom:9px;display:flex;align-items:center;justify-content:space-between}
-        .fs-input,.fs-select{width:100%;padding:8px 11px;border:1.5px solid #E2E8F0;border-radius:9px;font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;color:#0F172A;outline:none;transition:border .15s;background:#fff}
-        .fs-input:focus,.fs-select:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.08)}
-        .fs-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-        .fs-range-label{font-size:11px;color:#94A3B8;margin-bottom:4px}
-        .bed-btns{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
-        .bed-btn{padding:7px 4px;border:1.5px solid #E2E8F0;border-radius:8px;background:#fff;color:#475569;font-size:12px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;text-align:center;transition:all .15s}
-        .bed-btn:hover{border-color:#BFDBFE;color:#2563EB;background:#EFF6FF}
-        .bed-btn.active{border-color:#2563EB;background:#EFF6FF;color:#2563EB;font-weight:700}
-        .type-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
-        .type-btn{padding:7px 6px;border:1.5px solid #E2E8F0;border-radius:8px;background:#fff;color:#475569;font-size:11.5px;font-weight:600;cursor:pointer;text-align:center;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s}
-        .type-btn:hover{border-color:#BFDBFE;color:#2563EB;background:#EFF6FF}
-        .type-btn.active{border-color:#2563EB;background:#EFF6FF;color:#2563EB;font-weight:700}
-        .tag-checks{display:flex;flex-direction:column;gap:6px}
-        .tag-check{display:flex;align-items:center;gap:9px;cursor:pointer;padding:6px 8px;border-radius:8px;transition:background .15s}
-        .tag-check:hover{background:#F8FAFC}
-        .tag-check input{width:14px;height:14px;accent-color:#2563EB;cursor:pointer;flex-shrink:0}
-        .tag-check-label{font-size:12.5px;color:#374151;font-weight:500}
-        .fs-divider{border:none;border-top:1px solid #F1F5F9;margin:16px 0}
-        .apply-btn{width:100%;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 2px 10px rgba(37,99,235,.3);transition:all .18s;margin-top:4px}
-        .apply-btn:hover{transform:translateY(-1px);box-shadow:0 4px 18px rgba(37,99,235,.4)}
+        /* Page header */
+        .listings-header{margin-bottom:16px}
+        .lh-top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+        .lh-title{font-family:'Fraunces',serif;font-size:clamp(22px,3vw,30px);font-weight:400;color:#0F172A;letter-spacing:-.4px}
+        .lh-title em{font-style:italic;color:#2563EB}
+        .lh-sub{font-size:13px;color:#94A3B8;margin-top:3px}
 
-        /* ── LISTINGS PANEL ── */
-        .listings-panel{flex:1;padding:20px;min-width:0}
-        .lp-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap}
-        .lp-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-        .filter-toggle{display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:9px;border:1.5px solid #E2E8F0;background:#fff;color:#374151;font-size:12.5px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s}
-        .filter-toggle:hover{background:#F8FAFC;border-color:#CBD5E1}
-        .filter-toggle.active{border-color:#3B82F6;background:#EFF6FF;color:#2563EB}
-        .results-label{font-size:13px;color:#64748B;font-weight:500}
-        .lp-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-        .sort-select{padding:7px 11px;border:1.5px solid #E2E8F0;border-radius:9px;font-size:12.5px;font-family:'Plus Jakarta Sans',sans-serif;color:#374151;outline:none;background:#fff;cursor:pointer}
-        .view-btns{display:flex;gap:3px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:9px;padding:3px}
-        .view-btn{width:30px;height:30px;border:none;background:none;border-radius:6px;cursor:pointer;color:#94A3B8;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .15s}
-        .view-btn.active{background:#fff;color:#2563EB;box-shadow:0 1px 3px rgba(15,23,42,.08)}
+        /* Active chips */
+        .chips-bar{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px;min-height:0}
+        .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#374151;background:#fff;border:1.5px solid #E2E8F0;border-radius:99px;padding:4px 10px 4px 13px;transition:all .15s}
+        .chip-x{font-size:13px;color:#94A3B8;cursor:pointer;line-height:1;padding:1px;border-radius:50%;background:none;border:none;font-family:'Plus Jakarta Sans',sans-serif;transition:color .15s}
+        .chip-x:hover{color:#EF4444}
+        .chip-clear-all{font-size:12px;font-weight:700;color:#EF4444;background:none;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;padding:4px 8px;border-radius:99px;transition:background .15s}
+        .chip-clear-all:hover{background:#FEF2F2}
 
-        /* ── SEARCH BAR ── */
-        .lp-search{position:relative;margin-bottom:16px}
-        .lp-search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:15px;color:#94A3B8;pointer-events:none}
-        .lp-search-input{width:100%;padding:11px 13px 11px 38px;border-radius:12px;border:1.5px solid #E2E8F0;background:#fff;color:#0F172A;font-size:13.5px;font-family:'Plus Jakarta Sans',sans-serif;outline:none;transition:all .18s;box-shadow:0 1px 3px rgba(15,23,42,.04)}
-        .lp-search-input:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
-        .lp-search-input::placeholder{color:#94A3B8}
+        /* Toolbar */
+        .toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;background:#fff;border:1px solid #E2E8F0;border-radius:14px;margin-bottom:16px;flex-wrap:wrap}
+        .tb-left{display:flex;align-items:center;gap:10px}
+        .tb-count{font-size:13.5px;font-weight:700;color:#0F172A}
+        .tb-count span{color:#94A3B8;font-weight:400}
+        .tb-filter-btn{display:none;align-items:center;gap:6px;padding:7px 14px;border-radius:10px;border:1.5px solid #E2E8F0;background:#fff;color:#374151;font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;white-space:nowrap}
+        .tb-filter-btn:hover{border-color:#CBD5E1;background:#F8FAFC}
+        .tb-filter-btn.has-filters{border-color:#0F172A;background:#0F172A;color:#fff}
+        .filter-badge{background:#EF4444;color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center}
+        .tb-right{display:flex;align-items:center;gap:8px}
+        .tb-sort-wrap{display:flex;align-items:center;gap:6px}
+        .tb-sort-lbl{font-size:12px;color:#94A3B8;white-space:nowrap}
+        .tb-sort{padding:7px 10px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:12.5px;font-family:'Plus Jakarta Sans',sans-serif;color:#0F172A;outline:none;background:#fff;cursor:pointer;transition:border .15s}
+        .tb-sort:focus{border-color:#3B82F6}
+        .view-btns{display:flex;gap:2px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:3px}
+        .vbtn{width:30px;height:30px;border:none;background:none;border-radius:8px;cursor:pointer;color:#94A3B8;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .15s;font-size:15px}
+        .vbtn.active{background:#fff;color:#0F172A;box-shadow:0 1px 4px rgba(15,23,42,.08)}
 
-        /* ── TAG QUICK PILLS ── */
-        .quick-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
-        .quick-pill{padding:5px 12px;border-radius:99px;border:1.5px solid #E2E8F0;background:#fff;color:#64748B;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;font-family:'Plus Jakarta Sans',sans-serif}
-        .quick-pill:hover{background:#EFF6FF;border-color:#BFDBFE;color:#2563EB}
-        .quick-pill.active{background:#EFF6FF;border-color:#3B82F6;color:#2563EB}
+        /* ═══ LISTING CARDS — GRID ════════════════════════════════════════════ */
+        .listing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+        .listing-grid.view-list{grid-template-columns:1fr}
+        .listing-grid.view-compact{grid-template-columns:repeat(4,1fr);gap:12px}
 
-        /* ── LISTING GRID ── */
-        .listing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:100%}
-        .listing-grid.cols-2{grid-template-columns:repeat(2,1fr)}
-        .listing-grid.list-view{grid-template-columns:1fr}
-
-        /* ── LISTING CARD ── */
-        .lcard{background:#fff;border:1px solid #E2E8F0;border-radius:18px;overflow:hidden;display:flex;flex-direction:column;cursor:pointer;transition:box-shadow .18s,transform .18s;text-decoration:none;color:inherit}
-        .lcard:hover{box-shadow:0 8px 28px rgba(15,23,42,.11);transform:translateY(-2px)}
-        .lcard.list-view{flex-direction:row;border-radius:14px}
-        .lcard-banner{height:175px;position:relative;background:#F1F5F9;overflow:hidden;flex-shrink:0}
-        .lcard.list-view .lcard-banner{width:220px;height:auto;min-height:155px}
-        .lcard-img{width:100%;height:100%;object-fit:cover;transition:transform .3s ease}
-        .lcard:hover .lcard-img{transform:scale(1.04)}
-        .lcard-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:44px;background:linear-gradient(135deg,#E2E8F0,#CBD5E1)}
-        .lcard-save{position:absolute;top:9px;right:9px;width:32px;height:32px;border-radius:99px;background:rgba(255,255,255,.92);backdrop-filter:blur(6px);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;transition:transform .18s;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+        /* Grid card */
+        .lcard{background:#fff;border:1px solid #E2E8F0;border-radius:18px;overflow:hidden;cursor:pointer;transition:box-shadow .2s,transform .2s;box-shadow:0 1px 4px rgba(15,23,42,.04);display:flex;flex-direction:column}
+        .lcard:hover{box-shadow:0 10px 32px rgba(15,23,42,.12);transform:translateY(-3px)}
+        .lcard-banner{position:relative;overflow:hidden;background:#F1F5F9;flex-shrink:0}
+        .lcard-banner.h-normal{height:195px}
+        .lcard-banner.h-compact{height:150px}
+        .lcard-img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s}
+        .lcard:hover .lcard-img{transform:scale(1.05)}
+        .lcard-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;background:linear-gradient(135deg,#E2E8F0,#CBD5E1)}
+        .lcard-save{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:99px;background:rgba(255,255,255,.92);border:none;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.12);transition:transform .15s;z-index:2}
         .lcard-save:hover{transform:scale(1.12)}
-        .lcard-badge{position:absolute;top:9px;left:9px;font-size:10px;font-weight:700;border-radius:99px;padding:3px 9px;background:rgba(15,23,42,.7);color:#fff;backdrop-filter:blur(4px)}
-        .lcard-avail{position:absolute;bottom:9px;right:9px;font-size:10px;font-weight:700;border-radius:99px;padding:2px 8px;background:rgba(16,185,129,.9);color:#fff;backdrop-filter:blur(4px)}
-        .lcard-photo-ct{position:absolute;bottom:9px;left:9px;background:rgba(15,23,42,.55);color:#fff;font-size:10px;font-weight:700;border-radius:99px;padding:2px 8px;backdrop-filter:blur(4px)}
-        .lcard-body{padding:13px 15px;flex:1;display:flex;flex-direction:column;min-width:0}
-        .lcard-type{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#94A3B8;margin-bottom:3px}
-        .lcard-title{font-size:14px;font-weight:700;color:#0F172A;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .lcard.list-view .lcard-title{white-space:normal}
-        .lcard-loc{font-size:11.5px;color:#94A3B8;margin-bottom:9px;display:flex;align-items:center;gap:4px}
-        .lcard-price{font-family:'Fraunces',serif;font-size:21px;font-weight:700;color:#0F172A;margin-bottom:7px}
-        .lcard-price span{font-size:11.5px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:500;color:#94A3B8}
-        .lcard-facts{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
-        .lcard-fact{font-size:11px;color:#475569;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:3px 7px;font-weight:500}
-        .lcard-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:0}
-        .lcard-tag{font-size:10px;color:#7C3AED;background:rgba(124,58,237,.07);border:1px solid rgba(124,58,237,.15);border-radius:99px;padding:2px 8px;font-weight:600}
-        .lcard-desc{font-size:12px;color:#64748B;line-height:1.5;margin-top:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-        .lcard-footer{padding:10px 13px;border-top:1px solid #F1F5F9;display:flex;align-items:center;justify-content:space-between;gap:6px;flex-shrink:0}
-        .lcard-landlord{display:flex;align-items:center;gap:7px;min-width:0}
-        .lcard-ll-av{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:700;flex-shrink:0}
-        .lcard-ll-name{font-size:11.5px;color:#64748B;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px}
-        .lcard-view-btn{padding:6px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:11.5px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 2px 8px rgba(37,99,235,.25);transition:all .15s;white-space:nowrap;flex-shrink:0}
-        .lcard-view-btn:hover{transform:translateY(-1px)}
+        .lcard-badges{position:absolute;top:10px;left:10px;display:flex;flex-direction:column;gap:4px;z-index:2}
+        .badge{font-size:10px;font-weight:700;border-radius:99px;padding:3px 9px;display:inline-block;line-height:1.4}
+        .badge-green{background:rgba(16,185,129,.9);color:#fff}
+        .badge-blue{background:rgba(37,99,235,.9);color:#fff}
+        .badge-amber{background:rgba(245,158,11,.9);color:#fff}
+        .badge-dark{background:rgba(15,23,42,.75);color:#fff}
+        .lcard-photo-ct{position:absolute;bottom:10px;right:10px;background:rgba(15,23,42,.6);color:#fff;font-size:10px;font-weight:700;border-radius:99px;padding:3px 8px;backdrop-filter:blur(4px)}
+        .lcard-body{padding:14px 15px;flex:1;display:flex;flex-direction:column}
+        .lcard-type-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+        .lcard-type{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#94A3B8}
+        .lcard-city-pill{font-size:10px;font-weight:600;color:#2563EB;background:#EFF6FF;border-radius:99px;padding:2px 8px}
+        .lcard-title{font-size:14.5px;font-weight:700;color:#0F172A;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+        .lcard-price-row{display:flex;align-items:baseline;gap:5px;margin-bottom:9px}
+        .lcard-price{font-family:'Fraunces',serif;font-size:22px;font-weight:700;color:#0F172A;line-height:1}
+        .lcard-price-unit{font-size:11.5px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:400;color:#94A3B8}
+        .lcard-facts{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+        .lcard-fact{font-size:11.5px;color:#475569;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;padding:3px 8px;display:flex;align-items:center;gap:3px}
+        .lcard-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:0;flex:1;align-content:flex-start}
+        .lcard-tag{font-size:10.5px;color:#7C3AED;background:rgba(124,58,237,.07);border:1.5px solid rgba(124,58,237,.14);border-radius:99px;padding:2px 8px;font-weight:600}
+        .lcard-avail{font-size:11px;color:#16A34A;font-weight:600;margin-top:auto;padding-top:6px}
+        .lcard-footer{padding:10px 15px;border-top:1px solid #F1F5F9;display:flex;align-items:center;justify-content:space-between;gap:6px;flex-shrink:0}
+        .lcard-ll{display:flex;align-items:center;gap:7px;min-width:0;flex:1}
+        .lcard-ll-av{width:27px;height:27px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:9.5px;font-weight:700;flex-shrink:0}
+        .lcard-ll-name{font-size:11.5px;color:#475569;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .lcard-contact{padding:6px 13px;border-radius:9px;border:none;background:#0F172A;color:#fff;font-size:11.5px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:background .15s;white-space:nowrap;flex-shrink:0}
+        .lcard-contact:hover{background:#1E293B}
 
-        /* ── SKELETON ── */
+        /* ═══ LIST VIEW CARD ══════════════════════════════════════════════════ */
+        .lcard.view-list{flex-direction:row;border-radius:16px;max-height:none}
+        .lcard.view-list .lcard-banner{width:260px;min-height:0;height:auto}
+        .lcard.view-list .lcard-banner.h-normal{height:auto;min-height:170px}
+        .lcard.view-list .lcard-body{padding:18px 20px}
+        .lcard.view-list .lcard-title{white-space:normal;font-size:16px}
+        .lcard.view-list .lcard-price{font-size:24px}
+        .lcard-desc{font-size:12.5px;color:#64748B;line-height:1.65;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:8px}
+        .lcard.view-list .lcard-footer{border-top:none;padding:0 20px 16px;margin-top:auto}
+
+        /* ═══ COMPACT VIEW CARD ═══════════════════════════════════════════════ */
+        .lcard.view-compact .lcard-body{padding:11px 12px}
+        .lcard.view-compact .lcard-title{font-size:13px}
+        .lcard.view-compact .lcard-price{font-size:17px}
+        .lcard.view-compact .lcard-footer{padding:8px 12px}
+
+        /* ═══ SKELETON ════════════════════════════════════════════════════════ */
         @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
-        .skeleton{border-radius:8px;background:linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}
+        .skel{background:linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:8px}
 
-        /* ── EMPTY ── */
+        /* ═══ EMPTY STATE ═════════════════════════════════════════════════════ */
         .empty-state{text-align:center;padding:80px 20px;background:#fff;border:1px solid #E2E8F0;border-radius:18px;grid-column:1/-1}
-        .es-ico{font-size:52px;margin-bottom:14px}
-        .es-title{font-size:17px;font-weight:700;color:#475569;margin-bottom:6px}
-        .es-sub{font-size:13.5px;color:#94A3B8;margin-bottom:20px;line-height:1.6}
-        .es-btn{padding:9px 22px;border-radius:10px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
+        .es-ico{font-size:60px;margin-bottom:16px}
+        .es-title{font-family:'Fraunces',serif;font-size:22px;font-weight:400;color:#475569;margin-bottom:8px}
+        .es-sub{font-size:14px;color:#94A3B8;margin-bottom:24px;line-height:1.65;max-width:340px;margin-left:auto;margin-right:auto}
+        .es-btn{padding:11px 26px;border-radius:12px;border:none;background:#0F172A;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
 
-        /* ── LOAD MORE SENTINEL ── */
-        .load-sentinel{height:60px;display:flex;align-items:center;justify-content:center;grid-column:1/-1;color:#94A3B8;font-size:13px}
+        /* ═══ LOAD MORE ═══════════════════════════════════════════════════════ */
+        .load-more-wrap{text-align:center;padding:28px 0 12px}
+        .load-more-btn{padding:12px 36px;border-radius:13px;border:1.5px solid #E2E8F0;background:#fff;color:#374151;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .18s;box-shadow:0 1px 4px rgba(15,23,42,.05)}
+        .load-more-btn:hover{border-color:#0F172A;background:#0F172A;color:#fff;box-shadow:0 4px 16px rgba(15,23,42,.15)}
+        .lm-progress{font-size:12px;color:#94A3B8;margin-top:10px}
+        .lm-bar{height:3px;background:#E2E8F0;border-radius:99px;margin-top:10px;overflow:hidden}
+        .lm-fill{height:100%;background:linear-gradient(90deg,#2563EB,#6366F1);border-radius:99px;transition:width .4s}
 
-        /* ── RESPONSIVE ── */
-        @media(max-width:1100px){.listing-grid:not(.list-view){grid-template-columns:repeat(2,1fr)}}
-        @media(max-width:768px){
-          .sidebar{transform:translateX(-100%)}
-          .sk-main{margin-left:0!important;width:100%!important}
-          .hamburger{display:block}
-          .topbar{left:0!important}
-          .filter-sidebar{position:fixed;left:0;top:58px;bottom:0;z-index:100;box-shadow:4px 0 24px rgba(15,23,42,.1)}
-          .filter-sidebar.collapsed{transform:translateX(-100%);opacity:1;width:280px;overflow-y:auto}
-          .listing-grid:not(.list-view){grid-template-columns:repeat(2,1fr)}
-          .lcard.list-view{flex-direction:column}
-          .lcard.list-view .lcard-banner{width:100%;min-height:175px}
+        /* ═══ DETAIL MODAL ════════════════════════════════════════════════════ */
+        .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(6px)}
+        .modal-bg.open{display:flex}
+        .modal{background:#fff;border-radius:24px;width:100%;max-width:780px;max-height:92vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.28);display:flex;flex-direction:column}
+        .modal::-webkit-scrollbar{width:4px}
+        .modal::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:99px}
+        .modal-gal{position:relative;height:310px;background:#0F172A;overflow:hidden;border-radius:24px 24px 0 0;flex-shrink:0}
+        .mg-img{width:100%;height:100%;object-fit:cover;display:block}
+        .mg-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:80px;opacity:.15}
+        .mg-nav{position:absolute;top:50%;transform:translateY(-50%);width:100%;display:flex;justify-content:space-between;padding:0 14px;pointer-events:none}
+        .mg-btn{width:38px;height:38px;border-radius:99px;background:rgba(255,255,255,.9);border:none;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;pointer-events:all;box-shadow:0 2px 12px rgba(0,0,0,.15);transition:all .15s}
+        .mg-btn:hover{background:#fff;transform:scale(1.07)}
+        .mg-thumbs{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:5px}
+        .mg-thumb{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.4);cursor:pointer;transition:all .2s}
+        .mg-thumb.active{background:#fff;width:22px;border-radius:99px}
+        .mg-count{position:absolute;bottom:12px;right:14px;font-size:10.5px;font-weight:700;color:rgba(255,255,255,.8);background:rgba(15,23,42,.55);padding:3px 9px;border-radius:99px;backdrop-filter:blur(4px)}
+        .modal-close{position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:99px;background:rgba(15,23,42,.65);border:none;color:#fff;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2}
+        .modal-heart{position:absolute;top:12px;left:12px;width:34px;height:34px;border-radius:99px;background:rgba(255,255,255,.9);border:none;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;transition:transform .15s}
+        .modal-heart:hover{transform:scale(1.12)}
+        .modal-body{padding:28px 30px;flex:1}
+        .modal-hd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;gap:14px}
+        .modal-title-col{flex:1;min-width:0}
+        .modal-ptype-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+        .modal-ptype{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#94A3B8}
+        .modal-title{font-family:'Fraunces',serif;font-size:clamp(20px,3vw,26px);font-weight:400;color:#0F172A;line-height:1.2;margin-bottom:6px}
+        .modal-city{font-size:14px;color:#64748B;display:flex;align-items:center;gap:5px}
+        .modal-price-col{text-align:right;flex-shrink:0}
+        .modal-price{font-family:'Fraunces',serif;font-size:clamp(22px,3vw,30px);font-weight:700;color:#0F172A;line-height:1}
+        .modal-price span{font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:400;color:#94A3B8}
+        .modal-avail-row{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:5px}
+        .modal-avail{font-size:12px;font-weight:600}
+        .modal-avail.green{color:#16A34A}
+        .modal-avail.blue{color:#2563EB}
+        .modal-divider{height:1px;background:#F1F5F9;margin:18px 0}
+        .modal-facts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:20px}
+        .modal-fact{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:12px 14px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px}
+        .modal-fact-ico{font-size:18px}
+        .modal-fact-val{font-size:15px;font-weight:700;color:#0F172A;line-height:1}
+        .modal-fact-lbl{font-size:10.5px;color:#94A3B8;font-weight:500;text-transform:uppercase;letter-spacing:.4px}
+        .modal-sec-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#94A3B8;margin-bottom:10px}
+        .modal-desc{font-size:14.5px;color:#374151;line-height:1.8;margin-bottom:20px}
+        .modal-tags{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:4px}
+        .modal-tag{font-size:12.5px;color:#7C3AED;background:rgba(124,58,237,.07);border:1.5px solid rgba(124,58,237,.16);border-radius:99px;padding:5px 14px;font-weight:600}
+        .modal-ft{padding:18px 30px;border-top:1px solid #F1F5F9;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#FAFAFA;border-radius:0 0 24px 24px;flex-shrink:0}
+        .modal-ll{display:flex;align-items:center;gap:12px;flex:1;min-width:0}
+        .modal-ll-av{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:700;flex-shrink:0}
+        .modal-ll-name{font-size:14px;font-weight:700;color:#0F172A}
+        .modal-ll-lbl{font-size:12px;color:#94A3B8;margin-top:2px}
+        .modal-contact-btn{padding:12px 26px;border-radius:13px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 2px 14px rgba(37,99,235,.3);white-space:nowrap;flex-shrink:0;transition:all .18s}
+        .modal-contact-btn:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(37,99,235,.4)}
+        .modal-save-btn{padding:12px 16px;border-radius:13px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:13.5px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;flex-shrink:0;transition:all .15s;display:flex;align-items:center;gap:6px}
+        .modal-save-btn.saved{border-color:#FECDD3;background:#FFF1F2;color:#E11D48}
+
+        /* ═══ AUTH GATE ════════════════════════════════════════════════════════ */
+        .ag-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:700;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(6px)}
+        .ag-bg.open{display:flex}
+        .ag-box{background:#fff;border-radius:24px;width:100%;max-width:380px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.2)}
+        .ag-hd{background:linear-gradient(135deg,#0F172A,#1E3A5F);padding:32px 28px 24px;text-align:center;position:relative}
+        .ag-ico{font-size:40px;margin-bottom:12px}
+        .ag-title{font-family:'Fraunces',serif;font-size:22px;font-weight:400;color:#F8FAFC;margin-bottom:6px}
+        .ag-sub{font-size:13px;color:rgba(255,255,255,.48);line-height:1.6}
+        .ag-close{position:absolute;top:12px;right:12px;width:30px;height:30px;border-radius:99px;background:rgba(255,255,255,.1);border:none;color:rgba(255,255,255,.6);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+        .ag-body{padding:24px 26px}
+        .ag-btn{width:100%;padding:13px;border-radius:12px;border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .18s;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
+        .ag-btn-p{background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;box-shadow:0 2px 14px rgba(37,99,235,.35)}
+        .ag-btn-o{background:#fff;color:#374151;border:1.5px solid #E2E8F0}
+        .ag-or{text-align:center;font-size:12px;color:#94A3B8;margin:4px 0 12px}
+
+        /* ═══ LIST PROPERTY MODAL ═════════════════════════════════════════════ */
+        .list-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:700;align-items:flex-end;justify-content:center;backdrop-filter:blur(6px)}
+        .list-modal-bg.open{display:flex}
+        .list-modal{background:#fff;border-radius:24px 24px 0 0;width:100%;max-width:520px;padding:28px 28px 40px;box-shadow:0 -8px 40px rgba(0,0,0,.18);animation:slideUp .3s ease}
+        @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+        .lm-drag{width:40px;height:4px;background:#E2E8F0;border-radius:99px;margin:0 auto 20px}
+        .lm-title{font-family:'Fraunces',serif;font-size:22px;font-weight:400;color:#0F172A;margin-bottom:6px;text-align:center}
+        .lm-sub{font-size:13.5px;color:#94A3B8;text-align:center;margin-bottom:24px;line-height:1.6}
+        .lm-options{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+        .lm-option{background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:16px;padding:20px 16px;cursor:pointer;transition:all .2s;text-align:center;text-decoration:none;display:block}
+        .lm-option:hover{border-color:#3B82F6;background:#EFF6FF;transform:translateY(-2px);box-shadow:0 6px 20px rgba(37,99,235,.12)}
+        .lm-opt-ico{font-size:32px;margin-bottom:10px}
+        .lm-opt-title{font-size:14px;font-weight:700;color:#0F172A;margin-bottom:5px}
+        .lm-opt-desc{font-size:12px;color:#94A3B8;line-height:1.5}
+        .lm-cancel{width:100%;padding:12px;border-radius:12px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:14px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:background .15s}
+
+        /* ═══ MOBILE FILTER DRAWER ════════════════════════════════════════════ */
+        .mf-overlay{display:none;position:fixed;inset:0;z-index:800}
+        .mf-overlay.open{display:flex;flex-direction:column;justify-content:flex-end}
+        .mf-bg{position:absolute;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px)}
+        .mf-panel{position:relative;background:#fff;border-radius:24px 24px 0 0;max-height:88vh;overflow-y:auto;padding-bottom:24px;z-index:1;animation:slideUp .3s ease}
+        .mf-panel::-webkit-scrollbar{width:4px}
+        .mf-panel::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:99px}
+        .mf-hd{display:flex;align-items:center;justify-content:space-between;padding:20px 20px 0;margin-bottom:4px;position:sticky;top:0;background:#fff;z-index:2;padding-bottom:12px;border-bottom:1px solid #F1F5F9}
+        .mf-title{font-family:'Fraunces',serif;font-size:19px;font-weight:600;color:#0F172A}
+        .mf-close{background:none;border:none;font-size:20px;cursor:pointer;color:#64748B;padding:4px;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center}
+        .mf-close:hover{background:#F1F5F9}
+        .mf-body{padding:0 20px}
+        .mf-footer{position:sticky;bottom:0;background:#fff;padding:16px 20px 0;border-top:1px solid #F1F5F9;display:flex;gap:10px;margin-top:8px}
+        .mf-apply{flex:1;padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 2px 12px rgba(37,99,235,.3)}
+        .mf-clear{padding:13px 20px;border-radius:12px;border:1.5px solid #E2E8F0;background:#fff;color:#EF4444;font-size:14px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
+
+        /* ═══ MOBILE MENU ═════════════════════════════════════════════════════ */
+        .mm-overlay{display:none;position:fixed;inset:0;z-index:1000}
+        .mm-overlay.open{display:flex}
+        .mm-bg{position:absolute;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(4px)}
+        .mm-panel{position:absolute;top:0;right:0;bottom:0;width:min(300px,88vw);background:#fff;padding:24px 20px;display:flex;flex-direction:column;gap:4px;box-shadow:-8px 0 40px rgba(0,0,0,.12)}
+        .mm-close{align-self:flex-end;background:none;border:none;font-size:22px;cursor:pointer;color:#64748B;margin-bottom:8px}
+        .mm-link{font-size:15px;font-weight:600;color:#374151;padding:11px 14px;border-radius:10px;text-decoration:none;display:block;transition:background .15s}
+        .mm-link:hover{background:#F1F5F9}
+        .mm-link.active{background:#EFF6FF;color:#2563EB}
+        .mm-div{height:1px;background:#F1F5F9;margin:8px 0}
+        .mm-cta{font-size:14px;font-weight:700;color:#fff;padding:13px;border-radius:12px;background:linear-gradient(135deg,#2563EB,#6366F1);text-align:center;text-decoration:none;display:block;margin-top:8px}
+
+        /* ═══ RESPONSIVE ══════════════════════════════════════════════════════ */
+        @media(max-width:1200px){
+          .listing-grid{grid-template-columns:repeat(2,1fr)}
+          .listing-grid.view-compact{grid-template-columns:repeat(3,1fr)}
         }
-        @media(max-width:480px){
-          .listing-grid:not(.list-view){grid-template-columns:1fr}
-          .listings-panel{padding:12px}
+        @media(max-width:960px){
+          .sidebar{display:none}
+          .tb-filter-btn{display:flex}
+          .listing-grid{grid-template-columns:repeat(2,1fr)}
+          .listing-grid.view-compact{grid-template-columns:repeat(2,1fr)}
+          .nav-breadcrumb{display:none}
+          .page-layout{padding:80px 16px 48px}
+        }
+        @media(max-width:768px){
+          .hamburger{display:block}
+          .nav-link,.nav-list-btn{display:none}
+          .nav-search-wrap{flex:1}
+          .page-layout{padding:76px 12px 48px}
+          .listing-grid.view-list .lcard{flex-direction:column}
+          .listing-grid.view-list .lcard .lcard-banner{width:100%;min-height:180px}
+          .modal{border-radius:20px 20px 0 0;position:fixed;bottom:0;left:0;right:0;max-height:94vh;max-width:100%;margin:0}
+          .modal-gal{border-radius:20px 20px 0 0;height:220px}
+          .modal-body{padding:18px 18px}
+          .modal-ft{padding:14px 18px;border-radius:0 0 20px 20px}
+          .modal-hd{flex-direction:column;gap:8px}
+          .modal-price-col{text-align:left}
+          .toolbar{gap:8px}
+          .tb-sort-lbl{display:none}
+          .lm-options{grid-template-columns:1fr}
+        }
+        @media(max-width:520px){
+          .listing-grid,.listing-grid.view-compact{grid-template-columns:1fr}
+          .listing-grid.view-list .lcard{flex-direction:column}
+          .listing-grid.view-list .lcard .lcard-banner{width:100%;min-height:170px}
+          .nav-search-wrap{display:none}
+          .mf-overlay.open{justify-content:flex-end}
+          .toolbar{flex-direction:column;align-items:flex-start;gap:10px}
+          .tb-right{width:100%;justify-content:space-between}
+          .modal-facts-grid{grid-template-columns:repeat(2,1fr)}
         }
       `}</style>
 
-      {/* Sidebar overlay */}
-      <div className={`sb-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
-
-      <div className="sk-shell">
-        {/* ── SIDEBAR ── */}
-        <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
-          <div className="sb-logo">
-            <div className="sb-logo-icon">
-              <Image src="/icon.png" alt="Rentura" width={24} height={24} />
+      {/* ═══ AUTH GATE ═════════════════════════════════════════════════════════ */}
+      <div className={`ag-bg${authGateOpen ? ' open' : ''}`} onClick={() => setAuthGateOpen(false)}>
+        <div className="ag-box" onClick={e => e.stopPropagation()}>
+          <div className="ag-hd">
+            <button className="ag-close" onClick={() => setAuthGateOpen(false)}>✕</button>
+            <div className="ag-ico">{authGateAction === 'save' ? '❤️' : '💬'}</div>
+            <div className="ag-title">{authGateAction === 'save' ? 'Save this listing' : 'Contact landlord'}</div>
+            <div className="ag-sub">
+              {authGateAction === 'save'
+                ? 'Create a free account to save and compare listings.'
+                : 'Sign up to message landlords and arrange viewings.'}
             </div>
-            <span className="sb-logo-name">Rentura</span>
           </div>
-          <nav className="sb-nav">
-            <span className="sb-section">Discover</span>
-            <a href="/seeker" className="sb-item"><span className="sb-ico">🔍</span>Browse Homes</a>
-            <a href="/seeker/listings" className="sb-item active"><span className="sb-ico">🏘️</span>All Listings</a>
-            <a href="/seeker/saved" className="sb-item">
-              <span className="sb-ico">❤️</span>Saved Listings
-              {savedIds.size > 0 && <span className="sb-badge">{savedIds.size}</span>}
+          <div className="ag-body">
+            <a href="/signup" className="ag-btn ag-btn-p">✨ Create free account</a>
+            <div className="ag-or">or</div>
+            <a href="/login" className="ag-btn ag-btn-o">Sign in to existing account</a>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══ LIST PROPERTY MODAL ═══════════════════════════════════════════════ */}
+      <div className={`list-modal-bg${listModalOpen ? ' open' : ''}`} onClick={() => setListModalOpen(false)}>
+        <div className="list-modal" onClick={e => e.stopPropagation()}>
+          <div className="lm-drag" />
+          <div className="lm-title">How would you like to list?</div>
+          <div className="lm-sub">Your account is set up as a seeker. Choose how you'd like to get started.</div>
+          <div className="lm-options">
+            <a href="/onboarding?role=landlord" className="lm-option">
+              <div className="lm-opt-ico">🏠</div>
+              <div className="lm-opt-title">List as Landlord</div>
+              <div className="lm-opt-desc">You own the property and rent it directly to tenants.</div>
             </a>
-            <a href="/seeker/map" className="sb-item"><span className="sb-ico">🗺️</span>Map View</a>
-            <span className="sb-section">My Account</span>
-            <a href="/seeker/messages" className="sb-item">
-              <span className="sb-ico">💬</span>Messages
-              {unreadMessages > 0 && <span className="sb-badge">{unreadMessages > 99 ? '99+' : unreadMessages}</span>}
+            <a href="/onboarding?role=agent" className="lm-option">
+              <div className="lm-opt-ico">🤝</div>
+              <div className="lm-opt-title">List as Agent</div>
+              <div className="lm-opt-desc">You represent a landlord or manage multiple properties.</div>
             </a>
-            <a href="/seeker/applications" className="sb-item"><span className="sb-ico">📝</span>Applications</a>
-            <a href="/seeker/settings" className="sb-item"><span className="sb-ico">⚙️</span>Settings</a>
-          </nav>
-          <div className="sb-footer">
-            <div className="sb-user">
-              <div className="sb-av">{userInitials}</div>
-              <div>
-                <div className="sb-uname">{fullName}</div>
-                <span className="sb-urole">Seeker</span>
-              </div>
-            </div>
           </div>
-        </aside>
+          <button className="lm-cancel" onClick={() => setListModalOpen(false)}>Cancel</button>
+        </div>
+      </div>
 
-        {/* ── MAIN ── */}
-        <div className="sk-main">
-          <div className="topbar">
-            <div className="tb-left">
-              <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
-              <div className="breadcrumb">
-                <a href="/seeker" style={{ color: '#94A3B8', textDecoration: 'none' }}>Rentura</a>
-                &nbsp;/&nbsp; <b>All Listings</b>
-              </div>
-            </div>
-            <div className="tb-right">
-              <a href="/seeker/messages" className="tb-btn">
-                💬{unreadMessages > 0 && <span className="tb-dot" />}
-              </a>
-              <a href="/seeker/saved" className="tb-btn" title="Saved">
-                {savedIds.size > 0 ? '❤️' : '🤍'}
-              </a>
-            </div>
-          </div>
-
-          <div className="listings-layout">
-            {/* ── FILTER SIDEBAR ── */}
-            <div className={`filter-sidebar${filterPanelOpen ? '' : ' collapsed'}`}>
-              <div className="fs-header">
-                <div className="fs-title">
-                  Filters
-                  {activeFiltersCount > 0 && <span className="fs-count">{activeFiltersCount}</span>}
-                </div>
-                {activeFiltersCount > 0 && (
-                  <button className="fs-clear" onClick={clearFilters}>Clear all</button>
-                )}
-              </div>
-
-              {/* City */}
-              <div className="fs-group">
-                <div className="fs-group-title">City</div>
-                <select className="fs-select" value={filters.city} onChange={e => setFilters(f => ({ ...f, city: e.target.value }))}>
-                  <option value="">All Cities</option>
-                  {cities.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-
-              <hr className="fs-divider" />
-
-              {/* Price Range */}
-              <div className="fs-group">
-                <div className="fs-group-title">Price Range /mo</div>
-                <div className="fs-row">
-                  <div>
-                    <div className="fs-range-label">Min</div>
-                    <input className="fs-input" type="number" placeholder="0" value={filters.min_price} onChange={e => setFilters(f => ({ ...f, min_price: e.target.value }))} />
+      {/* ═══ DETAIL MODAL ══════════════════════════════════════════════════════ */}
+      <div className={`modal-bg${detail ? ' open' : ''}`} onClick={() => setDetail(null)}>
+        {detail && (
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-gal">
+              {detail.photos.length > 0
+                ? <img className="mg-img" src={detail.photos[detailPhoto]} alt={detail.title} />
+                : <div className="mg-ph">🏠</div>
+              }
+              {detail.photos.length > 1 && (
+                <>
+                  <div className="mg-nav">
+                    <button className="mg-btn" onClick={() => setDetailPhoto(p => (p - 1 + detail.photos.length) % detail.photos.length)}>‹</button>
+                    <button className="mg-btn" onClick={() => setDetailPhoto(p => (p + 1) % detail.photos.length)}>›</button>
                   </div>
-                  <div>
-                    <div className="fs-range-label">Max</div>
-                    <input className="fs-input" type="number" placeholder="Any" value={filters.max_price} onChange={e => setFilters(f => ({ ...f, max_price: e.target.value }))} />
+                  <div className="mg-thumbs">
+                    {detail.photos.map((_, i) => <div key={i} className={`mg-thumb${i === detailPhoto ? ' active' : ''}`} onClick={() => setDetailPhoto(i)} />)}
                   </div>
-                </div>
-              </div>
-
-              <hr className="fs-divider" />
-
-              {/* Bedrooms */}
-              <div className="fs-group">
-                <div className="fs-group-title">Bedrooms</div>
-                <div className="bed-btns">
-                  {BEDROOM_OPTIONS.map(b => (
-                    <button key={b} className={`bed-btn${filters.bedrooms === b ? ' active' : ''}`}
-                      onClick={() => setFilters(f => ({ ...f, bedrooms: b }))}>
-                      {b === 'Any' ? 'Any' : b === '5+' ? '5+' : `${b}bd`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <hr className="fs-divider" />
-
-              {/* Property Type */}
-              <div className="fs-group">
-                <div className="fs-group-title">Property Type</div>
-                <div className="type-grid">
-                  {PROPERTY_TYPES.map(t => (
-                    <button key={t} className={`type-btn${filters.property_type === t ? ' active' : ''}`}
-                      onClick={() => setFilters(f => ({ ...f, property_type: t }))}>
-                      {t}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <hr className="fs-divider" />
-
-              {/* Area */}
-              <div className="fs-group">
-                <div className="fs-group-title">Area (sqft)</div>
-                <div className="fs-row">
-                  <div>
-                    <div className="fs-range-label">Min</div>
-                    <input className="fs-input" type="number" placeholder="0" value={filters.min_area} onChange={e => setFilters(f => ({ ...f, min_area: e.target.value }))} />
-                  </div>
-                  <div>
-                    <div className="fs-range-label">Max</div>
-                    <input className="fs-input" type="number" placeholder="Any" value={filters.max_area} onChange={e => setFilters(f => ({ ...f, max_area: e.target.value }))} />
-                  </div>
-                </div>
-              </div>
-
-              <hr className="fs-divider" />
-
-              {/* Available Before */}
-              <div className="fs-group">
-                <div className="fs-group-title">Available Before</div>
-                <input className="fs-input" type="date" value={filters.available_before} onChange={e => setFilters(f => ({ ...f, available_before: e.target.value }))} />
-              </div>
-
-              <hr className="fs-divider" />
-
-              {/* Amenities */}
-              <div className="fs-group">
-                <div className="fs-group-title">Amenities</div>
-                <div className="tag-checks">
-                  {ALL_TAGS.map(tag => (
-                    <label key={tag} className="tag-check">
-                      <input type="checkbox" checked={filters.tags.includes(tag)}
-                        onChange={() => setFilters(f => ({
-                          ...f, tags: f.tags.includes(tag) ? f.tags.filter(t => t !== tag) : [...f.tags, tag]
-                        }))} />
-                      <span className="tag-check-label">{tag}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <button className="apply-btn" onClick={() => userId && loadListings(userId, true)}>
-                Apply Filters
+                  <div className="mg-count">📷 {detailPhoto + 1}/{detail.photos.length}</div>
+                </>
+              )}
+              <button className="modal-close" onClick={() => setDetail(null)}>✕</button>
+              <button className="modal-heart" onClick={e => toggleSave(detail.id, e)}>
+                {savedIds.has(detail.id) ? '❤️' : '🤍'}
               </button>
             </div>
 
-            {/* ── LISTINGS PANEL ── */}
-            <div className="listings-panel">
-              {/* Search */}
-              <div className="lp-search">
-                <span className="lp-search-icon">🔍</span>
-                <input
-                  className="lp-search-input"
-                  placeholder="Search listings by title, city, or description…"
-                  value={filters.query}
-                  onChange={e => setFilters(f => ({ ...f, query: e.target.value }))}
-                  onKeyDown={e => e.key === 'Enter' && userId && loadListings(userId, true)}
-                />
-              </div>
-
-              {/* Quick tag pills */}
-              <div className="quick-pills">
-                {['Furnished', 'Parking', 'Pet Friendly', 'Pool', 'Gym', 'Air Conditioned'].map(tag => (
-                  <button key={tag} className={`quick-pill${filters.tags.includes(tag) ? ' active' : ''}`}
-                    onClick={() => setFilters(f => ({
-                      ...f, tags: f.tags.includes(tag) ? f.tags.filter(t => t !== tag) : [...f.tags, tag]
-                    }))}>
-                    {tag}
-                  </button>
-                ))}
-              </div>
-
-              {/* Toolbar */}
-              <div className="lp-header">
-                <div className="lp-left">
-                  <button className={`filter-toggle${filterPanelOpen ? ' active' : ''}`} onClick={() => setFilterPanelOpen(o => !o)}>
-                    ⚡ Filters
-                    {activeFiltersCount > 0 && (
-                      <span style={{ background: '#2563EB', color: '#fff', borderRadius: 99, padding: '0 6px', fontSize: 10, fontWeight: 800 }}>
-                        {activeFiltersCount}
+            <div className="modal-body">
+              <div className="modal-hd">
+                <div className="modal-title-col">
+                  <div className="modal-ptype-row">
+                    <span className="modal-ptype">{detail.property_type}</span>
+                    {isNew(detail.created_at) && <span className="badge badge-blue">New</span>}
+                    {isAvailableSoon(detail.available_from) && <span className="badge badge-green">Available soon</span>}
+                  </div>
+                  <div className="modal-title">{detail.title}</div>
+                  <div className="modal-city">📍 {detail.city || 'Location not specified'}</div>
+                </div>
+                <div className="modal-price-col">
+                  <div className="modal-price">{fmtMoney(detail.rent_amount)}<span>/mo</span></div>
+                  <div className="modal-avail-row">
+                    {detail.available_from && (
+                      <span className={`modal-avail ${isAvailableSoon(detail.available_from) ? 'green' : 'blue'}`}>
+                        {isAvailableSoon(detail.available_from) ? '🟢 Move in soon' : `📅 From ${fmtDate(detail.available_from)}`}
                       </span>
                     )}
-                  </button>
-                  <span className="results-label">
-                    {loading ? 'Loading…' : `${totalCount.toLocaleString()} listing${totalCount !== 1 ? 's' : ''}`}
-                  </span>
-                </div>
-                <div className="lp-right">
-                  <select className="sort-select" value={filters.sort}
-                    onChange={e => setFilters(f => ({ ...f, sort: e.target.value as Filters['sort'] }))}>
-                    <option value="newest">Newest first</option>
-                    <option value="price_asc">Price: Low → High</option>
-                    <option value="price_desc">Price: High → Low</option>
-                  </select>
-                  <div className="view-btns">
-                    <button className={`view-btn${view === 'grid' ? ' active' : ''}`} onClick={() => setView('grid')} title="Grid">⊞</button>
-                    <button className={`view-btn${view === 'list' ? ' active' : ''}`} onClick={() => setView('list')} title="List">☰</button>
                   </div>
                 </div>
               </div>
 
-              {/* Grid */}
-              <div className={`listing-grid${view === 'list' ? ' list-view' : ''}`}>
-                {loading ? (
-                  Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="lcard" style={{ cursor: 'default' }}>
-                      <div className="skeleton" style={{ height: 175 }} />
-                      <div style={{ padding: 15, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <div className="skeleton" style={{ height: 10, width: '50%' }} />
-                        <div className="skeleton" style={{ height: 14, width: '80%' }} />
-                        <div className="skeleton" style={{ height: 10, width: '55%' }} />
-                        <div className="skeleton" style={{ height: 20, width: '45%' }} />
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <div className="skeleton" style={{ height: 22, width: 60, borderRadius: 6 }} />
-                          <div className="skeleton" style={{ height: 22, width: 60, borderRadius: 6 }} />
-                        </div>
-                      </div>
+              <div className="modal-facts-grid">
+                {detail.bedrooms > 0 && (
+                  <div className="modal-fact">
+                    <span className="modal-fact-ico">🛏</span>
+                    <span className="modal-fact-val">{detail.bedrooms}</span>
+                    <span className="modal-fact-lbl">Bedroom{detail.bedrooms !== 1 ? 's' : ''}</span>
+                  </div>
+                )}
+                <div className="modal-fact">
+                  <span className="modal-fact-ico">🚿</span>
+                  <span className="modal-fact-val">{detail.bathrooms}</span>
+                  <span className="modal-fact-lbl">Bathroom{detail.bathrooms !== 1 ? 's' : ''}</span>
+                </div>
+                {detail.area_sqft && (
+                  <div className="modal-fact">
+                    <span className="modal-fact-ico">📐</span>
+                    <span className="modal-fact-val">{detail.area_sqft.toLocaleString()}</span>
+                    <span className="modal-fact-lbl">Sq. feet</span>
+                  </div>
+                )}
+                <div className="modal-fact">
+                  <span className="modal-fact-ico">{TYPE_ICONS[detail.property_type] || '🏘️'}</span>
+                  <span className="modal-fact-val">{detail.property_type}</span>
+                  <span className="modal-fact-lbl">Type</span>
+                </div>
+              </div>
+
+              {detail.description && (
+                <>
+                  <div className="modal-divider" />
+                  <div className="modal-sec-lbl">About this property</div>
+                  <div className="modal-desc">{detail.description}</div>
+                </>
+              )}
+
+              {detail.tags?.length > 0 && (
+                <>
+                  <div className="modal-sec-lbl">Features & Amenities</div>
+                  <div className="modal-tags">
+                    {detail.tags.map(t => <span key={t} className="modal-tag">{t}</span>)}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="modal-ft">
+              <div className="modal-ll">
+                <div className="modal-ll-av" style={{ background: AVATAR_GRADIENTS[detail.landlord_id.charCodeAt(0) % AVATAR_GRADIENTS.length] }}>
+                  {detail.landlord_initials}
+                </div>
+                <div>
+                  <div className="modal-ll-name">{detail.landlord_name}</div>
+                  <div className="modal-ll-lbl">Property Owner</div>
+                </div>
+              </div>
+              <button className={`modal-save-btn${savedIds.has(detail.id) ? ' saved' : ''}`} onClick={e => toggleSave(detail.id, e)}>
+                {savedIds.has(detail.id) ? '❤️ Saved' : '🤍 Save'}
+              </button>
+              <button className="modal-contact-btn" onClick={e => contactLandlord(detail.landlord_id, e)}>
+                💬 Contact Landlord
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ═══ MOBILE FILTER DRAWER ══════════════════════════════════════════════ */}
+      <div className={`mf-overlay${mobileFilterOpen ? ' open' : ''}`}>
+        <div className="mf-bg" onClick={() => setMobileFilterOpen(false)} />
+        <div className="mf-panel">
+          <div className="mf-hd">
+            <div className="mf-title">Filters {activeFilterCount > 0 && <span style={{ fontSize: 13, color: '#94A3B8', fontFamily: "'Plus Jakarta Sans',sans-serif", fontWeight: 400 }}>({activeFilterCount} active)</span>}</div>
+            <button className="mf-close" onClick={() => setMobileFilterOpen(false)}>✕</button>
+          </div>
+          <div className="mf-body">
+            <FilterSidebar />
+          </div>
+          <div className="mf-footer">
+            <button className="mf-clear" onClick={clearAll}>Clear all</button>
+            <button className="mf-apply" onClick={() => setMobileFilterOpen(false)}>
+              Show {results.length} result{results.length !== 1 ? 's' : ''}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══ MOBILE MENU ════════════════════════════════════════════════════════ */}
+      <div className={`mm-overlay${mobileMenuOpen ? ' open' : ''}`}>
+        <div className="mm-bg" onClick={() => setMobileMenuOpen(false)} />
+        <div className="mm-panel">
+          <button className="mm-close" onClick={() => setMobileMenuOpen(false)}>✕</button>
+          <a href="/seeker" className="mm-link">🔍 Browse Homes</a>
+          <a href="/seeker/listings" className="mm-link active">📋 All Listings</a>
+          <a href="/seeker/map" className="mm-link">🗺️ Map View</a>
+          <div className="mm-div" />
+          <button
+            className="mm-link"
+            style={{ background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', width: '100%', fontFamily: 'inherit', fontWeight: 600, color: '#374151', padding: '11px 14px', borderRadius: 10, fontSize: 15 }}
+            onClick={(e) => { setMobileMenuOpen(false); handleListProperty(e as any) }}
+          >🏡 List Your Property</button>
+          <div className="mm-div" />
+          {userId
+            ? <a href="/seeker/messages" className="mm-link">💬 Messages</a>
+            : <a href="/login" className="mm-link">Sign In</a>
+          }
+          {!userId && <a href="/signup" className="mm-cta">Get Started Free →</a>}
+        </div>
+      </div>
+
+      {/* ═══ NAVBAR ════════════════════════════════════════════════════════════ */}
+      <nav className="nav">
+        <div className="nav-inner">
+          <a href="/" className="nav-logo">
+            <div className="nav-logo-icon">
+              <Image src="/icon.png" alt="Rentura" width={22} height={22} />
+            </div>
+            <span className="nav-logo-name">Rentura</span>
+          </a>
+
+          <div className="nav-breadcrumb">
+            <span className="nav-bc-sep">/</span>
+            <a href="/seeker">Browse</a>
+            <span className="nav-bc-sep">/</span>
+            <span className="nav-bc-current">All Listings</span>
+          </div>
+
+          <div className="nav-search-wrap">
+            <span className="nav-s-ico">🔍</span>
+            <input
+              className="nav-s-input"
+              placeholder="Search listings…"
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1) }}
+            />
+          </div>
+
+          <div className="nav-spacer" />
+
+          <div className="nav-actions">
+            <a href="/seeker" className="nav-link">Home</a>
+            <a href="/seeker/listings" className="nav-link active">Listings</a>
+            <a href="/seeker/map" className="nav-link">Map</a>
+            <button className="nav-list-btn" onClick={handleListProperty}>List Property</button>
+            {userId
+              ? <a href="/seeker" className="nav-avatar">{userInitials}</a>
+              : <a href="/login" className="nav-signin">Sign In</a>
+            }
+            <button className="hamburger" onClick={() => setMobileMenuOpen(true)}>☰</button>
+          </div>
+        </div>
+      </nav>
+
+      {/* ═══ PAGE LAYOUT ═══════════════════════════════════════════════════════ */}
+      <div className="page-layout">
+        {/* Desktop Sidebar */}
+        <FilterSidebar />
+
+        {/* Main content */}
+        <main className="main">
+          {/* Page header */}
+          <div className="listings-header">
+            <div className="lh-top">
+              <div>
+                <div className="lh-title">All <em>Listings</em></div>
+                <div className="lh-sub">
+                  {loading ? 'Loading properties…' : `${allListings.length.toLocaleString()} properties across ${cities.length} cities`}
+                </div>
+              </div>
+            </div>
+
+            {/* Active filter chips */}
+            {activeChips.length > 0 && (
+              <div className="chips-bar">
+                {activeChips.map((chip, i) => (
+                  <div key={i} className="chip">
+                    {chip.label}
+                    <button className="chip-x" onClick={chip.onRemove}>✕</button>
+                  </div>
+                ))}
+                <button className="chip-clear-all" onClick={clearAll}>Clear all</button>
+              </div>
+            )}
+          </div>
+
+          {/* Toolbar */}
+          <div className="toolbar">
+            <div className="tb-left">
+              <button
+                className={`tb-filter-btn${activeFilterCount > 0 ? ' has-filters' : ''}`}
+                onClick={() => setMobileFilterOpen(true)}
+              >
+                ⚡ Filters
+                {activeFilterCount > 0 && <span className="filter-badge">{activeFilterCount}</span>}
+              </button>
+              <div className="tb-count">
+                {loading ? 'Loading…' : <>{results.length.toLocaleString()} <span>propert{results.length !== 1 ? 'ies' : 'y'}</span></>}
+              </div>
+            </div>
+
+            <div className="tb-right">
+              <div className="tb-sort-wrap">
+                <span className="tb-sort-lbl">Sort by</span>
+                <select className="tb-sort" value={sort} onChange={e => { setSort(e.target.value as SortKey); setPage(1) }}>
+                  {SORT_OPTIONS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+                </select>
+              </div>
+              <div className="view-btns">
+                <button className={`vbtn${view === 'grid' ? ' active' : ''}`} title="Grid" onClick={() => setView('grid')}>⊞</button>
+                <button className={`vbtn${view === 'list' ? ' active' : ''}`} title="List" onClick={() => setView('list')}>☰</button>
+                <button className={`vbtn${view === 'compact' ? ' active' : ''}`} title="Compact" onClick={() => setView('compact')}>⊟</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Listings */}
+          <div className={`listing-grid view-${view}`}>
+            {loading
+              ? Array.from({ length: 9 }).map((_, i) => (
+                <div key={i} className={`lcard${view === 'list' ? ' view-list' : view === 'compact' ? ' view-compact' : ''}`} style={{ cursor: 'default', pointerEvents: 'none' }}>
+                  <div className={`lcard-banner h-${view === 'compact' ? 'compact' : 'normal'}`}>
+                    <div className="skel" style={{ width: '100%', height: '100%', borderRadius: 0 }} />
+                  </div>
+                  <div className="lcard-body">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <div className="skel" style={{ height: 9, width: '30%' }} />
+                      <div className="skel" style={{ height: 9, width: '20%', borderRadius: 99 }} />
                     </div>
-                  ))
-                ) : listings.length === 0 ? (
+                    <div className="skel" style={{ height: 15, width: '85%', marginBottom: 8 }} />
+                    <div className="skel" style={{ height: 22, width: '50%', marginBottom: 10 }} />
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <div className="skel" style={{ height: 24, width: 70, borderRadius: 7 }} />
+                      <div className="skel" style={{ height: 24, width: 70, borderRadius: 7 }} />
+                      <div className="skel" style={{ height: 24, width: 70, borderRadius: 7 }} />
+                    </div>
+                  </div>
+                  <div className="lcard-footer">
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <div className="skel" style={{ width: 27, height: 27, borderRadius: 8 }} />
+                      <div className="skel" style={{ height: 11, width: 80 }} />
+                    </div>
+                    <div className="skel" style={{ height: 30, width: 80, borderRadius: 9 }} />
+                  </div>
+                </div>
+              ))
+              : paginated.length === 0
+                ? (
                   <div className="empty-state">
                     <div className="es-ico">🏘️</div>
-                    <div className="es-title">No listings found</div>
-                    <div className="es-sub">Try adjusting your filters or search terms to find more properties.</div>
-                    <button className="es-btn" onClick={clearFilters}>Clear Filters</button>
+                    <div className="es-title">No properties found</div>
+                    <div className="es-sub">Try adjusting or clearing some of your filters to discover more listings.</div>
+                    <button className="es-btn" onClick={clearAll}>Clear all filters</button>
                   </div>
-                ) : (
-                  listings.map(l => (
-                    <a
+                )
+                : paginated.map(l => {
+                  const gradIdx = l.landlord_id.charCodeAt(0) % AVATAR_GRADIENTS.length
+                  const isListView = view === 'list'
+                  const isCompact = view === 'compact'
+                  return (
+                    <div
                       key={l.id}
-                      className={`lcard${view === 'list' ? ' list-view' : ''}`}
-                      href={`/seeker/listing-details/${l.id}`}
+                      className={`lcard${isListView ? ' view-list' : isCompact ? ' view-compact' : ''}`}
+                      onClick={() => { setDetail(l); setDetailPhoto(0) }}
                     >
-                      <div className="lcard-banner">
+                      <div className={`lcard-banner ${isCompact ? 'h-compact' : 'h-normal'}`}>
                         {l.photos.length > 0
                           ? <img className="lcard-img" src={l.photos[0]} alt={l.title} loading="lazy" />
-                          : <div className="lcard-placeholder">🏠</div>}
-                        <span className="lcard-badge">{l.property_type}</span>
-                        <button className={`lcard-save`} onClick={e => toggleSave(l.id, e)} title="Save">
+                          : <div className="lcard-ph">{TYPE_ICONS[l.property_type] || '🏠'}</div>
+                        }
+                        {/* Badges */}
+                        <div className="lcard-badges">
+                          {isNew(l.created_at) && <span className="badge badge-blue">New</span>}
+                          {isAvailableSoon(l.available_from) && <span className="badge badge-green">Soon</span>}
+                          {savedIds.has(l.id) && <span className="badge badge-amber">Saved</span>}
+                        </div>
+                        <button className="lcard-save" onClick={e => toggleSave(l.id, e)}>
                           {savedIds.has(l.id) ? '❤️' : '🤍'}
                         </button>
-                        {l.photos.length > 1 && <div className="lcard-photo-ct">📷 {l.photos.length}</div>}
-                        {isAvailableSoon(l.available_from) && <div className="lcard-avail">Available soon</div>}
+                        {l.photos.length > 1 && (
+                          <div className="lcard-photo-ct">📷 {l.photos.length}</div>
+                        )}
                       </div>
+
                       <div className="lcard-body">
-                        <div className="lcard-type">{l.property_type}</div>
+                        <div className="lcard-type-row">
+                          <span className="lcard-type">{l.property_type}</span>
+                          {l.city && <span className="lcard-city-pill">{l.city}</span>}
+                        </div>
                         <div className="lcard-title">{l.title}</div>
-                        <div className="lcard-loc">📍 {l.city || 'Location not specified'}</div>
-                        <div className="lcard-price">{fmtMoney(l.rent_amount)}<span> /mo</span></div>
+                        <div className="lcard-price-row">
+                          <span className="lcard-price">{fmtMoney(l.rent_amount)}</span>
+                          <span className="lcard-price-unit">/mo</span>
+                        </div>
                         <div className="lcard-facts">
                           {l.bedrooms > 0 && <span className="lcard-fact">🛏 {l.bedrooms} bed</span>}
                           <span className="lcard-fact">🚿 {l.bathrooms} bath</span>
                           {l.area_sqft && <span className="lcard-fact">📐 {l.area_sqft.toLocaleString()} sqft</span>}
-                          {l.available_from && <span className="lcard-fact">📅 {fmtDate(l.available_from)}</span>}
+                          {!isCompact && l.available_from && <span className="lcard-fact">📅 {fmtDate(l.available_from)}</span>}
                         </div>
-                        {l.tags.length > 0 && (
+                        {!isCompact && l.tags.length > 0 && (
                           <div className="lcard-tags">
-                            {l.tags.slice(0, 3).map(t => <span key={t} className="lcard-tag">{t}</span>)}
-                            {l.tags.length > 3 && <span className="lcard-tag">+{l.tags.length - 3}</span>}
+                            {l.tags.slice(0, isListView ? 5 : 3).map(t => <span key={t} className="lcard-tag">{t}</span>)}
+                            {l.tags.length > (isListView ? 5 : 3) && <span className="lcard-tag">+{l.tags.length - (isListView ? 5 : 3)}</span>}
                           </div>
                         )}
-                        {view === 'list' && l.description && (
+                        {isListView && l.description && (
                           <div className="lcard-desc">{l.description}</div>
                         )}
+                        {isAvailableSoon(l.available_from) && !isCompact && (
+                          <div className="lcard-avail">🟢 Available soon</div>
+                        )}
                       </div>
+
                       <div className="lcard-footer">
-                        <div className="lcard-landlord">
-                          <div className="lcard-ll-av" style={{ background: AVATAR_GRADIENTS[l.landlord_id.charCodeAt(0) % AVATAR_GRADIENTS.length] }}>
+                        <div className="lcard-ll">
+                          <div className="lcard-ll-av" style={{ background: AVATAR_GRADIENTS[gradIdx] }}>
                             {l.landlord_initials}
                           </div>
                           <span className="lcard-ll-name">{l.landlord_name}</span>
                         </div>
-                        <span className="lcard-view-btn">View →</span>
+                        <button className="lcard-contact" onClick={e => contactLandlord(l.landlord_id, e)}>
+                          💬 Contact
+                        </button>
                       </div>
-                    </a>
-                  ))
-                )}
+                    </div>
+                  )
+                })
+            }
+          </div>
 
-                {/* Infinite scroll sentinel */}
-                {!loading && listings.length > 0 && (
-                  <div ref={sentinelRef} className="load-sentinel">
-                    {loadingMore ? '⏳ Loading more…' : hasMore ? '' : `✓ All ${totalCount} listings loaded`}
-                  </div>
-                )}
+          {/* Load more */}
+          {!loading && hasMore && (
+            <div className="load-more-wrap">
+              <button className="load-more-btn" onClick={() => setPage(p => p + 1)}>
+                Load more properties
+              </button>
+              <div className="lm-progress">{paginated.length} of {results.length} shown</div>
+              <div className="lm-bar">
+                <div className="lm-fill" style={{ width: `${Math.round((paginated.length / results.length) * 100)}%` }} />
               </div>
             </div>
-          </div>
-        </div>
+          )}
+
+          {!loading && !hasMore && results.length > 0 && (
+            <div style={{ textAlign: 'center', padding: '28px 0 12px', fontSize: 13, color: '#94A3B8', fontWeight: 500 }}>
+              ✓ You've seen all {results.length} propert{results.length !== 1 ? 'ies' : 'y'}
+            </div>
+          )}
+        </main>
       </div>
     </>
-  )
-}
-
-export default function SeekerListings() {
-  return (
-    <Suspense fallback={
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'sans-serif', color: '#94A3B8' }}>
-        Loading…
-      </div>
-    }>
-      <SeekerListingsInner />
-    </Suspense>
   )
 }
