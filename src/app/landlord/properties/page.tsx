@@ -639,7 +639,7 @@ export default function PropertiesPage() {
 
           <div className="hint">
             {drawer === 'add'
-              ? '💡 Units will be created automatically. Use Manage Units to set individual rents per unit.'
+              ? '💡 A Unit is known as a single rental space within a property. Units will be created automatically. Use Manage Units to set individual rents per unit.'
               : '💡 To update rents, go to Manage Units → Edit each unit individually.'}
           </div>
 
