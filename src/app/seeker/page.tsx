@@ -1,29 +1,11 @@
 'use client'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Rentura — Public Marketplace  /src/app/seeker/page.tsx
-//
-// FIXES APPLIED:
-//  1. Fully responsive for all screen sizes
-//  2. Hero search bar is wider and more prominent
-//  3. Floating decorative boxes replaced with animated property preview cards
-//  4. "List Your Property" smart routing:
-//       landlord role  → /landlord/listings
-//       unregistered   → /signup
-//       seeker role    → bottom-sheet modal: List as Landlord | List as Agent
-//  5. "Avg rent/month" replaced with "Most affordable from LKR X"
-//  6. Featured listings: logged-in = interest-matched; guest = newest with photos
-//
-// Drop this file at:  /src/app/seeker/page.tsx
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { useEffect, useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import { useCurrency } from '@/lib/useCurrency'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
 type Listing = {
   id: string
   title: string
@@ -47,7 +29,6 @@ type Listing = {
 type CityCard = { city: string; count: number; photo: string }
 type UserRole = 'landlord' | 'seeker' | 'agent' | null
 
-// ── Constants ─────────────────────────────────────────────────────────────────
 const AVATAR_GRADIENTS = [
   'linear-gradient(135deg,#6366F1,#8B5CF6)',
   'linear-gradient(135deg,#0EA5E9,#38BDF8)',
@@ -66,13 +47,6 @@ const CITY_PHOTOS: Record<string, string> = {
   'default': 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=600&q=80',
 }
 
-// Floating hero preview cards data
-const HERO_PREVIEW_CARDS = [
-  { emoji: '🏡', type: 'Villa', city: 'Colombo 7', beds: 4, price: 'LKR 185,000', tag: 'Furnished', top: '18%', right: '5%', delay: '0s' },
-  { emoji: '🏢', type: 'Apartment', city: 'Nugegoda', beds: 2, price: 'LKR 65,000', tag: 'Parking', top: '52%', right: '2%', delay: '.6s' },
-  { emoji: '🛋️', type: 'Studio', city: 'Dehiwala', beds: 1, price: 'LKR 38,000', tag: 'Pet Friendly', top: '32%', left: '2%', delay: '1.1s' },
-]
-
 const PROPERTY_TYPES = ['All', 'House', 'Apartment', 'Studio', 'Villa', 'Room', 'Office']
 const BEDROOM_OPTIONS = ['Any', '1', '2', '3', '4', '5+']
 const QUICK_TAGS = ['Furnished', 'Pet Friendly', 'Parking', 'Air Conditioned', 'Pool', 'Gym', 'Solar Panel']
@@ -80,7 +54,6 @@ const CATEGORY_ICONS: Record<string, string> = {
   All: '🏘️', House: '🏡', Apartment: '🏢', Studio: '🛋️', Villa: '🏰', Room: '🚪', Office: '🏗️',
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function initials(name: string) {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
@@ -94,12 +67,12 @@ function isAvailableSoon(s: string) {
   return diff >= 0 && diff < 14 * 86400000
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
 export default function SeekerMarketplace() {
   const router = useRouter()
   const { fmtMoney } = useCurrency()
   const blockInvalidChar = (e: React.KeyboardEvent<HTMLInputElement>) =>
-    ['e', 'E', '-', '+'].includes(e.key) && e.preventDefault();
+    ['e', 'E', '-', '+'].includes(e.key) && e.preventDefault()
+
   // Auth
   const [userId, setUserId] = useState<string | null>(null)
   const [userInitials, setUserInitials] = useState('')
@@ -124,13 +97,7 @@ export default function SeekerMarketplace() {
   const [scrolled, setScrolled] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
-
-  // Modals
-  const [detail, setDetail] = useState<Listing | null>(null)
-  const [detailPhoto, setDetailPhoto] = useState(0)
-  const [authGateOpen, setAuthGateOpen] = useState(false)
-  const [authGateAction, setAuthGateAction] = useState<'save' | 'contact'>('save')
-  const [listModalOpen, setListModalOpen] = useState(false)  // "List your property" seeker modal
+  const [listModalOpen, setListModalOpen] = useState(false)
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
@@ -143,14 +110,14 @@ export default function SeekerMarketplace() {
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [browsedListings, setBrowsedListings] = useState<Listing[]>([])
 
-  // ── Scroll ───────────────────────────────────────────────────────────────
+  // Scroll
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 50)
     window.addEventListener('scroll', fn, { passive: true })
     return () => window.removeEventListener('scroll', fn)
   }, [])
 
-  // ── Auth ─────────────────────────────────────────────────────────────────
+  // Auth
   useEffect(() => {
     ; (async () => {
       try {
@@ -159,8 +126,6 @@ export default function SeekerMarketplace() {
         if (user) {
           setUserId(user.id)
           setUserInitials(initials(user.user_metadata?.full_name || 'U'))
-
-          // Fetch role from profiles
           const { data: profile } = await sb
             .from('profiles')
             .select('role, full_name')
@@ -168,7 +133,6 @@ export default function SeekerMarketplace() {
             .single()
           setUserRole((profile?.role as UserRole) || 'seeker')
 
-          // Saved listings + interests
           const { data: savedRows } = await sb
             .from('saved_listings')
             .select('listing_id, listings(tags, city)')
@@ -176,7 +140,6 @@ export default function SeekerMarketplace() {
           const savedSet = new Set((savedRows || []).map((s: any) => s.listing_id))
           setSavedIds(savedSet)
 
-          // Derive interest from saved listings
           const tagCounts: Record<string, number> = {}
           const cityCounts: Record<string, number> = {}
             ; (savedRows || []).forEach((s: any) => {
@@ -194,7 +157,7 @@ export default function SeekerMarketplace() {
     })()
   }, [])
 
-  // ── Load Listings ─────────────────────────────────────────────────────────
+  // Load Listings
   useEffect(() => {
     ; (async () => {
       setLoading(true)
@@ -230,7 +193,6 @@ export default function SeekerMarketplace() {
 
         setAllListings(mapped)
 
-        // City cards
         const cityMap: Record<string, number> = {}
         mapped.forEach(l => { if (l.city) cityMap[l.city] = (cityMap[l.city] || 0) + 1 })
         setCities(Object.keys(cityMap))
@@ -239,7 +201,6 @@ export default function SeekerMarketplace() {
             .map(([city, count]) => ({ city, count, photo: CITY_PHOTOS[city] || CITY_PHOTOS.default }))
         )
 
-        // Stats — fix 5: show min rent instead of avg
         const rents = mapped.map(l => l.rent_amount).filter(Boolean)
         setStats({
           total: mapped.length,
@@ -254,11 +215,10 @@ export default function SeekerMarketplace() {
     })()
   }, [])
 
-  // ── Featured listings — fix 6: interest-matched or newest-with-photos ────
+  // Featured listings
   useEffect(() => {
     if (allListings.length === 0) return
     if (userId && (userInterests.tags.length > 0 || userInterests.cities.length > 0)) {
-      // Score by interest match
       const scored = allListings
         .filter(l => l.photos.length > 0)
         .map(l => {
@@ -270,14 +230,13 @@ export default function SeekerMarketplace() {
         .sort((a, b) => b.score - a.score)
       setFeaturedListings(scored.slice(0, 6))
     } else {
-      // Guest or no history: newest with photos first, then without
       const withPhotos = allListings.filter(l => l.photos.length > 0).slice(0, 6)
       const withoutPhotos = allListings.filter(l => l.photos.length === 0).slice(0, Math.max(0, 6 - withPhotos.length))
       setFeaturedListings([...withPhotos, ...withoutPhotos])
     }
   }, [allListings, userId, userInterests])
 
-  // ── Filtered listings ─────────────────────────────────────────────────────
+  // Filtered listings
   const getFiltered = useCallback(() => {
     let result = allListings
     if (searchQuery) {
@@ -300,10 +259,10 @@ export default function SeekerMarketplace() {
 
   useEffect(() => { setBrowsedListings(getFiltered()) }, [getFiltered])
 
-  // ── Save / Unsave ─────────────────────────────────────────────────────────
+  // Save / Unsave
   async function toggleSave(listingId: string, e: React.MouseEvent) {
     e.stopPropagation()
-    if (!userId) { setAuthGateAction('save'); setAuthGateOpen(true); return }
+    if (!userId) { router.push('/login'); return }
     if (savingId) return
     setSavingId(listingId)
     try {
@@ -320,20 +279,24 @@ export default function SeekerMarketplace() {
     finally { setSavingId(null) }
   }
 
-  // ── Contact ───────────────────────────────────────────────────────────────
+  // Contact
   function contactLandlord(landlordId: string, e?: React.MouseEvent) {
     e?.stopPropagation()
-    if (!userId) { setAuthGateAction('contact'); setAuthGateOpen(true); return }
+    if (!userId) { router.push('/login'); return }
     router.push(`/seeker/messages?to=${landlordId}`)
   }
 
-  // ── "List Your Property" — fix 4 ─────────────────────────────────────────
+  // Navigate to listing detail
+  function goToListing(listingId: string) {
+    router.push(`/seeker/listing-details/${listingId}`)
+  }
+
+  // List Your Property
   function handleListProperty(e: React.MouseEvent) {
     e.preventDefault()
     if (!authChecked) return
     if (!userId) { router.push('/signup'); return }
     if (userRole === 'landlord' || userRole === 'agent') { router.push('/landlord/listings'); return }
-    // seeker — show choice modal
     setListModalOpen(true)
   }
 
@@ -344,7 +307,6 @@ export default function SeekerMarketplace() {
     document.getElementById('browse-section')?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
   return (
     <>
       <style>{`
@@ -356,16 +318,13 @@ export default function SeekerMarketplace() {
         ::-webkit-scrollbar{width:5px;height:5px}
         ::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:99px}
 
-        /* ══ NAVBAR ══════════════════════════════════════════════════════════ */
         .nav{position:fixed;top:0;left:0;right:0;z-index:500;transition:all .3s ease}
         .nav.scrolled{background:rgba(255,255,255,.97);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 1px 0 rgba(15,23,42,.08),0 4px 24px rgba(15,23,42,.06)}
         .nav-inner{max-width:1320px;margin:0 auto;padding:0 24px;height:68px;display:flex;align-items:center;gap:16px}
-        .nav-logo{display:flex;align-items:center;gap:12px;padding:22px 20px 18px; text-decoration:none}
+        .nav-logo{display:flex;align-items:center;gap:12px;padding:22px 20px 18px;text-decoration:none}
         .nav-logo-icon{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center}
-        .nav-logo-name{font-family:'Fraunces',serif;font-size:22px;font-weight:700;color:#0F172A;letter-spacing:-.3px;transition:color .2s; text-decoration:none}
-        
+        .nav-logo-name{font-family:'Fraunces',serif;font-size:22px;font-weight:700;color:#0F172A;letter-spacing:-.3px;transition:color .2s;text-decoration:none}
         .nav.transparent .nav-logo-name{color:#fff}
-        /* Nav search — hidden in transparent mode, shown when scrolled */
         .nav-search-wrap{flex:1;max-width:420px;display:none;position:relative;align-items:center}
         .nav.scrolled .nav-search-wrap{display:flex}
         .nav-s-ico{position:absolute;left:12px;font-size:14px;color:#94A3B8;pointer-events:none}
@@ -388,8 +347,7 @@ export default function SeekerMarketplace() {
         .hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;padding:4px;color:#475569;flex-shrink:0}
         .nav.transparent .hamburger{color:#fff}
 
-        /* ── MOBILE MENU ── */
-        .mm-overlay{display:none;position:fixed;inset:0;z-index:1000;}
+        .mm-overlay{display:none;position:fixed;inset:0;z-index:1000}
         .mm-overlay.open{display:flex}
         .mm-bg{position:absolute;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(4px)}
         .mm-panel{position:absolute;top:0;right:0;bottom:0;width:min(300px,88vw);background:#fff;padding:24px 20px;display:flex;flex-direction:column;gap:4px;box-shadow:-8px 0 40px rgba(0,0,0,.12)}
@@ -399,7 +357,6 @@ export default function SeekerMarketplace() {
         .mm-div{height:1px;background:#F1F5F9;margin:8px 0}
         .mm-cta{font-size:14px;font-weight:700;color:#fff;padding:13px;border-radius:12px;background:linear-gradient(135deg,#2563EB,#6366F1);text-align:center;text-decoration:none;display:block;margin-top:8px}
 
-        /* ══ HERO ════════════════════════════════════════════════════════════ */
         .hero{position:relative;min-height:600px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;padding:90px 24px 0}
         .hero-bg{position:absolute;inset:0;background:linear-gradient(145deg,#0B1629 0%,#162344 45%,#0B1629 100%)}
         .hero-orbs{position:absolute;inset:0;pointer-events:none;overflow:hidden}
@@ -408,30 +365,14 @@ export default function SeekerMarketplace() {
         .hero-orb-2{width:400px;height:400px;background:#6366F1;bottom:-80px;right:-60px}
         .hero-orb-3{width:300px;height:300px;background:#0EA5E9;top:40%;left:55%}
         .hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:56px 56px;pointer-events:none}
-
-        /* Fix 3 — floating property preview cards */
-        .hero-preview-card{position:absolute;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);border-radius:16px;backdrop-filter:blur(12px);padding:12px 14px;pointer-events:none;min-width:170px;animation:floatCard 5s ease-in-out infinite}
-        .hero-preview-card:nth-child(1){animation-delay:0s}
-        .hero-preview-card:nth-child(2){animation-delay:.7s}
-        .hero-preview-card:nth-child(3){animation-delay:1.4s}
-        @keyframes floatCard{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
-        .hpc-top{display:flex;align-items:center;gap:7px;margin-bottom:6px}
-        .hpc-emoji{font-size:18px}
-        .hpc-type{font-size:11px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.5px}
-        .hpc-price{font-family:'Fraunces',serif;font-size:16px;font-weight:700;color:#fff;margin-bottom:4px}
-        .hpc-meta{font-size:11px;color:rgba(255,255,255,.5)}
-        .hpc-tag{display:inline-block;font-size:10px;font-weight:700;border-radius:99px;padding:2px 8px;background:rgba(16,185,129,.25);color:#6EE7B7;border:1px solid rgba(16,185,129,.3);margin-top:5px}
-
         .hero-content{position:relative;z-index:2;text-align:center;max-width:800px;width:100%}
         .hero-eyebrow{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:99px;padding:6px 16px;font-size:12px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:.5px;text-transform:uppercase;margin-bottom:22px;backdrop-filter:blur(4px)}
         .hero-title{font-family:'Fraunces',serif;font-size:clamp(36px,6vw,60px);font-weight:300;color:#F8FAFC;line-height:1.1;letter-spacing:-1.5px;margin-bottom:14px}
         .hero-title em{font-style:italic;color:#93C5FD}
         .hero-title strong{font-weight:700;color:#fff}
         .hero-sub{font-size:clamp(14px,2vw,16px);color:rgba(255,255,255,.5);margin-bottom:36px;line-height:1.65;max-width:520px;margin-left:auto;margin-right:auto}
-
-        /* Fix 2 — wider search bar */
         .hero-search{background:rgba(255,255,255,.97);border-radius:20px;padding:10px 10px 10px 14px;display:flex;align-items:center;gap:0;box-shadow:0 12px 48px rgba(0,0,0,.3);max-width:780px;width:100%;margin:0 auto 26px}
-        .hs-input-wrap{flex:1;min-width:0;position:relative;display:flex;align-items:center }
+        .hs-input-wrap{flex:1;min-width:0;position:relative;display:flex;align-items:center}
         .hs-ico{position:absolute;left:0;font-size:15px;color:#94A3B8;pointer-events:none}
         .hs-input{width:100%;padding:10px 10px 10px 26px;border:none;outline:none;font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;color:#0F172A;background:transparent}
         .hs-input::placeholder{color:#94A3B8}
@@ -439,21 +380,17 @@ export default function SeekerMarketplace() {
         .hs-select{padding:9px 10px;border:none;outline:none;font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;color:#374151;background:transparent;cursor:pointer;white-space:nowrap;flex-shrink:0;max-width:120px}
         .hs-btn{padding:11px 26px;border-radius:14px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 2px 16px rgba(37,99,235,.45);transition:all .18s;white-space:nowrap;flex-shrink:0;margin-left:8px}
         .hs-btn:hover{transform:translateY(-1px);box-shadow:0 4px 22px rgba(37,99,235,.55)}
-
         .hero-hints{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:0}
         .hero-hint{font-size:12px;color:rgba(255,255,255,.38);font-weight:500}
-        .hero-hint-tag{font-size:12px;color:rgba(255,255,255,.6);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:99px;padding:4px 12px;cursor:pointer;transition:all .15s;font-weight:600;background:none;font-family:'Plus Jakarta Sans',sans-serif}
+        .hero-hint-tag{font-size:12px;color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.14);border-radius:99px;padding:4px 12px;cursor:pointer;transition:all .15s;font-weight:600;background:none;font-family:'Plus Jakarta Sans',sans-serif}
         .hero-hint-tag:hover{background:rgba(255,255,255,.14);color:#fff}
-
-        /* Hero stats bar */
-        .hero-stats{position:relative;z-index:2;width:100%;background:rgba(255,255,255,.05);border-top:1px solid rgba(255,255,255,.08);margin-top:36px; margin-bottom: 15px; border-radius:12px}
+        .hero-stats{position:relative;z-index:2;width:100%;background:rgba(255,255,255,.05);border-top:1px solid rgba(255,255,255,.08);margin-top:36px;margin-bottom:15px;border-radius:12px}
         .hero-stats-inner{max-width:1320px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:0}
         .hstat{display:flex;align-items:center;gap:10px;padding:6px 28px}
         .hstat+.hstat{border-left:1px solid rgba(255,255,255,.1)}
         .hstat-num{font-family:'Fraunces',serif;font-size:24px;font-weight:700;color:#F1F5F9;line-height:1}
         .hstat-lbl{font-size:12px;color:rgba(255,255,255,.42);font-weight:500;line-height:1.3;margin-top:2px}
 
-        /* ══ CATEGORY BAR ════════════════════════════════════════════════════ */
         .cat-bar{background:#fff;border-bottom:1px solid #E2E8F0;position:sticky;top:68px;z-index:100;box-shadow:0 2px 10px rgba(15,23,42,.05)}
         .cat-inner{max-width:1320px;margin:0 auto;padding:0 24px;display:flex;align-items:center;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;height:56px}
         .cat-inner::-webkit-scrollbar{display:none}
@@ -464,8 +401,6 @@ export default function SeekerMarketplace() {
         .cat-filter-btn{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:99px;border:1.5px solid #E2E8F0;background:#fff;color:#374151;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;font-family:'Plus Jakarta Sans',sans-serif;flex-shrink:0}
         .cat-filter-btn.active{border-color:#0F172A;background:#0F172A;color:#fff}
         .flt-dot{width:7px;height:7px;border-radius:50%;background:#EF4444;flex-shrink:0}
-
-        /* ── FILTER PANEL ── */
         .filter-panel{background:#fff;border-bottom:1px solid #E2E8F0;box-shadow:0 6px 20px rgba(15,23,42,.07)}
         .fp-inner{max-width:1320px;margin:0 auto;padding:18px 24px}
         .fp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:14px}
@@ -477,7 +412,6 @@ export default function SeekerMarketplace() {
         .fp-clear{padding:8px 16px;border-radius:10px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:12.5px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
         .fp-apply{padding:8px 20px;border-radius:10px;border:none;background:#0F172A;color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
 
-        /* ── TAG PILLS ── */
         .tag-row{background:#fff;border-bottom:1px solid #F1F5F9}
         .tag-row-inner{max-width:1320px;margin:0 auto;padding:12px 24px;display:flex;gap:7px;flex-wrap:wrap;align-items:center}
         .tr-lbl{font-size:12px;font-weight:700;color:#94A3B8;white-space:nowrap}
@@ -485,10 +419,7 @@ export default function SeekerMarketplace() {
         .tag-pill:hover{border-color:#CBD5E1;background:#F8FAFC}
         .tag-pill.active{background:#F0FDF4;border-color:#86EFAC;color:#16A34A}
 
-        /* ══ PAGE WRAPPER ════════════════════════════════════════════════════ */
         .page{max-width:1320px;margin:0 auto;padding:0 24px}
-
-        /* ══ SECTIONS ════════════════════════════════════════════════════════ */
         .section{padding:48px 0 0}
         .sec-hd{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap}
         .sec-title{font-family:'Fraunces',serif;font-size:clamp(20px,3vw,26px);font-weight:400;color:#0F172A;letter-spacing:-.4px}
@@ -497,19 +428,17 @@ export default function SeekerMarketplace() {
         .sec-link{font-size:13px;font-weight:700;color:#2563EB;text-decoration:none;white-space:nowrap;display:flex;align-items:center;gap:4px;background:none;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
         .sec-link:hover{text-decoration:underline}
 
-        /* ══ FEATURED STRIP ══════════════════════════════════════════════════ */
         .feat-strip{display:flex;gap:16px;overflow-x:auto;scrollbar-width:none;padding-bottom:6px;-webkit-overflow-scrolling:touch}
         .feat-strip::-webkit-scrollbar{display:none}
         .feat-label{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:#94A3B8;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px}
         .feat-label.personalised{color:#7C3AED}
-
         .fcard{min-width:290px;max-width:290px;background:#fff;border:1px solid #E2E8F0;border-radius:20px;overflow:hidden;cursor:pointer;transition:box-shadow .2s,transform .2s;flex-shrink:0;box-shadow:0 1px 4px rgba(15,23,42,.04)}
         .fcard:hover{box-shadow:0 10px 32px rgba(15,23,42,.12);transform:translateY(-3px)}
         .fcard-img{height:195px;position:relative;overflow:hidden;background:#F1F5F9}
         .fcard-img img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s}
         .fcard:hover .fcard-img img{transform:scale(1.04)}
         .fcard-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:52px;background:linear-gradient(135deg,#E2E8F0,#CBD5E1)}
-        .fcard-save{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:99px;background:rgba(255,255,255,.92);border:none;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.1);transition:transform .15s}
+        .fcard-save{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:99px;background:rgba(255,255,255,.92);border:none;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.1);transition:transform .15s;z-index:2}
         .fcard-save:hover{transform:scale(1.12)}
         .fcard-badge{position:absolute;top:10px;left:10px;font-size:10.5px;font-weight:700;border-radius:99px;padding:3px 10px;background:rgba(16,185,129,.9);color:#fff}
         .fcard-body{padding:14px 16px}
@@ -521,7 +450,6 @@ export default function SeekerMarketplace() {
         .fcard-facts{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
         .fcard-fact{font-size:11px;color:#475569;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:2px 7px}
 
-        /* ══ CITY GRID ════════════════════════════════════════════════════════ */
         .city-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
         .city-card{position:relative;height:155px;border-radius:18px;overflow:hidden;cursor:pointer;transition:transform .2s,box-shadow .2s}
         .city-card:hover{transform:translateY(-3px);box-shadow:0 14px 36px rgba(15,23,42,.18)}
@@ -531,7 +459,6 @@ export default function SeekerMarketplace() {
         .city-name{font-family:'Fraunces',serif;font-size:17px;font-weight:700;color:#fff;margin-bottom:2px}
         .city-count{font-size:11.5px;color:rgba(255,255,255,.65);font-weight:500}
 
-        /* ══ TRUST BANNER ═════════════════════════════════════════════════════ */
         .trust{background:#0F172A;border-radius:24px;padding:48px 52px;margin:48px 0;display:grid;grid-template-columns:1fr 1fr;gap:52px;align-items:center;overflow:hidden;position:relative}
         .trust::before{content:'';position:absolute;top:-60px;right:-40px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(37,99,235,.16) 0%,transparent 70%);pointer-events:none}
         .trust-title{font-family:'Fraunces',serif;font-size:clamp(22px,3vw,32px);font-weight:300;color:#F8FAFC;letter-spacing:-.5px;margin-bottom:12px;line-height:1.25}
@@ -548,7 +475,6 @@ export default function SeekerMarketplace() {
         .tc-title{font-size:13px;font-weight:700;color:#F1F5F9;margin-bottom:4px}
         .tc-desc{font-size:12px;color:rgba(255,255,255,.4);line-height:1.5}
 
-        /* ══ BROWSE SECTION ══════════════════════════════════════════════════ */
         .browse-toolbar{display:flex;align-items:center;justify-content:space-between;padding:24px 0 16px;gap:10px;flex-wrap:wrap}
         .browse-count{font-size:13px;color:#94A3B8;font-weight:500;white-space:nowrap}
         .view-btns{display:flex;gap:3px;background:#fff;border:1px solid #E2E8F0;border-radius:9px;padding:3px}
@@ -556,10 +482,8 @@ export default function SeekerMarketplace() {
         .vbtn.active{background:#F1F5F9;color:#0F172A}
         .browse-right{display:flex;align-items:center;gap:8px}
 
-        /* ══ LISTING GRID ═════════════════════════════════════════════════════ */
         .listing-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding-bottom:64px}
         .listing-grid.list-v{grid-template-columns:1fr}
-
         .lcard{background:#fff;border:1px solid #E2E8F0;border-radius:18px;overflow:hidden;cursor:pointer;transition:box-shadow .18s,transform .18s;box-shadow:0 1px 4px rgba(15,23,42,.04)}
         .lcard:hover{box-shadow:0 8px 28px rgba(15,23,42,.10);transform:translateY(-2px)}
         .lcard.list-v{display:flex;flex-direction:row}
@@ -568,7 +492,7 @@ export default function SeekerMarketplace() {
         .lcard-img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s}
         .lcard:hover .lcard-img{transform:scale(1.04)}
         .lcard-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:44px;background:linear-gradient(135deg,#E2E8F0,#CBD5E1)}
-        .lcard-save{position:absolute;top:9px;right:9px;width:30px;height:30px;border-radius:99px;background:rgba(255,255,255,.92);border:none;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.1);transition:transform .15s}
+        .lcard-save{position:absolute;top:9px;right:9px;width:30px;height:30px;border-radius:99px;background:rgba(255,255,255,.92);border:none;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.1);transition:transform .15s;z-index:2}
         .lcard-save:hover{transform:scale(1.12)}
         .lcard-avail{position:absolute;bottom:9px;right:9px;font-size:10px;font-weight:700;border-radius:99px;padding:2px 8px;background:rgba(16,185,129,.9);color:#fff}
         .lcard-photo-ct{position:absolute;bottom:9px;left:9px;background:rgba(15,23,42,.55);color:#fff;font-size:10px;font-weight:700;border-radius:99px;padding:2px 7px}
@@ -591,78 +515,14 @@ export default function SeekerMarketplace() {
         .lcard-contact{padding:5px 12px;border-radius:8px;border:none;background:#0F172A;color:#fff;font-size:11.5px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:background .15s;white-space:nowrap;flex-shrink:0}
         .lcard-contact:hover{background:#1E293B}
 
-        /* ── SKELETON ── */
         @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
         .skel{background:linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:8px}
-
-        /* ── EMPTY ── */
         .empty{text-align:center;padding:80px 20px;background:#fff;border:1px solid #E2E8F0;border-radius:18px;grid-column:1/-1}
         .empty-ico{font-size:52px;margin-bottom:14px}
         .empty-title{font-size:17px;font-weight:700;color:#475569;margin-bottom:6px}
         .empty-sub{font-size:13.5px;color:#94A3B8;margin-bottom:20px;line-height:1.6}
         .empty-btn{padding:9px 22px;border-radius:10px;border:none;background:#0F172A;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
 
-        /* ══ DETAIL MODAL ═════════════════════════════════════════════════════ */
-        .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(5px)}
-        .modal-bg.open{display:flex}
-        .modal{background:#fff;border-radius:24px;width:100%;max-width:740px;max-height:92vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.25);display:flex;flex-direction:column}
-        .modal::-webkit-scrollbar{width:4px}.modal::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:99px}
-        .modal-gal{position:relative;height:285px;background:#0F172A;overflow:hidden;border-radius:24px 24px 0 0;flex-shrink:0}
-        .mg-img{width:100%;height:100%;object-fit:cover}
-        .mg-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:72px;opacity:.18}
-        .mg-nav{position:absolute;top:50%;transform:translateY(-50%);width:100%;display:flex;justify-content:space-between;padding:0 12px;pointer-events:none}
-        .mg-btn{width:36px;height:36px;border-radius:99px;background:rgba(255,255,255,.88);border:none;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;pointer-events:all;box-shadow:0 2px 10px rgba(0,0,0,.15);transition:all .15s}
-        .mg-btn:hover{background:#fff;transform:scale(1.06)}
-        .mg-dots{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:5px}
-        .mg-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.4);cursor:pointer;transition:all .2s}
-        .mg-dot.active{background:#fff;width:18px;border-radius:99px}
-        .modal-close{position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:99px;background:rgba(15,23,42,.65);border:none;color:#fff;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-        .modal-heart{position:absolute;top:12px;left:12px;width:34px;height:34px;border-radius:99px;background:rgba(255,255,255,.88);border:none;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-        .modal-body{padding:26px 28px;flex:1}
-        .modal-hd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;gap:12px}
-        .modal-title-col{flex:1;min-width:0}
-        .modal-ptype{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#94A3B8;margin-bottom:4px}
-        .modal-title{font-family:'Fraunces',serif;font-size:clamp(18px,3vw,24px);font-weight:400;color:#0F172A;line-height:1.25;margin-bottom:5px}
-        .modal-city{font-size:13.5px;color:#64748B;display:flex;align-items:center;gap:5px}
-        .modal-price-col{text-align:right;flex-shrink:0}
-        .modal-price{font-family:'Fraunces',serif;font-size:clamp(20px,3vw,28px);font-weight:700;color:#0F172A}
-        .modal-price span{font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:400;color:#94A3B8}
-        .modal-avail{font-size:12px;color:#16A34A;font-weight:600;margin-top:3px}
-        .modal-facts{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
-        .modal-fact{display:flex;align-items:center;gap:6px;padding:8px 13px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;font-size:13px;color:#374151;font-weight:500}
-        .modal-fact strong{color:#0F172A;font-weight:700}
-        .modal-sec-lbl{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#94A3B8;margin-bottom:9px}
-        .modal-desc{font-size:14.5px;color:#374151;line-height:1.75;margin-bottom:18px}
-        .modal-tags{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:4px}
-        .modal-tag{font-size:12.5px;color:#7C3AED;background:rgba(124,58,237,.07);border:1.5px solid rgba(124,58,237,.16);border-radius:99px;padding:4px 13px;font-weight:600}
-        .modal-ft{padding:16px 28px;border-top:1px solid #F1F5F9;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-        .modal-ll{display:flex;align-items:center;gap:11px;flex:1;min-width:0}
-        .modal-ll-av{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:700;flex-shrink:0}
-        .modal-ll-name{font-size:13.5px;font-weight:700;color:#0F172A}
-        .modal-ll-lbl{font-size:11.5px;color:#94A3B8;margin-top:2px}
-        .modal-contact-btn{padding:12px 24px;border-radius:12px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 2px 12px rgba(37,99,235,.3);white-space:nowrap;flex-shrink:0;transition:all .18s}
-        .modal-contact-btn:hover{transform:translateY(-1px)}
-        .modal-save-btn{padding:12px 16px;border-radius:12px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;flex-shrink:0;transition:all .15s;display:flex;align-items:center;gap:6px}
-        .modal-save-btn.saved{border-color:#FECDD3;background:#FFF1F2;color:#E11D48}
-
-        /* ══ AUTH GATE ════════════════════════════════════════════════════════ */
-        .ag-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:700;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(6px)}
-        .ag-bg.open{display:flex}
-        .ag-box{background:#fff;border-radius:24px;width:100%;max-width:380px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.2)}
-        .ag-hd{background:linear-gradient(135deg,#0F172A,#1E3A5F);padding:32px 28px 24px;text-align:center;position:relative}
-        .ag-ico{font-size:40px;margin-bottom:12px}
-        .ag-title{font-family:'Fraunces',serif;font-size:22px;font-weight:400;color:#F8FAFC;margin-bottom:6px}
-        .ag-sub{font-size:13px;color:rgba(255,255,255,.48);line-height:1.6}
-        .ag-close{position:absolute;top:12px;right:12px;width:30px;height:30px;border-radius:99px;background:rgba(255,255,255,.1);border:none;color:rgba(255,255,255,.6);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-        .ag-body{padding:24px 26px}
-        .ag-btn{width:100%;padding:13px;border-radius:12px;border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .18s;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
-        .ag-btn-p{background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;box-shadow:0 2px 14px rgba(37,99,235,.35)}
-        .ag-btn-p:hover{transform:translateY(-1px)}
-        .ag-btn-o{background:#fff;color:#374151;border:1.5px solid #E2E8F0}
-        .ag-btn-o:hover{background:#F8FAFC}
-        .ag-or{text-align:center;font-size:12px;color:#94A3B8;margin:4px 0 12px}
-
-        /* ══ LIST-PROPERTY MODAL (seeker → landlord/agent choice) ════════════ */
         .list-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:700;align-items:flex-end;justify-content:center;backdrop-filter:blur(6px)}
         .list-modal-bg.open{display:flex}
         .list-modal{background:#fff;border-radius:24px 24px 0 0;width:100%;max-width:520px;padding:28px 28px 40px;box-shadow:0 -8px 40px rgba(0,0,0,.18);animation:slideUp .3s ease}
@@ -679,7 +539,6 @@ export default function SeekerMarketplace() {
         .lm-cancel{width:100%;padding:12px;border-radius:12px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:14px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:background .15s}
         .lm-cancel:hover{background:#F8FAFC}
 
-        /* ══ FOOTER ══════════════════════════════════════════════════════════ */
         .footer{background:#0F172A;border-top:1px solid #E2E8F0;padding:48px 0 24px}
         .footer-inner{max-width:1320px;margin:0 auto;padding:0 24px}
         .footer-top{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:36px;margin-bottom:36px}
@@ -696,22 +555,17 @@ export default function SeekerMarketplace() {
         .footer-legal a{font-size:13px;color:#94A3B8;text-decoration:none}
         .footer-legal a:hover{color:#374151}
 
-        /* ══ RESPONSIVE ═══════════════════════════════════════════════════════ */
-        /* ≤ 1200px */
         @media(max-width:1200px){
           .listing-grid{grid-template-columns:repeat(3,1fr)}
           .city-grid{grid-template-columns:repeat(3,1fr)}
         }
-        /* ≤ 960px */
         @media(max-width:960px){
           .listing-grid{grid-template-columns:repeat(2,1fr)}
           .city-grid{grid-template-columns:repeat(2,1fr)}
           .trust{grid-template-columns:1fr;padding:36px}
           .trust-cards{display:none}
           .footer-top{grid-template-columns:1fr 1fr;gap:24px}
-          .hero-preview-card{display:none}
         }
-        /* ≤ 768px */
         @media(max-width:768px){
           .hamburger{display:block}
           .nav-link,.nav-list-btn{display:none}
@@ -720,7 +574,7 @@ export default function SeekerMarketplace() {
           .hero-title{font-size:clamp(42px,8vw,44px)}
           .hero-search{flex-wrap:wrap;padding:8px;border-radius:16px;gap:6px}
           .hs-sep{display:none}
-          .hs-select{max-width:none;flex:1;max-width:100px;font-size:12.5px}
+          .hs-select{max-width:100px;font-size:12.5px}
           .hs-btn{width:96%;padding:12px}
           .hstat{padding:8px 16px}
           .hero-stats-inner{justify-content:flex-start}
@@ -728,17 +582,12 @@ export default function SeekerMarketplace() {
           .listing-grid{grid-template-columns:repeat(2,1fr)}
           .lcard.list-v{flex-direction:column}
           .lcard.list-v .lcard-banner{width:100%;min-height:160px}
-          .modal{border-radius:20px 20px 0 0;position:fixed;bottom:0;left:0;right:0;max-height:94vh;max-width:100%;margin:0}
-          .modal-gal{border-radius:20px 20px 0 0;height:220px}
-          .modal-body{padding:18px 18px}
-          .modal-ft{padding:14px 18px}
           .fp-grid{grid-template-columns:1fr 1fr}
           .page{padding:0 14px}
           .cat-inner{padding:0 14px}
           .tag-row-inner{padding:10px 14px}
           .lm-options{grid-template-columns:1fr 1fr}
         }
-        /* ≤ 520px */
         @media(max-width:520px){
           .listing-grid{grid-template-columns:1fr}
           .city-grid{grid-template-columns:repeat(2,1fr)}
@@ -749,8 +598,6 @@ export default function SeekerMarketplace() {
           .trust{padding:24px 20px;border-radius:18px}
           .trust-btns{flex-direction:column}
           .trust-btn-p,.trust-btn-s{text-align:center}
-          .modal-hd{flex-direction:column;gap:8px}
-          .modal-price-col{text-align:left}
           .hstat-num{font-size:18px}
           .lm-options{grid-template-columns:1fr}
           .hero-hints{display:none}
@@ -759,109 +606,11 @@ export default function SeekerMarketplace() {
           .nav-inner{padding:0 14px}
           .hero-stats-inner{padding:10px 12px}
           .hero-search{max-width:100%}
-          .footer-bottom{border-top:1px solid #94A3B8;padding-top:20px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px}
+          .footer-bottom{justify-content:center}
         }
       `}</style>
 
-      {/* ══ DETAIL MODAL ══ */}
-      <div className={`modal-bg${detail ? ' open' : ''}`} onClick={() => setDetail(null)}>
-        {detail && (
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-gal">
-              {detail.photos.length > 0
-                ? <img className="mg-img" src={detail.photos[detailPhoto]} alt={detail.title} />
-                : <div className="mg-ph">🏠</div>
-              }
-              {detail.photos.length > 1 && (
-                <>
-                  <div className="mg-nav">
-                    <button className="mg-btn" onClick={() => setDetailPhoto(p => (p - 1 + detail.photos.length) % detail.photos.length)}>‹</button>
-                    <button className="mg-btn" onClick={() => setDetailPhoto(p => (p + 1) % detail.photos.length)}>›</button>
-                  </div>
-                  <div className="mg-dots">
-                    {detail.photos.map((_, i) => <div key={i} className={`mg-dot${i === detailPhoto ? ' active' : ''}`} onClick={() => setDetailPhoto(i)} />)}
-                  </div>
-                </>
-              )}
-              <button className="modal-close" onClick={() => setDetail(null)}>✕</button>
-              <button className="modal-heart" onClick={e => toggleSave(detail.id, e)}>
-                {savedIds.has(detail.id) ? '❤️' : '🤍'}
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="modal-hd">
-                <div className="modal-title-col">
-                  <div className="modal-ptype">{detail.property_type}</div>
-                  <div className="modal-title">{detail.title}</div>
-                  <div className="modal-city">📍 {detail.city || 'Location not specified'}</div>
-                </div>
-                <div className="modal-price-col">
-                  <div className="modal-price">{fmtMoney(detail.rent_amount)}<span>/mo</span></div>
-                  {detail.available_from && (
-                    <div className="modal-avail">
-                      {isAvailableSoon(detail.available_from) ? '🟢 Available soon' : `📅 From ${fmtDate(detail.available_from)}`}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="modal-facts">
-                {detail.bedrooms > 0 && <div className="modal-fact">🛏 <strong>{detail.bedrooms}</strong> Beds</div>}
-                <div className="modal-fact">🚿 <strong>{detail.bathrooms}</strong> Baths</div>
-                {detail.area_sqft && <div className="modal-fact">📐 <strong>{detail.area_sqft.toLocaleString()}</strong> sqft</div>}
-                <div className="modal-fact">🏘️ <strong>{detail.property_type}</strong></div>
-              </div>
-              {detail.description && (
-                <><div className="modal-sec-lbl">About this property</div>
-                  <div className="modal-desc">{detail.description}</div></>
-              )}
-              {detail.tags?.length > 0 && (
-                <><div className="modal-sec-lbl">Features & Amenities</div>
-                  <div className="modal-tags">{detail.tags.map(t => <span key={t} className="modal-tag">{t}</span>)}</div></>
-              )}
-            </div>
-            <div className="modal-ft">
-              <div className="modal-ll">
-                <div className="modal-ll-av" style={{ background: AVATAR_GRADIENTS[detail.landlord_id.charCodeAt(0) % AVATAR_GRADIENTS.length] }}>
-                  {detail.landlord_initials}
-                </div>
-                <div>
-                  <div className="modal-ll-name">{detail.landlord_name}</div>
-                  <div className="modal-ll-lbl">Property Owner</div>
-                </div>
-              </div>
-              <button className={`modal-save-btn${savedIds.has(detail.id) ? ' saved' : ''}`} onClick={e => toggleSave(detail.id, e)}>
-                {savedIds.has(detail.id) ? '❤️ Saved' : '🤍 Save'}
-              </button>
-              <button className="modal-contact-btn" onClick={e => contactLandlord(detail.landlord_id, e)}>
-                💬 Contact Landlord
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ══ AUTH GATE MODAL ══ */}
-      <div className={`ag-bg${authGateOpen ? ' open' : ''}`} onClick={() => setAuthGateOpen(false)}>
-        <div className="ag-box" onClick={e => e.stopPropagation()}>
-          <div className="ag-hd">
-            <button className="ag-close" onClick={() => setAuthGateOpen(false)}>✕</button>
-            <div className="ag-ico">{authGateAction === 'save' ? '❤️' : '💬'}</div>
-            <div className="ag-title">{authGateAction === 'save' ? 'Save this listing' : 'Contact landlord'}</div>
-            <div className="ag-sub">
-              {authGateAction === 'save'
-                ? 'Create a free account to save and compare listings.'
-                : 'Sign up to message landlords and arrange viewings.'}
-            </div>
-          </div>
-          <div className="ag-body">
-            <a href="/signup" className="ag-btn ag-btn-p">✨ Create free account</a>
-            <div className="ag-or">or</div>
-            <a href="/login" className="ag-btn ag-btn-o">Sign in to existing account</a>
-          </div>
-        </div>
-      </div>
-
-      {/* ══ LIST PROPERTY MODAL (seeker role) — Fix 4 ══ */}
+      {/* ══ LIST PROPERTY MODAL ══ */}
       <div className={`list-modal-bg${listModalOpen ? ' open' : ''}`} onClick={() => setListModalOpen(false)}>
         <div className="list-modal" onClick={e => e.stopPropagation()}>
           <div className="lm-drag" />
@@ -894,7 +643,11 @@ export default function SeekerMarketplace() {
           <a href="/seeker/listings" className="mm-link">📋 All Listings</a>
           <a href="/seeker/map" className="mm-link">🗺️ Map View</a>
           <div className="mm-div" />
-          <button className="mm-link" style={{ background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', width: '100%', fontFamily: 'inherit', fontWeight: 600, color: '#374151', padding: '11px 14px', borderRadius: 10, fontSize: 15 }} onClick={(e) => { setMobileMenuOpen(false); handleListProperty(e as any) }}>
+          <button
+            className="mm-link"
+            style={{ background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', width: '100%', fontFamily: 'inherit', fontWeight: 600, color: '#374151', padding: '11px 14px', borderRadius: 10, fontSize: 15 }}
+            onClick={(e) => { setMobileMenuOpen(false); handleListProperty(e as any) }}
+          >
             🏡 List Your Property
           </button>
           <div className="mm-div" />
@@ -915,8 +668,6 @@ export default function SeekerMarketplace() {
             </div>
             <span className="nav-logo-name">Rentura</span>
           </a>
-
-          {/* Scrolled search — hidden on transparent hero */}
           <div className="nav-search-wrap">
             <span className="nav-s-ico">🔍</span>
             <input
@@ -927,19 +678,14 @@ export default function SeekerMarketplace() {
               onKeyDown={e => e.key === 'Enter' && scrollToBrowse()}
             />
           </div>
-
           <div className="nav-spacer" />
-
           <div className="nav-actions">
             <a href="/seeker" className="nav-link">Home</a>
             <a href="/seeker/listings" className="nav-link">Listings</a>
             <a href="/seeker/map" className="nav-link">Map</a>
-            {/* Fix 4 — smart List Your Property */}
-            <button className="nav-list-btn" onClick={handleListProperty}>
-              List Your Property
-            </button>
+            <button className="nav-list-btn" onClick={handleListProperty}>List Your Property</button>
             {userId
-              ? <a href="/seeker" className="nav-avatar">{userInitials}</a>
+              ? <a href="/seeker/profile" className="nav-avatar">{userInitials}</a>
               : <a href="/login" className="nav-signin">Sign In</a>
             }
             <button className="hamburger" onClick={() => setMobileMenuOpen(true)}>☰</button>
@@ -956,24 +702,6 @@ export default function SeekerMarketplace() {
           <div className="hero-orb hero-orb-3" />
         </div>
         <div className="hero-grid" />
-
-        {/* Fix 3 — floating property preview cards */}
-        {/* {HERO_PREVIEW_CARDS.map((card, i) => (
-          <div
-            key={i}
-            className="hero-preview-card"
-            style={{ top: card.top, right: card.right, left: card.left, animationDelay: card.delay }}
-          >
-            <div className="hpc-top">
-              <span className="hpc-emoji">{card.emoji}</span>
-              <span className="hpc-type">{card.type}</span>
-            </div>
-            <div className="hpc-price">{card.price}<span style={{ fontSize: 11, fontFamily: "'Plus Jakarta Sans',sans-serif", fontWeight: 400, color: 'rgba(255,255,255,.45)' }}>/mo</span></div>
-            <div className="hpc-meta">📍 {card.city} · {card.beds} bed</div>
-            <span className="hpc-tag">{card.tag}</span>
-          </div>
-        ))} */}
-
         <div className="hero-content">
           <div className="hero-eyebrow">
             🏡 {loading ? '…' : `${stats.total} verified listing${stats.total !== 1 ? 's' : ''}`}
@@ -985,8 +713,6 @@ export default function SeekerMarketplace() {
           <p className="hero-sub">
             Browse verified rentals from trusted landlords, no signup required.
           </p>
-
-          {/* Fix 2 — wider, more prominent search */}
           <div className="hero-search">
             <div className="hs-input-wrap">
               <span className="hs-ico">🔍</span>
@@ -1008,7 +734,6 @@ export default function SeekerMarketplace() {
             </select>
             <button className="hs-btn" onClick={scrollToBrowse}>Search →</button>
           </div>
-
           <div className="hero-hints">
             <span className="hero-hint">Popular:</span>
             {['Furnished', 'Pet Friendly', 'Near City', 'Parking'].map(tag => (
@@ -1023,8 +748,6 @@ export default function SeekerMarketplace() {
             ))}
           </div>
         </div>
-
-        {/* Fix 5 — min rent instead of avg */}
         <div className="hero-stats">
           <div className="hero-stats-inner">
             <div className="hstat">
@@ -1058,7 +781,6 @@ export default function SeekerMarketplace() {
       {/* ══ CATEGORY BAR ══ */}
       <div className="cat-bar">
         <div className="cat-inner">
-
           <button
             className={`cat-filter-btn${hasActiveFilters ? ' active' : ''}`}
             onClick={() => setFilterOpen(v => !v)}
@@ -1066,7 +788,6 @@ export default function SeekerMarketplace() {
             ⚡ Filters {hasActiveFilters && <span className="flt-dot" />}
           </button>
           <div className="cat-sep" />
-
           {PROPERTY_TYPES.map(type => (
             <button
               key={type}
@@ -1076,9 +797,7 @@ export default function SeekerMarketplace() {
               {CATEGORY_ICONS[type]} {type}
             </button>
           ))}
-
         </div>
-
         {filterOpen && (
           <div className="filter-panel">
             <div className="fp-inner">
@@ -1092,28 +811,11 @@ export default function SeekerMarketplace() {
                 </div>
                 <div className="fp-field">
                   <label className="fp-label">Min Price</label>
-                  <input
-                    className="fp-input"
-                    type="number"
-                    placeholder="0"
-                    min="0"
-                    value={priceMin}
-                    onKeyDown={blockInvalidChar} // This blocks the physical key press
-                    onChange={e => setPriceMin(e.target.value)}
-                  />
+                  <input className="fp-input" type="number" placeholder="0" min="0" value={priceMin} onKeyDown={blockInvalidChar} onChange={e => setPriceMin(e.target.value)} />
                 </div>
-
                 <div className="fp-field">
                   <label className="fp-label">Max Price</label>
-                  <input
-                    className="fp-input"
-                    type="number"
-                    placeholder="Any"
-                    min="0"
-                    value={priceMax}
-                    onKeyDown={blockInvalidChar} // Apply it here too
-                    onChange={e => setPriceMax(e.target.value)}
-                  />
+                  <input className="fp-input" type="number" placeholder="Any" min="0" value={priceMax} onKeyDown={blockInvalidChar} onChange={e => setPriceMax(e.target.value)} />
                 </div>
                 <div className="fp-field">
                   <label className="fp-label">Bedrooms</label>
@@ -1123,9 +825,7 @@ export default function SeekerMarketplace() {
                 </div>
               </div>
               <div className="fp-actions">
-                <button className="fp-clear" onClick={() => { setSelectedCity(''); setPriceMin(''); setPriceMax(''); setBedrooms('Any'); setSelectedTags([]); setSelectedType('All') }}>
-                  Clear All
-                </button>
+                <button className="fp-clear" onClick={() => { setSelectedCity(''); setPriceMin(''); setPriceMax(''); setBedrooms('Any'); setSelectedTags([]); setSelectedType('All') }}>Clear All</button>
                 <button className="fp-apply" onClick={() => setFilterOpen(false)}>Apply</button>
               </div>
             </div>
@@ -1147,20 +847,19 @@ export default function SeekerMarketplace() {
         </div>
       </div>
 
-      {/* ══ MAIN CONTENT ══ */}
-
-      {/* ── FEATURED (Fix 6: interest-based) ── */}
+      {/* ══ FEATURED ══ */}
       {!loading && featuredListings.length > 0 && showSections && (
         <div className="page">
           <div className="section">
             <div className="sec-hd">
               <div>
-                {userId && userInterests.tags.length > 0 ? (
-                  <div className="feat-label personalised">✨ Recommended for you</div>
-                ) : (
-                  <div className="feat-label">🆕 Recently listed</div>
-                )}
-                <div className="sec-title">{userId && userInterests.tags.length > 0 ? <>Based on your <em>interests</em></> : <><em>Featured</em> listings</>}</div>
+                {userId && userInterests.tags.length > 0
+                  ? <div className="feat-label personalised">✨ Recommended for you</div>
+                  : <div className="feat-label">🆕 Recently listed</div>
+                }
+                <div className="sec-title">
+                  {userId && userInterests.tags.length > 0 ? <>Based on your <em>interests</em></> : <><em>Featured</em> listings</>}
+                </div>
                 <div className="sec-sub">
                   {userId && userInterests.tags.length > 0
                     ? `Matched to: ${userInterests.tags.slice(0, 2).join(', ')}${userInterests.cities.length > 0 ? `, ${userInterests.cities[0]}` : ''}`
@@ -1172,7 +871,7 @@ export default function SeekerMarketplace() {
             </div>
             <div className="feat-strip">
               {featuredListings.map(l => (
-                <div key={l.id} className="fcard" onClick={() => { setDetail(l); setDetailPhoto(0) }}>
+                <div key={l.id} className="fcard" onClick={() => goToListing(l.id)}>
                   <div className="fcard-img">
                     {l.photos.length > 0
                       ? <img src={l.photos[0]} alt={l.title} loading="lazy" />
@@ -1201,7 +900,7 @@ export default function SeekerMarketplace() {
         </div>
       )}
 
-      {/* ── BROWSE BY CITY ── */}
+      {/* ══ BROWSE BY CITY ══ */}
       {!loading && cityCards.length > 0 && showSections && (
         <div className="page">
           <div className="section">
@@ -1227,7 +926,7 @@ export default function SeekerMarketplace() {
         </div>
       )}
 
-      {/* ── AVAILABLE SOON ── */}
+      {/* ══ AVAILABLE SOON ══ */}
       {!loading && availableListings.length > 0 && showSections && (
         <div className="page">
           <div className="section">
@@ -1239,7 +938,7 @@ export default function SeekerMarketplace() {
             </div>
             <div className="feat-strip">
               {availableListings.map(l => (
-                <div key={l.id} className="fcard" onClick={() => { setDetail(l); setDetailPhoto(0) }}>
+                <div key={l.id} className="fcard" onClick={() => goToListing(l.id)}>
                   <div className="fcard-img">
                     {l.photos.length > 0
                       ? <img src={l.photos[0]} alt={l.title} loading="lazy" />
@@ -1265,7 +964,7 @@ export default function SeekerMarketplace() {
         </div>
       )}
 
-      {/* ── TRUST BANNER ── */}
+      {/* ══ TRUST BANNER ══ */}
       {showSections && (
         <div className="page">
           <div className="trust">
@@ -1349,7 +1048,7 @@ export default function SeekerMarketplace() {
             <div
               key={l.id}
               className={`lcard${view === 'list' ? ' list-v' : ''}`}
-              onClick={() => { setDetail(l); setDetailPhoto(0) }}
+              onClick={() => goToListing(l.id)}
             >
               <div className="lcard-banner">
                 {l.photos.length > 0
@@ -1408,7 +1107,6 @@ export default function SeekerMarketplace() {
                 </div>
                 <span className="footer-logo-name">Rentura</span>
               </div>
-
               <p className="footer-tagline">The smarter way to find and list rental homes in Sri Lanka.</p>
             </div>
             <div>
@@ -1419,7 +1117,6 @@ export default function SeekerMarketplace() {
             </div>
             <div>
               <div className="footer-col-title">Landlords</div>
-              {/* <button style={{ all: 'unset', display: 'block', fontSize: '13.5px', color: '#64748B', cursor: 'pointer', marginBottom: 9, fontFamily: 'inherit', transition: 'color .15s' }} onClick={handleListProperty}>List Your Property</button> */}
               <a href="/landlord" onClick={handleListProperty} className="footer-link">List Your Property</a>
               <a href="/landlord" className="footer-link">Landlord Dashboard</a>
               <a href="/onboarding" className="footer-link">Get Started</a>

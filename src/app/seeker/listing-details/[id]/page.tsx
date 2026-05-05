@@ -123,6 +123,8 @@ function daysSinceListed(s: string) {
   return `${d} days ago`
 }
 
+
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function ListingDetailPage() {
   const router = useRouter()
@@ -179,7 +181,7 @@ export default function ListingDetailPage() {
 
   // Auth
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       try {
         const sb = createClient()
         const { data: { user } } = await sb.auth.getUser()
@@ -202,60 +204,68 @@ export default function ListingDetailPage() {
   // Load listing
   useEffect(() => {
     if (!listingId) return
-    ;(async () => {
-      setLoading(true)
-      try {
-        const sb = createClient()
-        const { data: row, error } = await sb
-          .from('listings')
-          .select('id,title,description,landlord_id,bedrooms,bathrooms,rent_amount,deposit_amount,currency,available_from,min_lease_months,photos,tags,city,address,property_type,area_sqft,lat,lng,created_at')
-          .eq('id', listingId)
-          .single()
+      ; (async () => {
+        setLoading(true)
+        try {
+          const sb = createClient()
 
-        if (error || !row) { setNotFound(true); setLoading(false); return }
+          console.log('=== DEBUG ===')
+          console.log('listingId:', listingId)
+          console.log('supabase url:', process.env.NEXT_PUBLIC_SUPABASE_URL)
 
-        // Landlord profile
-        const { data: profile } = await sb
-          .from('profiles')
-          .select('full_name,bio,created_at')
-          .eq('id', row.landlord_id)
-          .single()
+          const { data: row, error } = await sb
+            .from('listings')
+            .select('id,title,description,landlord_id,bedrooms,bathrooms,rent_amount,deposit_amount,currency,available_from,min_lease_months,photos,tags,city,address,property_type,area_sqft,lat,lng,created_at')
+            .eq('id', listingId)
+            .maybeSingle()
 
-        // Count landlord's other listings
-        const { count } = await sb
-          .from('listings')
-          .select('id', { count: 'exact', head: true })
-          .eq('landlord_id', row.landlord_id)
-          .eq('status', 'active')
+          console.log('row:', row)
+          console.log('error:', error)
 
-        const lName = profile?.full_name || 'Landlord'
-        setListing({
-          ...row,
-          landlord_name: lName,
-          landlord_initials: initials(lName),
-          landlord_bio: profile?.bio || 'Verified landlord on Rentura.',
-          landlord_joined: profile?.created_at || '',
-          landlord_listings_count: count || 1,
-          deposit_amount: row.deposit_amount || null,
-          min_lease_months: row.min_lease_months || null,
-          address: row.address || row.city || '',
-          lat: row.lat || null,
-          lng: row.lng || null,
-        })
+          if (!row) { setNotFound(true); setLoading(false); return }
 
-        // Similar listings
-        const { data: simRows } = await sb
-          .from('listings')
-          .select('id,title,city,rent_amount,bedrooms,bathrooms,photos,property_type')
-          .eq('status', 'active')
-          .eq('city', row.city)
-          .neq('id', listingId)
-          .limit(6)
-        setSimilar((simRows || []) as SimilarListing[])
+          // Landlord profile
+          const { data: profile } = await sb
+            .from('profiles')
+            .select('full_name,bio,created_at')
+            .eq('id', row.landlord_id)
+            .single()
 
-      } catch (e) { console.error(e); setNotFound(true) }
-      finally { setLoading(false) }
-    })()
+          // Count landlord's other listings
+          const { count } = await sb
+            .from('listings')
+            .select('id', { count: 'exact', head: true })
+            .eq('landlord_id', row.landlord_id)
+            .eq('status', 'active')
+
+          const lName = profile?.full_name || 'Landlord'
+          setListing({
+            ...row,
+            landlord_name: lName,
+            landlord_initials: initials(lName),
+            landlord_bio: profile?.bio || 'Verified landlord on Rentura.',
+            landlord_joined: profile?.created_at || '',
+            landlord_listings_count: count || 1,
+            deposit_amount: row.deposit_amount || null,
+            min_lease_months: row.min_lease_months || null,
+            address: row.address || row.city || '',
+            lat: row.lat || null,
+            lng: row.lng || null,
+          })
+
+          // Similar listings
+          const { data: simRows } = await sb
+            .from('listings')
+            .select('id,title,city,rent_amount,bedrooms,bathrooms,photos,property_type')
+            .eq('status', 'active')
+            .eq('city', row.city)
+            .neq('id', listingId)
+            .limit(6)
+          setSimilar((simRows || []) as SimilarListing[])
+
+        } catch (e) { console.error(e); setNotFound(true) }
+        finally { setLoading(false) }
+      })()
   }, [listingId])
 
   async function toggleSave() {
@@ -955,9 +965,9 @@ export default function ListingDetailPage() {
       <main className="page">
         {/* Back + share */}
         <div className="top-row">
-          <a href="/seeker/listings" className="back-btn">← Back to listings</a>
+          <a href="/seeker" className="back-btn">← Back to listings</a>
           <div className="share-row">
-            <button className="share-btn" onClick={() => navigator.share?.({ title: listing?.title, url: window.location.href }).catch(() => {})}>
+            <button className="share-btn" onClick={() => navigator.share?.({ title: listing?.title, url: window.location.href }).catch(() => { })}>
               🔗 Share
             </button>
             <button
@@ -1027,10 +1037,12 @@ export default function ListingDetailPage() {
                 <div className="skel" style={{ height: 36, width: '65%' }} />
                 <div className="skel" style={{ height: 14, width: '40%', marginBottom: 8 }} />
                 <div style={{ display: 'flex', gap: 10 }}>
-                  {[1,2,3,4].map(i => <div key={i} className="skel" style={{ height: 56, width: 110, borderRadius: 14 }} />)}
+                  {[1, 2, 3, 4].map(i => <div key={i} className="skel" style={{ height: 56, width: 110, borderRadius: 14 }} />)}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-                  {[1,2,3,4,5].map(i => <div key={i} className="skel" style={{ height: 14, width: `${80 + Math.random() * 15}%` }} />)}
+                  {(['85%', '92%', '78%', '88%', '70%']).map((w, i) => (
+                    <div key={i} className="skel" style={{ height: 14, width: w }} />
+                  ))}
                 </div>
               </div>
             ) : listing ? (
@@ -1239,7 +1251,7 @@ export default function ListingDetailPage() {
                     <div className="sec-title"><span className="sec-title-ico">🏘️</span> Similar in {listing.city}</div>
                     <div className="similar-strip">
                       {similar.map(s => (
-                        <a key={s.id} href={`/seeker/listings/${s.id}`} className="scard">
+                        <a key={s.id} href={`/seeker/listing-details/${s.id}`} className="scard">
                           <div className="scard-img">
                             {s.photos.length > 0
                               ? <img src={s.photos[0]} alt={s.title} loading="lazy" />

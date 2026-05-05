@@ -2,19 +2,6 @@
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Rentura — Full Listings Page  /src/app/seeker/listings/page.tsx
-//
-// Features:
-//  • Full-width sticky sidebar filter panel (desktop) / bottom-sheet (mobile)
-//  • Advanced filtering: city, type, bedrooms, bathrooms, price range, area sqft,
-//    availability, amenity tags, sort order
-//  • Grid / List / Map-preview view toggle
-//  • Detailed listing cards with photo galleries, landlord info, tag pills
-//  • Animated skeleton loaders
-//  • Active filter chips with individual clear
-//  • Result count + sort toolbar
-//  • Infinite-scroll-ready pagination
-//  • Fully responsive: desktop sidebar, tablet 2-col, mobile 1-col + drawer
-//  • Matches Rentura brand: Fraunces serif + Plus Jakarta Sans, dark navy palette
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useCallback, useState, useRef } from 'react'
@@ -109,6 +96,179 @@ function sortListings(listings: Listing[], sort: SortKey): Listing[] {
   }
 }
 
+// ── Filter Sidebar Content (shared between desktop & mobile drawer) ────────────
+function FilterContent({
+  search, setSearch,
+  selectedTypes, toggleType,
+  cities, selectedCity, setSelectedCity,
+  priceMin, setPriceMin, priceMax, setPriceMax,
+  bedsMin, setBedsMin,
+  bathsMin, setBathsMin,
+  areaMin, setAreaMin, areaMax, setAreaMax,
+  availableOnly, setAvailableOnly,
+  newOnly, setNewOnly,
+  hasPhotos, setHasPhotos,
+  selectedTags, toggleTag,
+  activeFilterCount, clearAll,
+  setPage,
+  isMobile = false,
+}: {
+  search: string; setSearch: (v: string) => void;
+  selectedTypes: string[]; toggleType: (t: string) => void;
+  cities: string[]; selectedCity: string; setSelectedCity: (v: string) => void;
+  priceMin: string; setPriceMin: (v: string) => void;
+  priceMax: string; setPriceMax: (v: string) => void;
+  bedsMin: string; setBedsMin: (v: string) => void;
+  bathsMin: string; setBathsMin: (v: string) => void;
+  areaMin: string; setAreaMin: (v: string) => void;
+  areaMax: string; setAreaMax: (v: string) => void;
+  availableOnly: boolean; setAvailableOnly: (v: boolean) => void;
+  newOnly: boolean; setNewOnly: (v: boolean) => void;
+  hasPhotos: boolean; setHasPhotos: (v: boolean) => void;
+  selectedTags: string[]; toggleTag: (t: string) => void;
+  activeFilterCount: number; clearAll: () => void;
+  setPage: (v: number) => void;
+  isMobile?: boolean;
+}) {
+  return (
+    <div className="filter-content">
+      {/* Header — only shown on desktop sidebar */}
+      {!isMobile && (
+        <div className="sb-hd">
+          <div className="sb-title">Filters</div>
+          {activeFilterCount > 0 && (
+            <button className="sb-clear-all" onClick={clearAll}>Clear all ({activeFilterCount})</button>
+          )}
+        </div>
+      )}
+
+      {/* Search */}
+      <div className="sb-section">
+        <div className="sb-sec-label">Keyword</div>
+        <div className="sb-search-wrap">
+          <span className="sb-s-ico">🔍</span>
+          <input
+            className="sb-s-input"
+            placeholder="Title, city, keyword…"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1) }}
+          />
+          {search && <button className="sb-s-clear" onClick={() => { setSearch(''); setPage(1) }}>✕</button>}
+        </div>
+      </div>
+
+      {/* Property type */}
+      <div className="sb-section">
+        <div className="sb-sec-label">Property type</div>
+        <div className="sb-type-grid">
+          {PROPERTY_TYPES.map(type => (
+            <button
+              key={type}
+              className={`sb-type-btn${selectedTypes.includes(type) ? ' active' : ''}`}
+              onClick={() => toggleType(type)}
+            >
+              <span>{TYPE_ICONS[type]}</span>
+              <span>{type}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* City */}
+      <div className="sb-section">
+        <div className="sb-sec-label">City</div>
+        <select className="sb-select" value={selectedCity} onChange={e => { setSelectedCity(e.target.value); setPage(1) }}>
+          <option value="">All cities</option>
+          {cities.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+
+      {/* Price */}
+      <div className="sb-section">
+        <div className="sb-sec-label">Monthly rent (LKR)</div>
+        <div className="sb-range-row">
+          <input className="sb-input" type="number" placeholder="Min" value={priceMin} onChange={e => { setPriceMin(e.target.value); setPage(1) }} />
+          <span className="sb-range-sep">–</span>
+          <input className="sb-input" type="number" placeholder="Max" value={priceMax} onChange={e => { setPriceMax(e.target.value); setPage(1) }} />
+        </div>
+        <div className="sb-quick-prices">
+          {[['Under 50k', '', '50000'], ['50k–100k', '50000', '100000'], ['100k–200k', '100000', '200000'], ['200k+', '200000', '']].map(([label, min, max]) => (
+            <button
+              key={label}
+              className={`sb-quick-price${priceMin === min && priceMax === max ? ' active' : ''}`}
+              onClick={() => { setPriceMin(min); setPriceMax(max); setPage(1) }}
+            >{label}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Bedrooms */}
+      <div className="sb-section">
+        <div className="sb-sec-label">Minimum bedrooms</div>
+        <div className="sb-option-row">
+          <button className={`sb-opt-btn${bedsMin === '' ? ' active' : ''}`} onClick={() => { setBedsMin(''); setPage(1) }}>Any</button>
+          {BEDROOM_OPTIONS.map(b => (
+            <button key={b} className={`sb-opt-btn${bedsMin === b ? ' active' : ''}`} onClick={() => { setBedsMin(b); setPage(1) }}>{b}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Bathrooms */}
+      <div className="sb-section">
+        <div className="sb-sec-label">Minimum bathrooms</div>
+        <div className="sb-option-row">
+          <button className={`sb-opt-btn${bathsMin === '' ? ' active' : ''}`} onClick={() => { setBathsMin(''); setPage(1) }}>Any</button>
+          {BATHROOM_OPTIONS.map(b => (
+            <button key={b} className={`sb-opt-btn${bathsMin === b ? ' active' : ''}`} onClick={() => { setBathsMin(b); setPage(1) }}>{b}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Area */}
+      <div className="sb-section">
+        <div className="sb-sec-label">Area (sqft)</div>
+        <div className="sb-range-row">
+          <input className="sb-input" type="number" placeholder="Min" value={areaMin} onChange={e => { setAreaMin(e.target.value); setPage(1) }} />
+          <span className="sb-range-sep">–</span>
+          <input className="sb-input" type="number" placeholder="Max" value={areaMax} onChange={e => { setAreaMax(e.target.value); setPage(1) }} />
+        </div>
+      </div>
+
+      {/* Quick toggles */}
+      <div className="sb-section">
+        <div className="sb-sec-label">Quick filters</div>
+        <div className="sb-toggles">
+          {[
+            { label: '🟢 Available soon', val: availableOnly, set: (v: boolean) => { setAvailableOnly(v); setPage(1) } },
+            { label: '🆕 New this week', val: newOnly, set: (v: boolean) => { setNewOnly(v); setPage(1) } },
+            { label: '📷 Has photos', val: hasPhotos, set: (v: boolean) => { setHasPhotos(v); setPage(1) } },
+          ].map(({ label, val, set }) => (
+            <label key={label} className="sb-toggle">
+              <input type="checkbox" checked={val} onChange={e => set(e.target.checked)} />
+              <span className="sb-toggle-track"><span className="sb-toggle-thumb" /></span>
+              <span className="sb-toggle-label">{label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Amenities */}
+      <div className="sb-section">
+        <div className="sb-sec-label">Amenities & features</div>
+        <div className="sb-amenity-grid">
+          {AMENITY_TAGS.map(tag => (
+            <button
+              key={tag}
+              className={`sb-amenity${selectedTags.includes(tag) ? ' active' : ''}`}
+              onClick={() => toggleTag(tag)}
+            >{tag}</button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function ListingsPage() {
   const router = useRouter()
@@ -133,9 +293,7 @@ export default function ListingsPage() {
   const [listModalOpen, setListModalOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  // Detail modal
-  const [detail, setDetail] = useState<Listing | null>(null)
-  const [detailPhoto, setDetailPhoto] = useState(0)
+  // Auth gate
   const [authGateOpen, setAuthGateOpen] = useState(false)
   const [authGateAction, setAuthGateAction] = useState<'save' | 'contact'>('save')
 
@@ -322,6 +480,11 @@ export default function ListingsPage() {
     setListModalOpen(true)
   }
 
+  // Navigate to single listing page on card click
+  function handleCardClick(listingId: string) {
+    router.push(`/seeker/listing-details/${listingId}`)
+  }
+
   // Active chips data
   type Chip = { label: string; onRemove: () => void }
   const activeChips: Chip[] = [
@@ -338,140 +501,21 @@ export default function ListingsPage() {
     ...(hasPhotos ? [{ label: '📷 Has photos', onRemove: () => { setHasPhotos(false); setPage(1) } }] : []),
   ]
 
-  const FilterSidebar = () => (
-    <aside className="sidebar">
-      <div className="sb-hd">
-        <div className="sb-title">Filters</div>
-        {activeFilterCount > 0 && (
-          <button className="sb-clear-all" onClick={clearAll}>Clear all ({activeFilterCount})</button>
-        )}
-      </div>
-
-      {/* Search */}
-      <div className="sb-section">
-        <div className="sb-sec-label">Keyword</div>
-        <div className="sb-search-wrap">
-          <span className="sb-s-ico">🔍</span>
-          <input
-            className="sb-s-input"
-            placeholder="Title, city, keyword…"
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1) }}
-          />
-          {search && <button className="sb-s-clear" onClick={() => { setSearch(''); setPage(1) }}>✕</button>}
-        </div>
-      </div>
-
-      {/* Property type */}
-      <div className="sb-section">
-        <div className="sb-sec-label">Property type</div>
-        <div className="sb-type-grid">
-          {PROPERTY_TYPES.map(type => (
-            <button
-              key={type}
-              className={`sb-type-btn${selectedTypes.includes(type) ? ' active' : ''}`}
-              onClick={() => toggleType(type)}
-            >
-              <span>{TYPE_ICONS[type]}</span>
-              <span>{type}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* City */}
-      <div className="sb-section">
-        <div className="sb-sec-label">City</div>
-        <select className="sb-select" value={selectedCity} onChange={e => { setSelectedCity(e.target.value); setPage(1) }}>
-          <option value="">All cities</option>
-          {cities.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </div>
-
-      {/* Price */}
-      <div className="sb-section">
-        <div className="sb-sec-label">Monthly rent (LKR)</div>
-        <div className="sb-range-row">
-          <input className="sb-input" type="number" placeholder="Min" value={priceMin} onChange={e => { setPriceMin(e.target.value); setPage(1) }} />
-          <span className="sb-range-sep">–</span>
-          <input className="sb-input" type="number" placeholder="Max" value={priceMax} onChange={e => { setPriceMax(e.target.value); setPage(1) }} />
-        </div>
-        <div className="sb-quick-prices">
-          {[['Under 50k', '', '50000'], ['50k–100k', '50000', '100000'], ['100k–200k', '100000', '200000'], ['200k+', '200000', '']].map(([label, min, max]) => (
-            <button
-              key={label}
-              className={`sb-quick-price${priceMin === min && priceMax === max ? ' active' : ''}`}
-              onClick={() => { setPriceMin(min); setPriceMax(max); setPage(1) }}
-            >{label}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* Bedrooms */}
-      <div className="sb-section">
-        <div className="sb-sec-label">Minimum bedrooms</div>
-        <div className="sb-option-row">
-          <button className={`sb-opt-btn${bedsMin === '' ? ' active' : ''}`} onClick={() => { setBedsMin(''); setPage(1) }}>Any</button>
-          {BEDROOM_OPTIONS.map(b => (
-            <button key={b} className={`sb-opt-btn${bedsMin === b ? ' active' : ''}`} onClick={() => { setBedsMin(b); setPage(1) }}>{b}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* Bathrooms */}
-      <div className="sb-section">
-        <div className="sb-sec-label">Minimum bathrooms</div>
-        <div className="sb-option-row">
-          <button className={`sb-opt-btn${bathsMin === '' ? ' active' : ''}`} onClick={() => { setBathsMin(''); setPage(1) }}>Any</button>
-          {BATHROOM_OPTIONS.map(b => (
-            <button key={b} className={`sb-opt-btn${bathsMin === b ? ' active' : ''}`} onClick={() => { setBathsMin(b); setPage(1) }}>{b}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* Area */}
-      <div className="sb-section">
-        <div className="sb-sec-label">Area (sqft)</div>
-        <div className="sb-range-row">
-          <input className="sb-input" type="number" placeholder="Min" value={areaMin} onChange={e => { setAreaMin(e.target.value); setPage(1) }} />
-          <span className="sb-range-sep">–</span>
-          <input className="sb-input" type="number" placeholder="Max" value={areaMax} onChange={e => { setAreaMax(e.target.value); setPage(1) }} />
-        </div>
-      </div>
-
-      {/* Quick toggles */}
-      <div className="sb-section">
-        <div className="sb-sec-label">Quick filters</div>
-        <div className="sb-toggles">
-          {[
-            { label: '🟢 Available soon', val: availableOnly, set: (v: boolean) => { setAvailableOnly(v); setPage(1) } },
-            { label: '🆕 New this week', val: newOnly, set: (v: boolean) => { setNewOnly(v); setPage(1) } },
-            { label: '📷 Has photos', val: hasPhotos, set: (v: boolean) => { setHasPhotos(v); setPage(1) } },
-          ].map(({ label, val, set }) => (
-            <label key={label} className="sb-toggle">
-              <input type="checkbox" checked={val} onChange={e => set(e.target.checked)} />
-              <span className="sb-toggle-track"><span className="sb-toggle-thumb" /></span>
-              <span className="sb-toggle-label">{label}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {/* Amenities */}
-      <div className="sb-section">
-        <div className="sb-sec-label">Amenities & features</div>
-        <div className="sb-amenity-grid">
-          {AMENITY_TAGS.map(tag => (
-            <button
-              key={tag}
-              className={`sb-amenity${selectedTags.includes(tag) ? ' active' : ''}`}
-              onClick={() => toggleTag(tag)}
-            >{tag}</button>
-          ))}
-        </div>
-      </div>
-    </aside>
-  )
+  // Shared filter props
+  const filterProps = {
+    search, setSearch,
+    selectedTypes, toggleType,
+    cities, selectedCity, setSelectedCity,
+    priceMin, setPriceMin, priceMax, setPriceMax,
+    bedsMin, setBedsMin, bathsMin, setBathsMin,
+    areaMin, setAreaMin, areaMax, setAreaMax,
+    availableOnly, setAvailableOnly,
+    newOnly, setNewOnly,
+    hasPhotos, setHasPhotos,
+    selectedTags, toggleTag,
+    activeFilterCount, clearAll,
+    setPage,
+  }
 
   return (
     <>
@@ -515,10 +559,13 @@ export default function ListingsPage() {
         /* ═══ PAGE LAYOUT ═════════════════════════════════════════════════════ */
         .page-layout{display:flex;max-width:1440px;margin:0 auto;padding:88px 24px 48px;gap:0;min-height:100vh;align-items:flex-start}
 
-        /* ═══ SIDEBAR ═════════════════════════════════════════════════════════ */
-        .sidebar{width:292px;flex-shrink:0;background:#fff;border:1px solid #E2E8F0;border-radius:20px;overflow:hidden;position:sticky;top:84px;max-height:calc(100vh - 104px);overflow-y:auto;margin-right:24px;box-shadow:0 2px 12px rgba(15,23,42,.05)}
-        .sidebar::-webkit-scrollbar{width:4px}
-        .sidebar::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:99px}
+        /* ═══ DESKTOP SIDEBAR ═════════════════════════════════════════════════ */
+        .desktop-sidebar{width:292px;flex-shrink:0;background:#fff;border:1px solid #E2E8F0;border-radius:20px;overflow:hidden;position:sticky;top:84px;max-height:calc(100vh - 104px);overflow-y:auto;margin-right:24px;box-shadow:0 2px 12px rgba(15,23,42,.05)}
+        .desktop-sidebar::-webkit-scrollbar{width:4px}
+        .desktop-sidebar::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:99px}
+
+        /* ═══ FILTER CONTENT (shared) ═════════════════════════════════════════ */
+        .filter-content{}
         .sb-hd{display:flex;align-items:center;justify-content:space-between;padding:18px 18px 0;margin-bottom:4px}
         .sb-title{font-family:'Fraunces',serif;font-size:18px;font-weight:600;color:#0F172A}
         .sb-clear-all{font-size:12px;font-weight:700;color:#EF4444;background:none;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;padding:4px 0}
@@ -678,59 +725,6 @@ export default function ListingsPage() {
         .lm-bar{height:3px;background:#E2E8F0;border-radius:99px;margin-top:10px;overflow:hidden}
         .lm-fill{height:100%;background:linear-gradient(90deg,#2563EB,#6366F1);border-radius:99px;transition:width .4s}
 
-        /* ═══ DETAIL MODAL ════════════════════════════════════════════════════ */
-        .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(6px)}
-        .modal-bg.open{display:flex}
-        .modal{background:#fff;border-radius:24px;width:100%;max-width:780px;max-height:92vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.28);display:flex;flex-direction:column}
-        .modal::-webkit-scrollbar{width:4px}
-        .modal::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:99px}
-        .modal-gal{position:relative;height:310px;background:#0F172A;overflow:hidden;border-radius:24px 24px 0 0;flex-shrink:0}
-        .mg-img{width:100%;height:100%;object-fit:cover;display:block}
-        .mg-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:80px;opacity:.15}
-        .mg-nav{position:absolute;top:50%;transform:translateY(-50%);width:100%;display:flex;justify-content:space-between;padding:0 14px;pointer-events:none}
-        .mg-btn{width:38px;height:38px;border-radius:99px;background:rgba(255,255,255,.9);border:none;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;pointer-events:all;box-shadow:0 2px 12px rgba(0,0,0,.15);transition:all .15s}
-        .mg-btn:hover{background:#fff;transform:scale(1.07)}
-        .mg-thumbs{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:5px}
-        .mg-thumb{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.4);cursor:pointer;transition:all .2s}
-        .mg-thumb.active{background:#fff;width:22px;border-radius:99px}
-        .mg-count{position:absolute;bottom:12px;right:14px;font-size:10.5px;font-weight:700;color:rgba(255,255,255,.8);background:rgba(15,23,42,.55);padding:3px 9px;border-radius:99px;backdrop-filter:blur(4px)}
-        .modal-close{position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:99px;background:rgba(15,23,42,.65);border:none;color:#fff;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2}
-        .modal-heart{position:absolute;top:12px;left:12px;width:34px;height:34px;border-radius:99px;background:rgba(255,255,255,.9);border:none;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;transition:transform .15s}
-        .modal-heart:hover{transform:scale(1.12)}
-        .modal-body{padding:28px 30px;flex:1}
-        .modal-hd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;gap:14px}
-        .modal-title-col{flex:1;min-width:0}
-        .modal-ptype-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-        .modal-ptype{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#94A3B8}
-        .modal-title{font-family:'Fraunces',serif;font-size:clamp(20px,3vw,26px);font-weight:400;color:#0F172A;line-height:1.2;margin-bottom:6px}
-        .modal-city{font-size:14px;color:#64748B;display:flex;align-items:center;gap:5px}
-        .modal-price-col{text-align:right;flex-shrink:0}
-        .modal-price{font-family:'Fraunces',serif;font-size:clamp(22px,3vw,30px);font-weight:700;color:#0F172A;line-height:1}
-        .modal-price span{font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:400;color:#94A3B8}
-        .modal-avail-row{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:5px}
-        .modal-avail{font-size:12px;font-weight:600}
-        .modal-avail.green{color:#16A34A}
-        .modal-avail.blue{color:#2563EB}
-        .modal-divider{height:1px;background:#F1F5F9;margin:18px 0}
-        .modal-facts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:20px}
-        .modal-fact{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:12px 14px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px}
-        .modal-fact-ico{font-size:18px}
-        .modal-fact-val{font-size:15px;font-weight:700;color:#0F172A;line-height:1}
-        .modal-fact-lbl{font-size:10.5px;color:#94A3B8;font-weight:500;text-transform:uppercase;letter-spacing:.4px}
-        .modal-sec-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#94A3B8;margin-bottom:10px}
-        .modal-desc{font-size:14.5px;color:#374151;line-height:1.8;margin-bottom:20px}
-        .modal-tags{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:4px}
-        .modal-tag{font-size:12.5px;color:#7C3AED;background:rgba(124,58,237,.07);border:1.5px solid rgba(124,58,237,.16);border-radius:99px;padding:5px 14px;font-weight:600}
-        .modal-ft{padding:18px 30px;border-top:1px solid #F1F5F9;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#FAFAFA;border-radius:0 0 24px 24px;flex-shrink:0}
-        .modal-ll{display:flex;align-items:center;gap:12px;flex:1;min-width:0}
-        .modal-ll-av{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:700;flex-shrink:0}
-        .modal-ll-name{font-size:14px;font-weight:700;color:#0F172A}
-        .modal-ll-lbl{font-size:12px;color:#94A3B8;margin-top:2px}
-        .modal-contact-btn{padding:12px 26px;border-radius:13px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 2px 14px rgba(37,99,235,.3);white-space:nowrap;flex-shrink:0;transition:all .18s}
-        .modal-contact-btn:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(37,99,235,.4)}
-        .modal-save-btn{padding:12px 16px;border-radius:13px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:13.5px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;flex-shrink:0;transition:all .15s;display:flex;align-items:center;gap:6px}
-        .modal-save-btn.saved{border-color:#FECDD3;background:#FFF1F2;color:#E11D48}
-
         /* ═══ AUTH GATE ════════════════════════════════════════════════════════ */
         .ag-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:700;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(6px)}
         .ag-bg.open{display:flex}
@@ -762,27 +756,98 @@ export default function ListingsPage() {
         .lm-opt-desc{font-size:12px;color:#94A3B8;line-height:1.5}
         .lm-cancel{width:100%;padding:12px;border-radius:12px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:14px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:background .15s}
 
-        /* ═══ MOBILE FILTER DRAWER ════════════════════════════════════════════ */
-        .mf-overlay{display:none;position:fixed;inset:0;z-index:800}
-        .mf-overlay.open{display:flex;flex-direction:column;justify-content:flex-end}
-        .mf-bg{position:absolute;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px)}
-        .mf-panel{position:relative;background:#fff;border-radius:24px 24px 0 0;max-height:88vh;overflow-y:auto;padding-bottom:24px;z-index:1;animation:slideUp .3s ease}
+        /* ═══ MOBILE FILTER DRAWER ════════════════════════════════════════════
+             Fixed: overlay covers full screen, panel slides up from bottom,
+             filter content renders directly (no nested sidebar component) */
+        .mf-overlay{
+          visibility:hidden;
+          opacity:0;
+          position:fixed;
+          inset:0;
+          z-index:800;
+          display:flex;
+          flex-direction:column;
+          justify-content:flex-end;
+          transition:opacity .25s ease, visibility .25s ease;
+        }
+        .mf-overlay.open{
+          visibility:visible;
+          opacity:1;
+        }
+        .mf-bg{position:absolute;inset:0;background:rgba(0,0,0,.52);backdrop-filter:blur(4px)}
+        .mf-panel{
+          position:relative;
+          background:#fff;
+          border-radius:24px 24px 0 0;
+          max-height:88vh;
+          overflow-y:auto;
+          z-index:1;
+          transform:translateY(100%);
+          transition:transform .3s cubic-bezier(.32,.72,0,1);
+        }
+        .mf-overlay.open .mf-panel{
+          transform:translateY(0);
+        }
         .mf-panel::-webkit-scrollbar{width:4px}
         .mf-panel::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:99px}
-        .mf-hd{display:flex;align-items:center;justify-content:space-between;padding:20px 20px 0;margin-bottom:4px;position:sticky;top:0;background:#fff;z-index:2;padding-bottom:12px;border-bottom:1px solid #F1F5F9}
+        .mf-hd{
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          padding:20px 20px 14px;
+          position:sticky;
+          top:0;
+          background:#fff;
+          z-index:2;
+          border-bottom:1px solid #F1F5F9;
+        }
         .mf-title{font-family:'Fraunces',serif;font-size:19px;font-weight:600;color:#0F172A}
         .mf-close{background:none;border:none;font-size:20px;cursor:pointer;color:#64748B;padding:4px;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center}
         .mf-close:hover{background:#F1F5F9}
-        .mf-body{padding:0 20px}
-        .mf-footer{position:sticky;bottom:0;background:#fff;padding:16px 20px 0;border-top:1px solid #F1F5F9;display:flex;gap:10px;margin-top:8px}
+        .mf-footer{
+          position:sticky;
+          bottom:0;
+          background:#fff;
+          padding:14px 20px 28px;
+          border-top:1px solid #F1F5F9;
+          display:flex;
+          gap:10px;
+        }
         .mf-apply{flex:1;padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 2px 12px rgba(37,99,235,.3)}
         .mf-clear{padding:13px 20px;border-radius:12px;border:1.5px solid #E2E8F0;background:#fff;color:#EF4444;font-size:14px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
 
-        /* ═══ MOBILE MENU ═════════════════════════════════════════════════════ */
-        .mm-overlay{display:none;position:fixed;inset:0;z-index:1000}
-        .mm-overlay.open{display:flex}
+        /* ═══ MOBILE MENU — slide in from right with smooth animation ═════════ */
+        .mm-overlay{
+          visibility:hidden;
+          opacity:0;
+          position:fixed;
+          inset:0;
+          z-index:1000;
+          transition:opacity .25s ease, visibility .25s ease;
+        }
+        .mm-overlay.open{
+          visibility:visible;
+          opacity:1;
+        }
         .mm-bg{position:absolute;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(4px)}
-        .mm-panel{position:absolute;top:0;right:0;bottom:0;width:min(300px,88vw);background:#fff;padding:24px 20px;display:flex;flex-direction:column;gap:4px;box-shadow:-8px 0 40px rgba(0,0,0,.12)}
+        .mm-panel{
+          position:absolute;
+          top:0;
+          right:0;
+          bottom:0;
+          width:min(300px,88vw);
+          background:#fff;
+          padding:24px 20px;
+          display:flex;
+          flex-direction:column;
+          gap:4px;
+          box-shadow:-8px 0 40px rgba(0,0,0,.12);
+          transform:translateX(100%);
+          transition:transform .32s cubic-bezier(.32,.72,0,1);
+        }
+        .mm-overlay.open .mm-panel{
+          transform:translateX(0);
+        }
         .mm-close{align-self:flex-end;background:none;border:none;font-size:22px;cursor:pointer;color:#64748B;margin-bottom:8px}
         .mm-link{font-size:15px;font-weight:600;color:#374151;padding:11px 14px;border-radius:10px;text-decoration:none;display:block;transition:background .15s}
         .mm-link:hover{background:#F1F5F9}
@@ -796,7 +861,7 @@ export default function ListingsPage() {
           .listing-grid.view-compact{grid-template-columns:repeat(3,1fr)}
         }
         @media(max-width:960px){
-          .sidebar{display:none}
+          .desktop-sidebar{display:none}
           .tb-filter-btn{display:flex}
           .listing-grid{grid-template-columns:repeat(2,1fr)}
           .listing-grid.view-compact{grid-template-columns:repeat(2,1fr)}
@@ -810,12 +875,6 @@ export default function ListingsPage() {
           .page-layout{padding:76px 12px 48px}
           .listing-grid.view-list .lcard{flex-direction:column}
           .listing-grid.view-list .lcard .lcard-banner{width:100%;min-height:180px}
-          .modal{border-radius:20px 20px 0 0;position:fixed;bottom:0;left:0;right:0;max-height:94vh;max-width:100%;margin:0}
-          .modal-gal{border-radius:20px 20px 0 0;height:220px}
-          .modal-body{padding:18px 18px}
-          .modal-ft{padding:14px 18px;border-radius:0 0 20px 20px}
-          .modal-hd{flex-direction:column;gap:8px}
-          .modal-price-col{text-align:left}
           .toolbar{gap:8px}
           .tb-sort-lbl{display:none}
           .lm-options{grid-template-columns:1fr}
@@ -825,10 +884,8 @@ export default function ListingsPage() {
           .listing-grid.view-list .lcard{flex-direction:column}
           .listing-grid.view-list .lcard .lcard-banner{width:100%;min-height:170px}
           .nav-search-wrap{display:none}
-          .mf-overlay.open{justify-content:flex-end}
           .toolbar{flex-direction:column;align-items:flex-start;gap:10px}
           .tb-right{width:100%;justify-content:space-between}
-          .modal-facts-grid{grid-template-columns:repeat(2,1fr)}
         }
       `}</style>
 
@@ -875,135 +932,24 @@ export default function ListingsPage() {
         </div>
       </div>
 
-      {/* ═══ DETAIL MODAL ══════════════════════════════════════════════════════ */}
-      <div className={`modal-bg${detail ? ' open' : ''}`} onClick={() => setDetail(null)}>
-        {detail && (
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-gal">
-              {detail.photos.length > 0
-                ? <img className="mg-img" src={detail.photos[detailPhoto]} alt={detail.title} />
-                : <div className="mg-ph">🏠</div>
-              }
-              {detail.photos.length > 1 && (
-                <>
-                  <div className="mg-nav">
-                    <button className="mg-btn" onClick={() => setDetailPhoto(p => (p - 1 + detail.photos.length) % detail.photos.length)}>‹</button>
-                    <button className="mg-btn" onClick={() => setDetailPhoto(p => (p + 1) % detail.photos.length)}>›</button>
-                  </div>
-                  <div className="mg-thumbs">
-                    {detail.photos.map((_, i) => <div key={i} className={`mg-thumb${i === detailPhoto ? ' active' : ''}`} onClick={() => setDetailPhoto(i)} />)}
-                  </div>
-                  <div className="mg-count">📷 {detailPhoto + 1}/{detail.photos.length}</div>
-                </>
-              )}
-              <button className="modal-close" onClick={() => setDetail(null)}>✕</button>
-              <button className="modal-heart" onClick={e => toggleSave(detail.id, e)}>
-                {savedIds.has(detail.id) ? '❤️' : '🤍'}
-              </button>
-            </div>
-
-            <div className="modal-body">
-              <div className="modal-hd">
-                <div className="modal-title-col">
-                  <div className="modal-ptype-row">
-                    <span className="modal-ptype">{detail.property_type}</span>
-                    {isNew(detail.created_at) && <span className="badge badge-blue">New</span>}
-                    {isAvailableSoon(detail.available_from) && <span className="badge badge-green">Available soon</span>}
-                  </div>
-                  <div className="modal-title">{detail.title}</div>
-                  <div className="modal-city">📍 {detail.city || 'Location not specified'}</div>
-                </div>
-                <div className="modal-price-col">
-                  <div className="modal-price">{fmtMoney(detail.rent_amount)}<span>/mo</span></div>
-                  <div className="modal-avail-row">
-                    {detail.available_from && (
-                      <span className={`modal-avail ${isAvailableSoon(detail.available_from) ? 'green' : 'blue'}`}>
-                        {isAvailableSoon(detail.available_from) ? '🟢 Move in soon' : `📅 From ${fmtDate(detail.available_from)}`}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="modal-facts-grid">
-                {detail.bedrooms > 0 && (
-                  <div className="modal-fact">
-                    <span className="modal-fact-ico">🛏</span>
-                    <span className="modal-fact-val">{detail.bedrooms}</span>
-                    <span className="modal-fact-lbl">Bedroom{detail.bedrooms !== 1 ? 's' : ''}</span>
-                  </div>
-                )}
-                <div className="modal-fact">
-                  <span className="modal-fact-ico">🚿</span>
-                  <span className="modal-fact-val">{detail.bathrooms}</span>
-                  <span className="modal-fact-lbl">Bathroom{detail.bathrooms !== 1 ? 's' : ''}</span>
-                </div>
-                {detail.area_sqft && (
-                  <div className="modal-fact">
-                    <span className="modal-fact-ico">📐</span>
-                    <span className="modal-fact-val">{detail.area_sqft.toLocaleString()}</span>
-                    <span className="modal-fact-lbl">Sq. feet</span>
-                  </div>
-                )}
-                <div className="modal-fact">
-                  <span className="modal-fact-ico">{TYPE_ICONS[detail.property_type] || '🏘️'}</span>
-                  <span className="modal-fact-val">{detail.property_type}</span>
-                  <span className="modal-fact-lbl">Type</span>
-                </div>
-              </div>
-
-              {detail.description && (
-                <>
-                  <div className="modal-divider" />
-                  <div className="modal-sec-lbl">About this property</div>
-                  <div className="modal-desc">{detail.description}</div>
-                </>
-              )}
-
-              {detail.tags?.length > 0 && (
-                <>
-                  <div className="modal-sec-lbl">Features & Amenities</div>
-                  <div className="modal-tags">
-                    {detail.tags.map(t => <span key={t} className="modal-tag">{t}</span>)}
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="modal-ft">
-              <div className="modal-ll">
-                <div className="modal-ll-av" style={{ background: AVATAR_GRADIENTS[detail.landlord_id.charCodeAt(0) % AVATAR_GRADIENTS.length] }}>
-                  {detail.landlord_initials}
-                </div>
-                <div>
-                  <div className="modal-ll-name">{detail.landlord_name}</div>
-                  <div className="modal-ll-lbl">Property Owner</div>
-                </div>
-              </div>
-              <button className={`modal-save-btn${savedIds.has(detail.id) ? ' saved' : ''}`} onClick={e => toggleSave(detail.id, e)}>
-                {savedIds.has(detail.id) ? '❤️ Saved' : '🤍 Save'}
-              </button>
-              <button className="modal-contact-btn" onClick={e => contactLandlord(detail.landlord_id, e)}>
-                💬 Contact Landlord
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* ═══ MOBILE FILTER DRAWER ══════════════════════════════════════════════ */}
       <div className={`mf-overlay${mobileFilterOpen ? ' open' : ''}`}>
         <div className="mf-bg" onClick={() => setMobileFilterOpen(false)} />
         <div className="mf-panel">
           <div className="mf-hd">
-            <div className="mf-title">Filters {activeFilterCount > 0 && <span style={{ fontSize: 13, color: '#94A3B8', fontFamily: "'Plus Jakarta Sans',sans-serif", fontWeight: 400 }}>({activeFilterCount} active)</span>}</div>
+            <div className="mf-title">
+              Filters{activeFilterCount > 0 && (
+                <span style={{ fontSize: 13, color: '#94A3B8', fontFamily: "'Plus Jakarta Sans',sans-serif", fontWeight: 400, marginLeft: 6 }}>
+                  ({activeFilterCount} active)
+                </span>
+              )}
+            </div>
             <button className="mf-close" onClick={() => setMobileFilterOpen(false)}>✕</button>
           </div>
-          <div className="mf-body">
-            <FilterSidebar />
-          </div>
+          {/* Filter content rendered directly — no nested sidebar wrapper */}
+          <FilterContent {...filterProps} isMobile />
           <div className="mf-footer">
-            <button className="mf-clear" onClick={clearAll}>Clear all</button>
+            <button className="mf-clear" onClick={() => { clearAll(); }}>Clear all</button>
             <button className="mf-apply" onClick={() => setMobileFilterOpen(false)}>
               Show {results.length} result{results.length !== 1 ? 's' : ''}
             </button>
@@ -1079,8 +1025,11 @@ export default function ListingsPage() {
 
       {/* ═══ PAGE LAYOUT ═══════════════════════════════════════════════════════ */}
       <div className="page-layout">
+
         {/* Desktop Sidebar */}
-        <FilterSidebar />
+        <aside className="desktop-sidebar">
+          <FilterContent {...filterProps} />
+        </aside>
 
         {/* Main content */}
         <main className="main">
@@ -1186,7 +1135,7 @@ export default function ListingsPage() {
                     <div
                       key={l.id}
                       className={`lcard${isListView ? ' view-list' : isCompact ? ' view-compact' : ''}`}
-                      onClick={() => { setDetail(l); setDetailPhoto(0) }}
+                      onClick={() => handleCardClick(l.id)}
                     >
                       <div className={`lcard-banner ${isCompact ? 'h-compact' : 'h-normal'}`}>
                         {l.photos.length > 0
