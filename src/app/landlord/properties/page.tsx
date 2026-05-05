@@ -600,7 +600,7 @@ export default function PropertiesPage() {
               <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
                 <option value="apartment">Apartment Building</option>
                 <option value="house">House</option>
-                <option value="house">Villa</option>
+                <option value="villa">Villa</option>
                 <option value="studio">Studio Apartment</option>
                 <option value="townhouse">Townhouse</option>
                 <option value="office">Offices</option>
