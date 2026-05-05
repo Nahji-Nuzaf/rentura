@@ -48,8 +48,15 @@ export async function middleware(request: NextRequest) {
   }
 
   // 1. Define protected and auth routes
-  const protectedPrefixes = ['/landlord', '/tenant', '/seeker', '/onboarding']
-  const isProtected = protectedPrefixes.some(p => pathname.startsWith(p))
+  const protectedPrefixes = ['/landlord', '/tenant', '/onboarding']
+  const seekerProtectedPrefixes = [
+    '/seeker/messages',
+    '/seeker/profile',
+    '/seeker/saved',
+  ]
+  const isProtected =
+  protectedPrefixes.some(p => pathname.startsWith(p)) ||
+  seekerProtectedPrefixes.some(p => pathname.startsWith(p))
   const isAuthPage = pathname === '/login' || pathname === '/signup'
 
   // 2. If user is NOT logged in and trying to access protected routes
