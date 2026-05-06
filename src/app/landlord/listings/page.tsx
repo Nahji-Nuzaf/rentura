@@ -27,6 +27,8 @@ type Listing = {
   area_sqft: number | null
   deposit_amount: number | null
   address: string
+  property_type: string | null
+  city: string | null
 }
 
 type PropertyOption = { id: string; name: string; city?: string; type?: string }
@@ -99,7 +101,8 @@ export default function ListingsPage() {
     title: '', description: '', property_id: '', unit_id: '',
     bedrooms: '1', bathrooms: '1', rent_amount: '', available_from: '',
     status: 'draft' as Listing['status'],
-    area_sqft: '', deposit_amount: '', address: '',
+    area_sqft: '', deposit_amount: '', address: '', property_type: '',
+    city: '',
   })
 
   // ── LOAD ─────────────────────────────────────────────────
@@ -137,7 +140,7 @@ export default function ListingsPage() {
         available_from: row.available_from || '', status: row.status || 'draft',
         photos: row.photos || [], tags: row.tags || [], created_at: row.created_at || '',
         area_sqft: row.area_sqft || null, deposit_amount: row.deposit_amount || null,
-        address: row.address || '',
+        address: row.address || '', property_type: row.property_type || null, city: row.city || null
       })))
     } catch (e: any) { console.error(e?.message) }
     finally { setLoading(false) }
@@ -318,7 +321,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
         tags: tags,
         area_sqft: form.area_sqft ? parseFloat(form.area_sqft) : null,
         deposit_amount: form.deposit_amount ? parseFloat(form.deposit_amount) : null,
-        address: form.address || null,
+        address: form.address || null, property_type: form.property_type || null, city: form.city || null
       }
       if (drawer === 'add') {
         const { error } = await sb.from('listings').insert(payload)
@@ -356,7 +359,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
     setForm({
       title: '', description: '', property_id: properties[0]?.id || '', unit_id: '',
       bedrooms: '1', bathrooms: '1', rent_amount: '', available_from: '', status: 'draft',
-      area_sqft: '', deposit_amount: '', address: '',
+      area_sqft: '', deposit_amount: '', address: '', property_type: '', city: ''
     })
     if (properties[0]?.id) loadUnitsForProperty(properties[0].id)
     setPhotoFiles([]); setPhotoPreviews([]); setExistingPhotos([])
@@ -372,7 +375,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
       rent_amount: String(l.rent_amount), available_from: l.available_from, status: l.status,
       area_sqft: l.area_sqft != null ? String(l.area_sqft) : '',
       deposit_amount: l.deposit_amount != null ? String(l.deposit_amount) : '',
-      address: l.address || '',
+      address: l.address || '', property_type: l.property_type || '', city: l.city || ''
     })
     loadUnitsForProperty(l.property_id, l.unit_id)
     setPhotoFiles([]); setPhotoPreviews([]); setExistingPhotos(l.photos || [])
@@ -745,6 +748,33 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
                 onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
                 placeholder="e.g. 45/2 Galle Road, Colombo 03"
               />
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>City <span style={{ fontWeight: 400, color: '#94A3B8', textTransform: 'none', letterSpacing: 0 }}>(optional)</span></label>
+                <input
+                  value={form.city}
+                  onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
+                  placeholder="e.g. Colombo 03"
+                />
+              </div>
+              <div className="field">
+                <label>Property Type <span style={{ fontWeight: 400, color: '#94A3B8', textTransform: 'none', letterSpacing: 0 }}>(optional)</span></label>
+                <select value={form.property_type} onChange={e => setForm(f => ({ ...f, property_type: e.target.value }))}>
+                  <option value="">Select type</option>
+                  <option value="apartment">Apartment Building</option>
+                  <option value="house">House</option>
+                  <option value="villa">Villa</option>
+                  <option value="studio">Studio Apartment</option>
+                  <option value="townhouse">Townhouse</option>
+                  <option value="office">Offices</option>
+                  <option value="shop">Shop / Retail</option>
+                  <option value="warehouse">Warehouse</option>
+                  <option value="annex">Annex</option>
+                  <option value="commercial">Commercial Spaces</option>
+                  <option value="land">Land / Plot</option>
+                </select>
+              </div>
             </div>
             <div className="field-row">
               <div className="field">

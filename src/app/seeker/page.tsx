@@ -29,7 +29,6 @@ type Listing = {
 type CityCard = { city: string; count: number; photo: string }
 type UserRole = 'landlord' | 'seeker' | 'agent' | null
 
-// ── Change 7: Exchange rate state & currency selector ──────────────────────────
 const SUPPORTED_CURRENCIES = ['LKR', 'USD', 'EUR', 'GBP', 'AUD'] as const
 type CurrencyCode = typeof SUPPORTED_CURRENCIES[number]
 
@@ -41,7 +40,6 @@ const CURRENCY_SYMBOLS: Record<CurrencyCode, string> = {
   AUD: 'A$',
 }
 
-// Rough static fallback rates (LKR base). In production swap for a live API.
 const FALLBACK_RATES: Record<CurrencyCode, number> = {
   LKR: 1,
   USD: 0.0033,
@@ -75,7 +73,6 @@ const CATEGORY_ICONS: Record<string, string> = {
   All: '🏘️', House: '🏡', Apartment: '🏢', Studio: '🛋️', Villa: '🏰', Room: '🚪', Office: '🏗️',
 }
 
-// ── Change 6: Items per page ────────────────────────────────────────────────
 const ITEMS_PER_PAGE = 15
 
 function initials(name: string) {
@@ -120,7 +117,6 @@ export default function SeekerMarketplace() {
   // UI state
   const [scrolled, setScrolled] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  // Change 1: track animation state for mobile menu
   const [mobileMenuVisible, setMobileMenuVisible] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
   const [listModalOpen, setListModalOpen] = useState(false)
@@ -136,14 +132,32 @@ export default function SeekerMarketplace() {
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [browsedListings, setBrowsedListings] = useState<Listing[]>([])
 
-  // Change 6: pagination
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1)
 
-  // Change 7: currency state
+  // ── Carousel state ──────────────────────────────────────────────────────────
+  const [featIdx, setFeatIdx] = useState(0)
+  const [visibleCount, setVisibleCount] = useState(4)
+  const touchStartX = useRef(0)
+
+  // Currency state
   const [displayCurrency, setDisplayCurrency] = useState<CurrencyCode>('LKR')
   const [exchangeRates, setExchangeRates] = useState<Record<CurrencyCode, number>>(FALLBACK_RATES)
   const [currencyDropOpen, setCurrencyDropOpen] = useState(false)
   const currencyRef = useRef<HTMLDivElement>(null)
+
+  // ── Responsive visibleCount ─────────────────────────────────────────────────
+  useEffect(() => {
+    function updateVisible() {
+      const w = window.innerWidth
+      const next = w <= 520 ? 2 : w <= 768 ? 2 : 4
+      setVisibleCount(next)
+      setFeatIdx(0)
+    }
+    updateVisible()
+    window.addEventListener('resize', updateVisible)
+    return () => window.removeEventListener('resize', updateVisible)
+  }, [])
 
   // Fetch exchange rates on mount
   useEffect(() => {
@@ -160,7 +174,7 @@ export default function SeekerMarketplace() {
           })
         }
       })
-      .catch(() => {/* use fallback */})
+      .catch(() => {/* use fallback */ })
   }, [])
 
   // Close currency dropdown on outside click
@@ -174,7 +188,6 @@ export default function SeekerMarketplace() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Currency formatter that converts from LKR to selected currency
   function convertAndFormat(amountLKR: number): string {
     const rate = exchangeRates[displayCurrency] ?? 1
     const converted = amountLKR * rate
@@ -185,19 +198,15 @@ export default function SeekerMarketplace() {
     return `${sym}${converted.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
   }
 
-  // Change 1: Open mobile menu with animation
   function openMobileMenu() {
     setMobileMenuOpen(true)
-    // slight delay so overlay renders before slide-in
     requestAnimationFrame(() => setMobileMenuVisible(true))
   }
   function closeMobileMenu() {
     setMobileMenuVisible(false)
-    // wait for animation to finish before unmounting
     setTimeout(() => setMobileMenuOpen(false), 300)
   }
 
-  // Change 2: Lock body scroll when mobile menu is open
   useEffect(() => {
     if (mobileMenuOpen) {
       document.body.style.overflow = 'hidden'
@@ -207,7 +216,6 @@ export default function SeekerMarketplace() {
     return () => { document.body.style.overflow = '' }
   }, [mobileMenuOpen])
 
-  // Scroll
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 50)
     window.addEventListener('scroll', fn, { passive: true })
@@ -254,26 +262,22 @@ export default function SeekerMarketplace() {
     })()
   }, [])
 
-  // ── Change 3 & 4: Load Listings — join with properties table for city & type ─
+  // Load Listings
   useEffect(() => {
     ; (async () => {
       setLoading(true)
       try {
         const sb = createClient()
-        // Fetch listings joined with properties to get correct city and type
+
         const { data: rows } = await sb
           .from('listings')
-          .select(`
-            id,title,description,landlord_id,bedrooms,bathrooms,rent_amount,currency,
-            available_from,photos,tags,city,property_type,area_sqft,
-            property_id,
-            properties(city, type)
-          `)
+          .select('id,title,description,landlord_id,bedrooms,bathrooms,rent_amount,currency,available_from,photos,tags,city,property_type,area_sqft')
           .eq('status', 'active')
           .order('created_at', { ascending: false })
           .limit(80)
 
         const landlordIds = [...new Set((rows || []).map((r: any) => r.landlord_id).filter(Boolean))]
+
         const profileMap: Record<string, string> = {}
         if (landlordIds.length > 0) {
           const { data: pArr } = await sb.from('profiles').select('id,full_name').in('id', landlordIds)
@@ -282,12 +286,10 @@ export default function SeekerMarketplace() {
 
         const mapped: Listing[] = (rows || []).map((r: any) => {
           const lName = profileMap[r.landlord_id] || 'Landlord'
-          // Change 3: prefer property type from properties table
-          const propType = r.properties?.type || r.property_type || 'House'
-          // Capitalise first letter so it matches the PROPERTY_TYPES array
-          const normType = propType.charAt(0).toUpperCase() + propType.slice(1).toLowerCase()
-          // Change 4: prefer city from properties table
-          const city = r.properties?.city || r.city || ''
+          const rawType = r.property_type || 'House'
+          const normType = rawType.charAt(0).toUpperCase() + rawType.slice(1).toLowerCase()
+          const city = r.city || ''
+
           return {
             id: r.id, title: r.title || 'Untitled', description: r.description || '',
             landlord_id: r.landlord_id || '', landlord_name: lName, landlord_initials: initials(lName),
@@ -325,7 +327,7 @@ export default function SeekerMarketplace() {
     })()
   }, [])
 
-  // ── Change 5: Featured listings — limit to 12 ──────────────────────────────
+  // Featured listings
   useEffect(() => {
     if (allListings.length === 0) return
     if (userId && (userInterests.tags.length > 0 || userInterests.cities.length > 0)) {
@@ -338,7 +340,7 @@ export default function SeekerMarketplace() {
           return { ...l, score }
         })
         .sort((a, b) => b.score - a.score)
-      setFeaturedListings(scored.slice(0, 12)) // ← was 6, now 12
+      setFeaturedListings(scored.slice(0, 12))
     } else {
       const withPhotos = allListings.filter(l => l.photos.length > 0).slice(0, 12)
       const withoutPhotos = allListings.filter(l => l.photos.length === 0).slice(0, Math.max(0, 12 - withPhotos.length))
@@ -369,15 +371,31 @@ export default function SeekerMarketplace() {
 
   useEffect(() => {
     setBrowsedListings(getFiltered())
-    setCurrentPage(1) // reset to page 1 when filters change
+    setCurrentPage(1)
   }, [getFiltered])
 
-  // Change 6: paginated listings
   const totalPages = Math.ceil(browsedListings.length / ITEMS_PER_PAGE)
   const paginatedListings = browsedListings.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   )
+
+  // ── Carousel helpers ────────────────────────────────────────────────────────
+  const totalDots = Math.ceil(featuredListings.length / visibleCount)
+  const activeDot = Math.floor(featIdx / visibleCount)
+  // card width % inside the track (accounting for 16px gaps)
+  const cardWidthPct = 100 / visibleCount
+  // translate: each step moves by one card width + gap
+  const translateX = featIdx > 0
+    ? `calc(-${featIdx * cardWidthPct}% - ${featIdx * 16}px)`
+    : '0px'
+
+  function carouselPrev() {
+    setFeatIdx(i => Math.max(0, i - 1))
+  }
+  function carouselNext() {
+    setFeatIdx(i => Math.min(featuredListings.length - visibleCount, i + 1))
+  }
 
   // Save / Unsave
   async function toggleSave(listingId: string, e: React.MouseEvent) {
@@ -399,19 +417,16 @@ export default function SeekerMarketplace() {
     finally { setSavingId(null) }
   }
 
-  // Contact
   function contactLandlord(landlordId: string, e?: React.MouseEvent) {
     e?.stopPropagation()
     if (!userId) { router.push('/login'); return }
     router.push(`/seeker/messages?to=${landlordId}`)
   }
 
-  // Navigate to listing detail
   function goToListing(listingId: string) {
     router.push(`/seeker/listing-details/${listingId}`)
   }
 
-  // List Your Property
   function handleListProperty(e: React.MouseEvent) {
     e.preventDefault()
     if (!authChecked) return
@@ -467,7 +482,6 @@ export default function SeekerMarketplace() {
         .hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;padding:4px;color:#475569;flex-shrink:0}
         .nav.transparent .hamburger{color:#fff}
 
-        /* ── Change 7: Currency selector ── */
         .nav-currency{position:relative;flex-shrink:0}
         .nav-currency-btn{display:flex;align-items:center;gap:5px;padding:7px 11px;border-radius:10px;border:1.5px solid #E2E8F0;background:#F8FAFC;color:#374151;font-size:12.5px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;white-space:nowrap}
         .nav-currency-btn:hover{border-color:#CBD5E1;background:#F1F5F9}
@@ -478,7 +492,6 @@ export default function SeekerMarketplace() {
         .nav-currency-item:hover{background:#F1F5F9}
         .nav-currency-item.active{color:#2563EB;background:#EFF6FF}
 
-        /* ── Change 1: Mobile menu slide animation ── */
         .mm-overlay{display:none;position:fixed;inset:0;z-index:1000}
         .mm-overlay.open{display:flex}
         .mm-bg{position:absolute;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);opacity:0;transition:opacity .3s ease}
@@ -490,7 +503,6 @@ export default function SeekerMarketplace() {
         .mm-link:hover{background:#F1F5F9}
         .mm-div{height:1px;background:#F1F5F9;margin:8px 0}
         .mm-cta{font-size:14px;font-weight:700;color:#fff;padding:13px;border-radius:12px;background:linear-gradient(135deg,#2563EB,#6366F1);text-align:center;text-decoration:none;display:block;margin-top:8px}
-        /* Currency in mobile menu */
         .mm-currency-row{display:flex;align-items:center;gap:8px;padding:10px 14px;flex-wrap:wrap}
         .mm-currency-lbl{font-size:12px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.5px}
         .mm-currency-pill{padding:5px 12px;border-radius:99px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;font-family:'Plus Jakarta Sans',sans-serif}
@@ -571,7 +583,7 @@ export default function SeekerMarketplace() {
         .feat-strip::-webkit-scrollbar{display:none}
         .feat-label{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:#94A3B8;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px}
         .feat-label.personalised{color:#7C3AED}
-        .fcard{min-width:290px;max-width:290px;background:#fff;border:1px solid #E2E8F0;border-radius:20px;overflow:hidden;cursor:pointer;transition:box-shadow .2s,transform .2s;flex-shrink:0;box-shadow:0 1px 4px rgba(15,23,42,.04)}
+        .fcard{min-width:0;width:100%;background:#fff;border:1px solid #E2E8F0;border-radius:20px;overflow:hidden;cursor:pointer;transition:box-shadow .2s,transform .2s;flex-shrink:0;box-shadow:0 1px 4px rgba(15,23,42,.04)}
         .fcard:hover{box-shadow:0 10px 32px rgba(15,23,42,.12);transform:translateY(-3px)}
         .fcard-img{height:195px;position:relative;overflow:hidden;background:#F1F5F9}
         .fcard-img img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s}
@@ -589,7 +601,29 @@ export default function SeekerMarketplace() {
         .fcard-facts{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
         .fcard-fact{font-size:11px;color:#475569;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:2px 7px}
 
-        /* Change 5: View all button for featured */
+        /* ── Carousel ── */
+        .carousel-wrap{position:relative;display:flex;align-items:center;gap:0}
+        .carousel-viewport{flex:1;min-width:0;overflow:hidden}
+        .carousel-track{
+          display:flex;
+          gap:16px;
+          transition:transform .45s cubic-bezier(.4,0,.2,1);
+          will-change:transform;
+        }
+        /* Each card takes exactly 1/visibleCount of the viewport minus gaps */
+        .carousel-track .fcard{
+          flex:0 0 calc(25% - 12px);
+          min-width:0;
+        }
+        .carousel-arrow{width:40px;height:40px;border-radius:50%;border:1.5px solid #E2E8F0;background:#fff;font-size:28px;font-weight:300;color:#374151;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;box-shadow:0 2px 8px rgba(15,23,42,.08);z-index:2;line-height:1;padding-bottom:2px}
+        .carousel-arrow:hover:not([disabled]){border-color:#0F172A;background:#0F172A;color:#fff;box-shadow:0 4px 14px rgba(15,23,42,.18)}
+        .carousel-arrow:disabled{opacity:.3;cursor:not-allowed}
+        .carousel-arrow-left{margin-right:10px}
+        .carousel-arrow-right{margin-left:10px}
+        .carousel-dots{display:flex;justify-content:center;gap:6px;margin-top:16px}
+        .carousel-dot{width:7px;height:7px;border-radius:50%;border:none;background:#CBD5E1;cursor:pointer;padding:0;transition:all .35s cubic-bezier(.4,0,.2,1)}
+        .carousel-dot.active{background:#0F172A;width:20px;border-radius:99px}
+
         .feat-view-all{display:inline-flex;align-items:center;gap:6px;margin-top:14px;font-size:13px;font-weight:700;color:#2563EB;background:none;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;text-decoration:none}
         .feat-view-all:hover{text-decoration:underline}
 
@@ -658,7 +692,6 @@ export default function SeekerMarketplace() {
         .lcard-contact{padding:5px 12px;border-radius:8px;border:none;background:#0F172A;color:#fff;font-size:11.5px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:background .15s;white-space:nowrap;flex-shrink:0}
         .lcard-contact:hover{background:#1E293B}
 
-        /* Change 6: Pagination */
         .pagination{display:flex;align-items:center;justify-content:center;gap:6px;padding:24px 0 48px}
         .pg-btn{min-width:36px;height:36px;padding:0 10px;border-radius:9px;border:1.5px solid #E2E8F0;background:#fff;color:#374151;font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;display:flex;align-items:center;justify-content:center}
         .pg-btn:hover{border-color:#CBD5E1;background:#F8FAFC}
@@ -738,13 +771,18 @@ export default function SeekerMarketplace() {
           .cat-inner{padding:0 14px}
           .tag-row-inner{padding:10px 14px}
           .lm-options{grid-template-columns:1fr 1fr}
+          /* Tablet: 2 cards visible */
+          .carousel-track .fcard{flex:0 0 calc(50% - 8px)}
+          .carousel-arrow{width:34px;height:34px;font-size:22px}
         }
         @media(max-width:520px){
           .listing-grid{grid-template-columns:1fr}
           .city-grid{grid-template-columns:repeat(2,1fr)}
           .city-card{height:130px}
           .feat-strip{gap:12px}
-          .fcard{min-width:260px;max-width:260px}
+          /* Mobile: 2 cards visible, no arrows — swipe instead */
+          .carousel-track .fcard{flex:0 0 calc(50% - 8px)}
+          .carousel-arrow{display:none}
           .footer-top{grid-template-columns:1fr}
           .trust{padding:24px 20px;border-radius:18px}
           .trust-btns{flex-direction:column}
@@ -785,7 +823,7 @@ export default function SeekerMarketplace() {
         </div>
       </div>
 
-      {/* ══ MOBILE MENU — Change 1: slide animation ══ */}
+      {/* ══ MOBILE MENU ══ */}
       {mobileMenuOpen && (
         <div className={`mm-overlay open${mobileMenuVisible ? ' visible' : ''}`}>
           <div className="mm-bg" onClick={closeMobileMenu} />
@@ -803,7 +841,6 @@ export default function SeekerMarketplace() {
               🏡 List Your Property
             </button>
             <div className="mm-div" />
-            {/* Change 7: Currency picker in mobile menu */}
             <div className="mm-currency-row">
               <span className="mm-currency-lbl">Currency:</span>
               {SUPPORTED_CURRENCIES.map(c => (
@@ -850,7 +887,6 @@ export default function SeekerMarketplace() {
             <a href="/seeker/map" className="nav-link">Map</a>
             <button className="nav-list-btn" onClick={handleListProperty}>List Your Property</button>
 
-            {/* ── Change 7: Currency selector in navbar ── */}
             <div className="nav-currency" ref={currencyRef}>
               <button
                 className="nav-currency-btn"
@@ -1036,7 +1072,7 @@ export default function SeekerMarketplace() {
         </div>
       </div>
 
-      {/* ══ FEATURED — Change 5: 12 listings + View all → /seeker/listings ══ */}
+      {/* ══ FEATURED CAROUSEL ══ */}
       {!loading && featuredListings.length > 0 && showSections && (
         <div className="page">
           <div className="section">
@@ -1058,35 +1094,81 @@ export default function SeekerMarketplace() {
               </div>
               <a href="/seeker/listings" className="sec-link">View all →</a>
             </div>
-            <div className="feat-strip">
-              {featuredListings.map(l => (
-                <div key={l.id} className="fcard" onClick={() => goToListing(l.id)}>
-                  <div className="fcard-img">
-                    {l.photos.length > 0
-                      ? <img src={l.photos[0]} alt={l.title} loading="lazy" />
-                      : <div className="fcard-ph">🏠</div>
-                    }
-                    <button className="fcard-save" onClick={e => toggleSave(l.id, e)}>
-                      {savedIds.has(l.id) ? '❤️' : '🤍'}
-                    </button>
-                    {isAvailableSoon(l.available_from) && <div className="fcard-badge">Available soon</div>}
-                  </div>
-                  <div className="fcard-body">
-                    <div className="fcard-type">{l.property_type}</div>
-                    <div className="fcard-title">{l.title}</div>
-                    <div className="fcard-loc">📍 {l.city || 'Unknown'}</div>
-                    {/* Change 7: use convertAndFormat */}
-                    <div className="fcard-price">{convertAndFormat(l.rent_amount)}<span> /mo</span></div>
-                    <div className="fcard-facts">
-                      {l.bedrooms > 0 && <span className="fcard-fact">🛏 {l.bedrooms}</span>}
-                      <span className="fcard-fact">🚿 {l.bathrooms}</span>
-                      {l.area_sqft && <span className="fcard-fact">📐 {l.area_sqft.toLocaleString()} sqft</span>}
+
+            {/* Carousel */}
+            <div className="carousel-wrap">
+              {/* Left arrow */}
+              <button
+                className="carousel-arrow carousel-arrow-left"
+                onClick={carouselPrev}
+                disabled={featIdx === 0}
+                aria-label="Previous"
+              >&#8249;</button>
+
+              {/* Sliding viewport — touch swipe supported */}
+              <div
+                className="carousel-viewport"
+                onTouchStart={e => { touchStartX.current = e.touches[0].clientX }}
+                onTouchEnd={e => {
+                  const diff = touchStartX.current - e.changedTouches[0].clientX
+                  if (Math.abs(diff) > 40) {
+                    if (diff > 0 && featIdx + visibleCount < featuredListings.length) carouselNext()
+                    else if (diff < 0 && featIdx > 0) carouselPrev()
+                  }
+                }}
+              >
+                <div
+                  className="carousel-track"
+                  style={{ transform: `translateX(${translateX})` }}
+                >
+                  {featuredListings.map(l => (
+                    <div key={l.id} className="fcard" onClick={() => goToListing(l.id)}>
+                      <div className="fcard-img">
+                        {l.photos.length > 0
+                          ? <img src={l.photos[0]} alt={l.title} loading="lazy" />
+                          : <div className="fcard-ph">🏠</div>
+                        }
+                        <button className="fcard-save" onClick={e => toggleSave(l.id, e)}>
+                          {savedIds.has(l.id) ? '❤️' : '🤍'}
+                        </button>
+                        {isAvailableSoon(l.available_from) && <div className="fcard-badge">Available soon</div>}
+                      </div>
+                      <div className="fcard-body">
+                        <div className="fcard-type">{l.property_type}</div>
+                        <div className="fcard-title">{l.title}</div>
+                        <div className="fcard-loc">📍 {l.city || 'Location not specified'}</div>
+                        <div className="fcard-price">{convertAndFormat(l.rent_amount)}<span> /mo</span></div>
+                        <div className="fcard-facts">
+                          {l.bedrooms > 0 && <span className="fcard-fact">🛏 {l.bedrooms}</span>}
+                          <span className="fcard-fact">🚿 {l.bathrooms}</span>
+                          {l.area_sqft && <span className="fcard-fact">📐 {l.area_sqft.toLocaleString()} sqft</span>}
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
+              </div>
+
+              {/* Right arrow */}
+              <button
+                className="carousel-arrow carousel-arrow-right"
+                onClick={carouselNext}
+                disabled={featIdx + visibleCount >= featuredListings.length}
+                aria-label="Next"
+              >&#8250;</button>
+            </div>
+
+            {/* Dot indicators */}
+            <div className="carousel-dots">
+              {Array.from({ length: totalDots }).map((_, i) => (
+                <button
+                  key={i}
+                  className={`carousel-dot${activeDot === i ? ' active' : ''}`}
+                  onClick={() => setFeatIdx(i * visibleCount)}
+                />
               ))}
             </div>
-            {/* Change 5: explicit View all button below strip */}
+
             <a href="/seeker/listings" className="feat-view-all">View all listings →</a>
           </div>
         </div>
@@ -1186,7 +1268,7 @@ export default function SeekerMarketplace() {
         </div>
       )}
 
-      {/* ══ BROWSE ALL — Change 6: paginated ══ */}
+      {/* ══ BROWSE ALL ══ */}
       <div className="page" id="browse-section">
         <div className="browse-toolbar">
           <div>
@@ -1257,7 +1339,6 @@ export default function SeekerMarketplace() {
                 <div className="lcard-type">{l.property_type}</div>
                 <div className="lcard-title">{l.title}</div>
                 <div className="lcard-loc">📍 {l.city || 'Location not specified'}</div>
-                {/* Change 7: converted price */}
                 <div className="lcard-price">{convertAndFormat(l.rent_amount)}<span> /mo</span></div>
                 <div className="lcard-facts">
                   {l.bedrooms > 0 && <span className="lcard-fact">🛏 {l.bedrooms} bed</span>}
@@ -1288,7 +1369,7 @@ export default function SeekerMarketplace() {
           ))}
         </div>
 
-        {/* Change 6: Pagination controls */}
+        {/* Pagination */}
         {!loading && totalPages > 1 && (
           <div className="pagination">
             <button
@@ -1298,7 +1379,6 @@ export default function SeekerMarketplace() {
             >← Prev</button>
 
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
-              // Show first, last, current and neighbours; ellipsis otherwise
               const show = page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1
               if (!show) {
                 if (page === 2 || page === totalPages - 1) return <span key={page} className="pg-ellipsis">…</span>
