@@ -24,6 +24,9 @@ type Listing = {
   photos: string[]
   tags: string[]
   created_at: string
+  area_sqft: number | null
+  deposit_amount: number | null
+  address: string
 }
 
 type PropertyOption = { id: string; name: string; city?: string; type?: string }
@@ -96,6 +99,7 @@ export default function ListingsPage() {
     title: '', description: '', property_id: '', unit_id: '',
     bedrooms: '1', bathrooms: '1', rent_amount: '', available_from: '',
     status: 'draft' as Listing['status'],
+    area_sqft: '', deposit_amount: '', address: '',
   })
 
   // ── LOAD ─────────────────────────────────────────────────
@@ -119,7 +123,7 @@ export default function ListingsPage() {
 
       const { data, error } = await sb
         .from('listings')
-        .select('id,title,description,property_id,unit_id,bedrooms,bathrooms,rent_amount,currency,available_from,status,photos,tags,created_at')
+        .select('id,title,description,property_id,unit_id,bedrooms,bathrooms,rent_amount,currency,available_from,status,photos,tags,created_at,area_sqft,deposit_amount,address')
         .eq('landlord_id', uid)
         .order('created_at', { ascending: false })
       if (error) throw error
@@ -132,6 +136,8 @@ export default function ListingsPage() {
         rent_amount: row.rent_amount || 0, currency: row.currency || 'USD',
         available_from: row.available_from || '', status: row.status || 'draft',
         photos: row.photos || [], tags: row.tags || [], created_at: row.created_at || '',
+        area_sqft: row.area_sqft || null, deposit_amount: row.deposit_amount || null,
+        address: row.address || '',
       })))
     } catch (e: any) { console.error(e?.message) }
     finally { setLoading(false) }
@@ -154,7 +160,6 @@ export default function ListingsPage() {
     if (!propId) { setUnits([]); return }
     const sb = createClient()
     const { data } = await sb.from('units').select('id,unit_number,monthly_rent,status').eq('property_id', propId)
-    // Show unit if: not occupied, OR it's the unit currently assigned to this listing
     const available = (data || []).filter((u: any) =>
       u.status !== 'occupied' || u.id === currentUnitId
     )
@@ -311,6 +316,9 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
         status: form.status,
         photos: allPhotos,
         tags: tags,
+        area_sqft: form.area_sqft ? parseFloat(form.area_sqft) : null,
+        deposit_amount: form.deposit_amount ? parseFloat(form.deposit_amount) : null,
+        address: form.address || null,
       }
       if (drawer === 'add') {
         const { error } = await sb.from('listings').insert(payload)
@@ -347,7 +355,8 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
     if (!isPro && activeCount >= 2) { setShowUpgradeModal(true); return }
     setForm({
       title: '', description: '', property_id: properties[0]?.id || '', unit_id: '',
-      bedrooms: '1', bathrooms: '1', rent_amount: '', available_from: '', status: 'draft'
+      bedrooms: '1', bathrooms: '1', rent_amount: '', available_from: '', status: 'draft',
+      area_sqft: '', deposit_amount: '', address: '',
     })
     if (properties[0]?.id) loadUnitsForProperty(properties[0].id)
     setPhotoFiles([]); setPhotoPreviews([]); setExistingPhotos([])
@@ -360,7 +369,10 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
     setForm({
       title: l.title, description: l.description, property_id: l.property_id,
       unit_id: l.unit_id, bedrooms: String(l.bedrooms), bathrooms: String(l.bathrooms),
-      rent_amount: String(l.rent_amount), available_from: l.available_from, status: l.status
+      rent_amount: String(l.rent_amount), available_from: l.available_from, status: l.status,
+      area_sqft: l.area_sqft != null ? String(l.area_sqft) : '',
+      deposit_amount: l.deposit_amount != null ? String(l.deposit_amount) : '',
+      address: l.address || '',
     })
     loadUnitsForProperty(l.property_id, l.unit_id)
     setPhotoFiles([]); setPhotoPreviews([]); setExistingPhotos(l.photos || [])
@@ -461,7 +473,6 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
         .sb-uplan{display:inline-block;font-size:10px;font-weight:700;color:#60A5FA;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.25);border-radius:5px;padding:1px 6px;margin-top:2px}
 
         .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:clip;width:calc(100% - 260px)}
-        /* ── FIX 1: Sticky topbar ── */
         .topbar{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:#fff;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(15,23,42,.04);width:100%}
         .tb-left{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
         .hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;color:#475569;padding:4px;flex-shrink:0}
@@ -659,47 +670,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
         </div>
         <div className="dr-body">
 
-          {/* ── FIX 2: Content (Title + Description) moved to TOP ── */}
-          <div className="section-divider" style={{ borderTop: 'none', paddingTop: 0, marginTop: 0 }}>
-            <div className="section-divider-label">
-              Content
-              {aiSuccess && <span style={{ fontSize: 10, fontWeight: 700, color: '#7C3AED', background: 'rgba(124,58,237,.1)', padding: '1px 7px', borderRadius: 99 }}>✨ AI Generated</span>}
-            </div>
-            <div className="field">
-              <label>Title *</label>
-              <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Bright 2BR in Colombo 03" />
-            </div>
-            <div className="field">
-              <label>Description</label>
-              <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Describe the property — or use AI to generate below..." style={{ minHeight: 110 }} />
-            </div>
-          </div>
-
-          {/* ── AI WRITER (now below content) ── */}
-          <div style={{ background: 'linear-gradient(135deg,rgba(124,58,237,.06),rgba(37,99,235,.06))', border: '1.5px solid rgba(124,58,237,.15)', borderRadius: 14, padding: '14px 16px', marginBottom: 18 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#4C1D95', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-              ✨ AI Listing Writer
-              <span style={{ fontSize: 10, fontWeight: 600, color: '#7C3AED', background: 'rgba(124,58,237,.1)', padding: '1px 7px', borderRadius: 99 }}>Beta</span>
-            </div>
-            <div style={{ fontSize: 12, color: '#64748B', marginBottom: 10, lineHeight: 1.5 }}>
-              Fill in property, bedrooms, bathrooms & rent — then let AI generate a professional title and description instantly.
-            </div>
-            <button
-              className="ai-btn"
-              disabled={aiLoading || !form.property_id}
-              onClick={handleAiWrite}>
-              {aiLoading && <span className="ai-btn-shimmer" />}
-              {aiLoading ? '✨ Writing your listing...' : '✨ Generate with AI'}
-            </button>
-            {aiSuccess && (
-              <div className="ai-success">✓ Title and description generated! Review and edit above.</div>
-            )}
-            {aiError && (
-              <div className="ai-error">⚠️ {aiError}</div>
-            )}
-          </div>
-
-          {/* ── Photos ── */}
+          {/* ── 1. Photos ── */}
           <div style={{ marginBottom: 16 }}>
             <div className="photo-section-label">
               <span>Photos</span>
@@ -735,7 +706,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
             )}
           </div>
 
-          {/* ── Property & Unit ── */}
+          {/* ── 2. Property Details ── */}
           <div className="section-divider">
             <div className="section-divider-label">Property Details</div>
             <div className="field">
@@ -748,7 +719,6 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
                 {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
-            {/* ── FIX 3: Unit dropdown shows only available units (occupied filtered out) ── */}
             <div className="field">
               <label>Unit</label>
               <select value={form.unit_id} onChange={e => {
@@ -767,6 +737,14 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
                   No available units for this property
                 </div>
               )}
+            </div>
+            <div className="field">
+              <label>Address <span style={{ fontWeight: 400, color: '#94A3B8', textTransform: 'none', letterSpacing: 0 }}>(optional)</span></label>
+              <input
+                value={form.address}
+                onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
+                placeholder="e.g. 45/2 Galle Road, Colombo 03"
+              />
             </div>
             <div className="field-row">
               <div className="field">
@@ -788,6 +766,26 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
                 <input type="date" value={form.available_from} onChange={e => setForm(f => ({ ...f, available_from: e.target.value }))} />
               </div>
             </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Area <span style={{ fontWeight: 400, color: '#94A3B8', textTransform: 'none', letterSpacing: 0 }}>(sqft / perch)</span></label>
+                <input
+                  type="number" min="0"
+                  value={form.area_sqft}
+                  onChange={e => setForm(f => ({ ...f, area_sqft: e.target.value }))}
+                  placeholder="e.g. 1200"
+                />
+              </div>
+              <div className="field">
+                <label>Deposit Amount <span style={{ fontWeight: 400, color: '#94A3B8', textTransform: 'none', letterSpacing: 0 }}>(optional)</span></label>
+                <input
+                  type="number" min="0"
+                  value={form.deposit_amount}
+                  onChange={e => setForm(f => ({ ...f, deposit_amount: e.target.value }))}
+                  placeholder="e.g. 90000"
+                />
+              </div>
+            </div>
             <div className="field">
               <label>Status</label>
               <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as Listing['status'] }))}>
@@ -799,13 +797,11 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
             </div>
           </div>
 
-          {/* ── FIX 4: Special Tags / Features ── */}
+          {/* ── 3. Features & Amenities ── */}
           <div className="section-divider">
             <div className="section-divider-label">
               ✨ Features & Amenities
             </div>
-
-            {/* Added tags */}
             {tags.length > 0 && (
               <div className="tags-wrap" style={{ marginBottom: 10 }}>
                 {tags.map(tag => (
@@ -816,8 +812,6 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
                 ))}
               </div>
             )}
-
-            {/* Suggestions (show only tags not yet added) */}
             {filteredSuggestions.length > 0 && (
               <div style={{ marginBottom: 8 }}>
                 <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 6, fontWeight: 600 }}>QUICK ADD</div>
@@ -828,8 +822,6 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
                 </div>
               </div>
             )}
-
-            {/* Custom tag input */}
             {showTagInput ? (
               <div className="tag-input-row">
                 <input
@@ -850,6 +842,48 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
                 <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Add custom feature
               </button>
             )}
+          </div>
+
+          {/* ── 4. AI Writer ── */}
+          <div className="section-divider">
+            <div style={{ background: 'linear-gradient(135deg,rgba(124,58,237,.06),rgba(37,99,235,.06))', border: '1.5px solid rgba(124,58,237,.15)', borderRadius: 14, padding: '14px 16px' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#4C1D95', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                ✨ AI Listing Writer
+                <span style={{ fontSize: 10, fontWeight: 600, color: '#7C3AED', background: 'rgba(124,58,237,.1)', padding: '1px 7px', borderRadius: 99 }}>Beta</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#64748B', marginBottom: 10, lineHeight: 1.5 }}>
+                Fill in property, bedrooms, bathrooms & rent — then let AI generate a professional title and description instantly.
+              </div>
+              <button
+                className="ai-btn"
+                disabled={aiLoading || !form.property_id}
+                onClick={handleAiWrite}>
+                {aiLoading && <span className="ai-btn-shimmer" />}
+                {aiLoading ? '✨ Writing your listing...' : '✨ Generate with AI'}
+              </button>
+              {aiSuccess && (
+                <div className="ai-success">✓ Title and description generated! Review and edit below.</div>
+              )}
+              {aiError && (
+                <div className="ai-error">⚠️ {aiError}</div>
+              )}
+            </div>
+          </div>
+
+          {/* ── 5. Content (Title + Description) — at the bottom ── */}
+          <div className="section-divider">
+            <div className="section-divider-label">
+              Content
+              {aiSuccess && <span style={{ fontSize: 10, fontWeight: 700, color: '#7C3AED', background: 'rgba(124,58,237,.1)', padding: '1px 7px', borderRadius: 99 }}>✨ AI Generated</span>}
+            </div>
+            <div className="field">
+              <label>Title *</label>
+              <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Bright 2BR in Colombo 03" />
+            </div>
+            <div className="field">
+              <label>Description</label>
+              <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Describe the property — or use AI to generate above..." style={{ minHeight: 110 }} />
+            </div>
           </div>
 
         </div>
@@ -1025,6 +1059,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
                         <div className="lc-facts">
                           {l.bedrooms > 0 && <span className="lc-fact">🛏 {l.bedrooms} bed</span>}
                           <span className="lc-fact">🚿 {l.bathrooms} bath</span>
+                          {l.area_sqft && <span className="lc-fact">📐 {l.area_sqft} sqft</span>}
                           {l.available_from && <span className="lc-fact">📅 {fmtDate(l.available_from)}</span>}
                         </div>
                         {l.tags && l.tags.length > 0 && (
