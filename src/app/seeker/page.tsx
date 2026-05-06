@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback, useState } from 'react'
+import { useEffect, useCallback, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
@@ -29,6 +29,27 @@ type Listing = {
 type CityCard = { city: string; count: number; photo: string }
 type UserRole = 'landlord' | 'seeker' | 'agent' | null
 
+// ── Change 7: Exchange rate state & currency selector ──────────────────────────
+const SUPPORTED_CURRENCIES = ['LKR', 'USD', 'EUR', 'GBP', 'AUD'] as const
+type CurrencyCode = typeof SUPPORTED_CURRENCIES[number]
+
+const CURRENCY_SYMBOLS: Record<CurrencyCode, string> = {
+  LKR: 'Rs',
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  AUD: 'A$',
+}
+
+// Rough static fallback rates (LKR base). In production swap for a live API.
+const FALLBACK_RATES: Record<CurrencyCode, number> = {
+  LKR: 1,
+  USD: 0.0033,
+  EUR: 0.0031,
+  GBP: 0.0026,
+  AUD: 0.0051,
+}
+
 const AVATAR_GRADIENTS = [
   'linear-gradient(135deg,#6366F1,#8B5CF6)',
   'linear-gradient(135deg,#0EA5E9,#38BDF8)',
@@ -53,6 +74,9 @@ const QUICK_TAGS = ['Furnished', 'Pet Friendly', 'Parking', 'Air Conditioned', '
 const CATEGORY_ICONS: Record<string, string> = {
   All: '🏘️', House: '🏡', Apartment: '🏢', Studio: '🛋️', Villa: '🏰', Room: '🚪', Office: '🏗️',
 }
+
+// ── Change 6: Items per page ────────────────────────────────────────────────
+const ITEMS_PER_PAGE = 15
 
 function initials(name: string) {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -96,6 +120,8 @@ export default function SeekerMarketplace() {
   // UI state
   const [scrolled, setScrolled] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  // Change 1: track animation state for mobile menu
+  const [mobileMenuVisible, setMobileMenuVisible] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
   const [listModalOpen, setListModalOpen] = useState(false)
 
@@ -109,6 +135,77 @@ export default function SeekerMarketplace() {
   const [bedrooms, setBedrooms] = useState('Any')
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [browsedListings, setBrowsedListings] = useState<Listing[]>([])
+
+  // Change 6: pagination
+  const [currentPage, setCurrentPage] = useState(1)
+
+  // Change 7: currency state
+  const [displayCurrency, setDisplayCurrency] = useState<CurrencyCode>('LKR')
+  const [exchangeRates, setExchangeRates] = useState<Record<CurrencyCode, number>>(FALLBACK_RATES)
+  const [currencyDropOpen, setCurrencyDropOpen] = useState(false)
+  const currencyRef = useRef<HTMLDivElement>(null)
+
+  // Fetch exchange rates on mount
+  useEffect(() => {
+    fetch('https://open.er-api.com/v6/latest/LKR')
+      .then(r => r.json())
+      .then(data => {
+        if (data?.rates) {
+          setExchangeRates({
+            LKR: 1,
+            USD: data.rates.USD ?? FALLBACK_RATES.USD,
+            EUR: data.rates.EUR ?? FALLBACK_RATES.EUR,
+            GBP: data.rates.GBP ?? FALLBACK_RATES.GBP,
+            AUD: data.rates.AUD ?? FALLBACK_RATES.AUD,
+          })
+        }
+      })
+      .catch(() => {/* use fallback */})
+  }, [])
+
+  // Close currency dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (currencyRef.current && !currencyRef.current.contains(e.target as Node)) {
+        setCurrencyDropOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Currency formatter that converts from LKR to selected currency
+  function convertAndFormat(amountLKR: number): string {
+    const rate = exchangeRates[displayCurrency] ?? 1
+    const converted = amountLKR * rate
+    const sym = CURRENCY_SYMBOLS[displayCurrency]
+    if (displayCurrency === 'LKR') {
+      return `${sym} ${Math.round(converted).toLocaleString()}`
+    }
+    return `${sym}${converted.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+  }
+
+  // Change 1: Open mobile menu with animation
+  function openMobileMenu() {
+    setMobileMenuOpen(true)
+    // slight delay so overlay renders before slide-in
+    requestAnimationFrame(() => setMobileMenuVisible(true))
+  }
+  function closeMobileMenu() {
+    setMobileMenuVisible(false)
+    // wait for animation to finish before unmounting
+    setTimeout(() => setMobileMenuOpen(false), 300)
+  }
+
+  // Change 2: Lock body scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [mobileMenuOpen])
 
   // Scroll
   useEffect(() => {
@@ -157,15 +254,21 @@ export default function SeekerMarketplace() {
     })()
   }, [])
 
-  // Load Listings
+  // ── Change 3 & 4: Load Listings — join with properties table for city & type ─
   useEffect(() => {
     ; (async () => {
       setLoading(true)
       try {
         const sb = createClient()
+        // Fetch listings joined with properties to get correct city and type
         const { data: rows } = await sb
           .from('listings')
-          .select('id,title,description,landlord_id,bedrooms,bathrooms,rent_amount,currency,available_from,photos,tags,city,property_type,area_sqft')
+          .select(`
+            id,title,description,landlord_id,bedrooms,bathrooms,rent_amount,currency,
+            available_from,photos,tags,city,property_type,area_sqft,
+            property_id,
+            properties(city, type)
+          `)
           .eq('status', 'active')
           .order('created_at', { ascending: false })
           .limit(80)
@@ -179,6 +282,12 @@ export default function SeekerMarketplace() {
 
         const mapped: Listing[] = (rows || []).map((r: any) => {
           const lName = profileMap[r.landlord_id] || 'Landlord'
+          // Change 3: prefer property type from properties table
+          const propType = r.properties?.type || r.property_type || 'House'
+          // Capitalise first letter so it matches the PROPERTY_TYPES array
+          const normType = propType.charAt(0).toUpperCase() + propType.slice(1).toLowerCase()
+          // Change 4: prefer city from properties table
+          const city = r.properties?.city || r.city || ''
           return {
             id: r.id, title: r.title || 'Untitled', description: r.description || '',
             landlord_id: r.landlord_id || '', landlord_name: lName, landlord_initials: initials(lName),
@@ -186,7 +295,8 @@ export default function SeekerMarketplace() {
             rent_amount: r.rent_amount || 0, currency: r.currency || 'LKR',
             available_from: r.available_from || '',
             photos: r.photos || [], tags: r.tags || [],
-            city: r.city || '', property_type: r.property_type || 'House',
+            city,
+            property_type: normType,
             area_sqft: r.area_sqft || null, saved: false,
           }
         })
@@ -215,7 +325,7 @@ export default function SeekerMarketplace() {
     })()
   }, [])
 
-  // Featured listings
+  // ── Change 5: Featured listings — limit to 12 ──────────────────────────────
   useEffect(() => {
     if (allListings.length === 0) return
     if (userId && (userInterests.tags.length > 0 || userInterests.cities.length > 0)) {
@@ -228,10 +338,10 @@ export default function SeekerMarketplace() {
           return { ...l, score }
         })
         .sort((a, b) => b.score - a.score)
-      setFeaturedListings(scored.slice(0, 6))
+      setFeaturedListings(scored.slice(0, 12)) // ← was 6, now 12
     } else {
-      const withPhotos = allListings.filter(l => l.photos.length > 0).slice(0, 6)
-      const withoutPhotos = allListings.filter(l => l.photos.length === 0).slice(0, Math.max(0, 6 - withPhotos.length))
+      const withPhotos = allListings.filter(l => l.photos.length > 0).slice(0, 12)
+      const withoutPhotos = allListings.filter(l => l.photos.length === 0).slice(0, Math.max(0, 12 - withPhotos.length))
       setFeaturedListings([...withPhotos, ...withoutPhotos])
     }
   }, [allListings, userId, userInterests])
@@ -257,7 +367,17 @@ export default function SeekerMarketplace() {
     return result
   }, [allListings, searchQuery, selectedType, selectedCity, priceMin, priceMax, bedrooms, selectedTags])
 
-  useEffect(() => { setBrowsedListings(getFiltered()) }, [getFiltered])
+  useEffect(() => {
+    setBrowsedListings(getFiltered())
+    setCurrentPage(1) // reset to page 1 when filters change
+  }, [getFiltered])
+
+  // Change 6: paginated listings
+  const totalPages = Math.ceil(browsedListings.length / ITEMS_PER_PAGE)
+  const paginatedListings = browsedListings.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  )
 
   // Save / Unsave
   async function toggleSave(listingId: string, e: React.MouseEvent) {
@@ -347,15 +467,34 @@ export default function SeekerMarketplace() {
         .hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;padding:4px;color:#475569;flex-shrink:0}
         .nav.transparent .hamburger{color:#fff}
 
+        /* ── Change 7: Currency selector ── */
+        .nav-currency{position:relative;flex-shrink:0}
+        .nav-currency-btn{display:flex;align-items:center;gap:5px;padding:7px 11px;border-radius:10px;border:1.5px solid #E2E8F0;background:#F8FAFC;color:#374151;font-size:12.5px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;white-space:nowrap}
+        .nav-currency-btn:hover{border-color:#CBD5E1;background:#F1F5F9}
+        .nav.transparent .nav-currency-btn{border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:rgba(255,255,255,.85)}
+        .nav.transparent .nav-currency-btn:hover{background:rgba(255,255,255,.18)}
+        .nav-currency-drop{position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1.5px solid #E2E8F0;border-radius:12px;box-shadow:0 8px 24px rgba(15,23,42,.12);overflow:hidden;min-width:120px;z-index:600}
+        .nav-currency-item{display:block;width:100%;padding:9px 16px;font-size:13px;font-weight:600;color:#374151;background:none;border:none;text-align:left;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:background .12s}
+        .nav-currency-item:hover{background:#F1F5F9}
+        .nav-currency-item.active{color:#2563EB;background:#EFF6FF}
+
+        /* ── Change 1: Mobile menu slide animation ── */
         .mm-overlay{display:none;position:fixed;inset:0;z-index:1000}
         .mm-overlay.open{display:flex}
-        .mm-bg{position:absolute;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(4px)}
-        .mm-panel{position:absolute;top:0;right:0;bottom:0;width:min(300px,88vw);background:#fff;padding:24px 20px;display:flex;flex-direction:column;gap:4px;box-shadow:-8px 0 40px rgba(0,0,0,.12)}
+        .mm-bg{position:absolute;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);opacity:0;transition:opacity .3s ease}
+        .mm-overlay.visible .mm-bg{opacity:1}
+        .mm-panel{position:absolute;top:0;right:0;bottom:0;width:min(300px,88vw);background:#fff;padding:24px 20px;display:flex;flex-direction:column;gap:4px;box-shadow:-8px 0 40px rgba(0,0,0,.12);transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1)}
+        .mm-overlay.visible .mm-panel{transform:translateX(0)}
         .mm-close{align-self:flex-end;background:none;border:none;font-size:22px;cursor:pointer;color:#64748B;margin-bottom:8px}
         .mm-link{font-size:15px;font-weight:600;color:#374151;padding:11px 14px;border-radius:10px;text-decoration:none;display:block;transition:background .15s}
         .mm-link:hover{background:#F1F5F9}
         .mm-div{height:1px;background:#F1F5F9;margin:8px 0}
         .mm-cta{font-size:14px;font-weight:700;color:#fff;padding:13px;border-radius:12px;background:linear-gradient(135deg,#2563EB,#6366F1);text-align:center;text-decoration:none;display:block;margin-top:8px}
+        /* Currency in mobile menu */
+        .mm-currency-row{display:flex;align-items:center;gap:8px;padding:10px 14px;flex-wrap:wrap}
+        .mm-currency-lbl{font-size:12px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.5px}
+        .mm-currency-pill{padding:5px 12px;border-radius:99px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;font-family:'Plus Jakarta Sans',sans-serif}
+        .mm-currency-pill.active{background:#EFF6FF;border-color:#93C5FD;color:#2563EB}
 
         .hero{position:relative;min-height:600px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;padding:90px 24px 0}
         .hero-bg{position:absolute;inset:0;background:linear-gradient(145deg,#0B1629 0%,#162344 45%,#0B1629 100%)}
@@ -450,6 +589,10 @@ export default function SeekerMarketplace() {
         .fcard-facts{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
         .fcard-fact{font-size:11px;color:#475569;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:2px 7px}
 
+        /* Change 5: View all button for featured */
+        .feat-view-all{display:inline-flex;align-items:center;gap:6px;margin-top:14px;font-size:13px;font-weight:700;color:#2563EB;background:none;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;text-decoration:none}
+        .feat-view-all:hover{text-decoration:underline}
+
         .city-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
         .city-card{position:relative;height:155px;border-radius:18px;overflow:hidden;cursor:pointer;transition:transform .2s,box-shadow .2s}
         .city-card:hover{transform:translateY(-3px);box-shadow:0 14px 36px rgba(15,23,42,.18)}
@@ -482,7 +625,7 @@ export default function SeekerMarketplace() {
         .vbtn.active{background:#F1F5F9;color:#0F172A}
         .browse-right{display:flex;align-items:center;gap:8px}
 
-        .listing-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding-bottom:64px}
+        .listing-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding-bottom:32px}
         .listing-grid.list-v{grid-template-columns:1fr}
         .lcard{background:#fff;border:1px solid #E2E8F0;border-radius:18px;overflow:hidden;cursor:pointer;transition:box-shadow .18s,transform .18s;box-shadow:0 1px 4px rgba(15,23,42,.04)}
         .lcard:hover{box-shadow:0 8px 28px rgba(15,23,42,.10);transform:translateY(-2px)}
@@ -514,6 +657,14 @@ export default function SeekerMarketplace() {
         .lcard-ll-name{font-size:11.5px;color:#475569;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px}
         .lcard-contact{padding:5px 12px;border-radius:8px;border:none;background:#0F172A;color:#fff;font-size:11.5px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:background .15s;white-space:nowrap;flex-shrink:0}
         .lcard-contact:hover{background:#1E293B}
+
+        /* Change 6: Pagination */
+        .pagination{display:flex;align-items:center;justify-content:center;gap:6px;padding:24px 0 48px}
+        .pg-btn{min-width:36px;height:36px;padding:0 10px;border-radius:9px;border:1.5px solid #E2E8F0;background:#fff;color:#374151;font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;display:flex;align-items:center;justify-content:center}
+        .pg-btn:hover{border-color:#CBD5E1;background:#F8FAFC}
+        .pg-btn.active{background:#0F172A;border-color:#0F172A;color:#fff}
+        .pg-btn:disabled{opacity:.4;cursor:not-allowed}
+        .pg-ellipsis{padding:0 6px;color:#94A3B8;font-size:13px;font-weight:600}
 
         @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
         .skel{background:linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:8px}
@@ -568,7 +719,7 @@ export default function SeekerMarketplace() {
         }
         @media(max-width:768px){
           .hamburger{display:block}
-          .nav-link,.nav-list-btn{display:none}
+          .nav-link,.nav-list-btn,.nav-currency{display:none}
           .nav-search-wrap{display:none!important}
           .hero{padding:80px 16px 0;min-height:auto}
           .hero-title{font-size:clamp(42px,8vw,44px)}
@@ -634,30 +785,44 @@ export default function SeekerMarketplace() {
         </div>
       </div>
 
-      {/* ══ MOBILE MENU ══ */}
-      <div className={`mm-overlay${mobileMenuOpen ? ' open' : ''}`}>
-        <div className="mm-bg" onClick={() => setMobileMenuOpen(false)} />
-        <div className="mm-panel">
-          <button className="mm-close" onClick={() => setMobileMenuOpen(false)}>✕</button>
-          <a href="/seeker" className="mm-link">🔍 Browse Homes</a>
-          <a href="/seeker/listings" className="mm-link">📋 All Listings</a>
-          <a href="/seeker/map" className="mm-link">🗺️ Map View</a>
-          <div className="mm-div" />
-          <button
-            className="mm-link"
-            style={{ background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', width: '100%', fontFamily: 'inherit', fontWeight: 600, color: '#374151', padding: '11px 14px', borderRadius: 10, fontSize: 15 }}
-            onClick={(e) => { setMobileMenuOpen(false); handleListProperty(e as any) }}
-          >
-            🏡 List Your Property
-          </button>
-          <div className="mm-div" />
-          {userId
-            ? <a href="/seeker/messages" className="mm-link">💬 Messages</a>
-            : <a href="/login" className="mm-link">Sign In</a>
-          }
-          {!userId && <a href="/signup" className="mm-cta">Get Started Free →</a>}
+      {/* ══ MOBILE MENU — Change 1: slide animation ══ */}
+      {mobileMenuOpen && (
+        <div className={`mm-overlay open${mobileMenuVisible ? ' visible' : ''}`}>
+          <div className="mm-bg" onClick={closeMobileMenu} />
+          <div className="mm-panel">
+            <button className="mm-close" onClick={closeMobileMenu}>✕</button>
+            <a href="/seeker" className="mm-link">🔍 Browse Homes</a>
+            <a href="/seeker/listings" className="mm-link">📋 All Listings</a>
+            <a href="/seeker/map" className="mm-link">🗺️ Map View</a>
+            <div className="mm-div" />
+            <button
+              className="mm-link"
+              style={{ background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', width: '100%', fontFamily: 'inherit', fontWeight: 600, color: '#374151', padding: '11px 14px', borderRadius: 10, fontSize: 15 }}
+              onClick={(e) => { closeMobileMenu(); handleListProperty(e as any) }}
+            >
+              🏡 List Your Property
+            </button>
+            <div className="mm-div" />
+            {/* Change 7: Currency picker in mobile menu */}
+            <div className="mm-currency-row">
+              <span className="mm-currency-lbl">Currency:</span>
+              {SUPPORTED_CURRENCIES.map(c => (
+                <button
+                  key={c}
+                  className={`mm-currency-pill${displayCurrency === c ? ' active' : ''}`}
+                  onClick={() => setDisplayCurrency(c)}
+                >{c}</button>
+              ))}
+            </div>
+            <div className="mm-div" />
+            {userId
+              ? <a href="/seeker/messages" className="mm-link">💬 Messages</a>
+              : <a href="/login" className="mm-link">Sign In</a>
+            }
+            {!userId && <a href="/signup" className="mm-cta">Get Started Free →</a>}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ══ NAVBAR ══ */}
       <nav className={`nav${scrolled ? ' scrolled' : ' transparent'}`}>
@@ -684,11 +849,35 @@ export default function SeekerMarketplace() {
             <a href="/seeker/listings" className="nav-link">Listings</a>
             <a href="/seeker/map" className="nav-link">Map</a>
             <button className="nav-list-btn" onClick={handleListProperty}>List Your Property</button>
+
+            {/* ── Change 7: Currency selector in navbar ── */}
+            <div className="nav-currency" ref={currencyRef}>
+              <button
+                className="nav-currency-btn"
+                onClick={() => setCurrencyDropOpen(v => !v)}
+              >
+                {CURRENCY_SYMBOLS[displayCurrency]} {displayCurrency} ▾
+              </button>
+              {currencyDropOpen && (
+                <div className="nav-currency-drop">
+                  {SUPPORTED_CURRENCIES.map(c => (
+                    <button
+                      key={c}
+                      className={`nav-currency-item${displayCurrency === c ? ' active' : ''}`}
+                      onClick={() => { setDisplayCurrency(c); setCurrencyDropOpen(false) }}
+                    >
+                      {CURRENCY_SYMBOLS[c]} {c}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {userId
               ? <a href="/seeker/profile" className="nav-avatar">{userInitials}</a>
               : <a href="/login" className="nav-signin">Sign In</a>
             }
-            <button className="hamburger" onClick={() => setMobileMenuOpen(true)}>☰</button>
+            <button className="hamburger" onClick={openMobileMenu}>☰</button>
           </div>
         </div>
       </nav>
@@ -770,7 +959,7 @@ export default function SeekerMarketplace() {
             </div>
             <div className="hstat">
               <div>
-                <div className="hstat-num">{loading ? '…' : (stats.minRent > 0 ? fmtMoney(stats.minRent) : '—')}</div>
+                <div className="hstat-num">{loading ? '…' : (stats.minRent > 0 ? convertAndFormat(stats.minRent) : '—')}</div>
                 <div className="hstat-lbl">Starting from / mo</div>
               </div>
             </div>
@@ -847,7 +1036,7 @@ export default function SeekerMarketplace() {
         </div>
       </div>
 
-      {/* ══ FEATURED ══ */}
+      {/* ══ FEATURED — Change 5: 12 listings + View all → /seeker/listings ══ */}
       {!loading && featuredListings.length > 0 && showSections && (
         <div className="page">
           <div className="section">
@@ -867,7 +1056,7 @@ export default function SeekerMarketplace() {
                   }
                 </div>
               </div>
-              <button className="sec-link" onClick={scrollToBrowse}>View all →</button>
+              <a href="/seeker/listings" className="sec-link">View all →</a>
             </div>
             <div className="feat-strip">
               {featuredListings.map(l => (
@@ -886,7 +1075,8 @@ export default function SeekerMarketplace() {
                     <div className="fcard-type">{l.property_type}</div>
                     <div className="fcard-title">{l.title}</div>
                     <div className="fcard-loc">📍 {l.city || 'Unknown'}</div>
-                    <div className="fcard-price">{fmtMoney(l.rent_amount)}<span> /mo</span></div>
+                    {/* Change 7: use convertAndFormat */}
+                    <div className="fcard-price">{convertAndFormat(l.rent_amount)}<span> /mo</span></div>
                     <div className="fcard-facts">
                       {l.bedrooms > 0 && <span className="fcard-fact">🛏 {l.bedrooms}</span>}
                       <span className="fcard-fact">🚿 {l.bathrooms}</span>
@@ -896,6 +1086,8 @@ export default function SeekerMarketplace() {
                 </div>
               ))}
             </div>
+            {/* Change 5: explicit View all button below strip */}
+            <a href="/seeker/listings" className="feat-view-all">View all listings →</a>
           </div>
         </div>
       )}
@@ -951,7 +1143,7 @@ export default function SeekerMarketplace() {
                     <div className="fcard-type">{l.property_type}</div>
                     <div className="fcard-title">{l.title}</div>
                     <div className="fcard-loc">📍 {l.city || 'Unknown'}</div>
-                    <div className="fcard-price">{fmtMoney(l.rent_amount)}<span> /mo</span></div>
+                    <div className="fcard-price">{convertAndFormat(l.rent_amount)}<span> /mo</span></div>
                     <div className="fcard-facts">
                       {l.bedrooms > 0 && <span className="fcard-fact">🛏 {l.bedrooms}</span>}
                       <span className="fcard-fact">🚿 {l.bathrooms}</span>
@@ -994,7 +1186,7 @@ export default function SeekerMarketplace() {
         </div>
       )}
 
-      {/* ══ BROWSE ALL ══ */}
+      {/* ══ BROWSE ALL — Change 6: paginated ══ */}
       <div className="page" id="browse-section">
         <div className="browse-toolbar">
           <div>
@@ -1044,7 +1236,7 @@ export default function SeekerMarketplace() {
               <div className="empty-sub">Try adjusting your search or clearing some filters to see more properties.</div>
               <button className="empty-btn" onClick={() => { setSearchQuery(''); setSelectedType('All'); setSelectedCity(''); setPriceMin(''); setPriceMax(''); setBedrooms('Any'); setSelectedTags([]) }}>Clear all filters</button>
             </div>
-          ) : browsedListings.map(l => (
+          ) : paginatedListings.map(l => (
             <div
               key={l.id}
               className={`lcard${view === 'list' ? ' list-v' : ''}`}
@@ -1065,7 +1257,8 @@ export default function SeekerMarketplace() {
                 <div className="lcard-type">{l.property_type}</div>
                 <div className="lcard-title">{l.title}</div>
                 <div className="lcard-loc">📍 {l.city || 'Location not specified'}</div>
-                <div className="lcard-price">{fmtMoney(l.rent_amount)}<span> /mo</span></div>
+                {/* Change 7: converted price */}
+                <div className="lcard-price">{convertAndFormat(l.rent_amount)}<span> /mo</span></div>
                 <div className="lcard-facts">
                   {l.bedrooms > 0 && <span className="lcard-fact">🛏 {l.bedrooms} bed</span>}
                   <span className="lcard-fact">🚿 {l.bathrooms} bath</span>
@@ -1094,6 +1287,39 @@ export default function SeekerMarketplace() {
             </div>
           ))}
         </div>
+
+        {/* Change 6: Pagination controls */}
+        {!loading && totalPages > 1 && (
+          <div className="pagination">
+            <button
+              className="pg-btn"
+              onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); scrollToBrowse() }}
+              disabled={currentPage === 1}
+            >← Prev</button>
+
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+              // Show first, last, current and neighbours; ellipsis otherwise
+              const show = page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1
+              if (!show) {
+                if (page === 2 || page === totalPages - 1) return <span key={page} className="pg-ellipsis">…</span>
+                return null
+              }
+              return (
+                <button
+                  key={page}
+                  className={`pg-btn${currentPage === page ? ' active' : ''}`}
+                  onClick={() => { setCurrentPage(page); scrollToBrowse() }}
+                >{page}</button>
+              )
+            })}
+
+            <button
+              className="pg-btn"
+              onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); scrollToBrowse() }}
+              disabled={currentPage === totalPages}
+            >Next →</button>
+          </div>
+        )}
       </div>
 
       {/* ══ FOOTER ══ */}
