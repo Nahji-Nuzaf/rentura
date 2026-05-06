@@ -2,6 +2,8 @@
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Rentura — Full Listings Page  /src/app/seeker/listings/page.tsx
+// Updated: homepage navbar + footer, currency conversion, hidden scrollbar,
+//          pagination (20/page), full responsiveness
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useCallback, useState, useRef } from 'react'
@@ -36,6 +38,26 @@ type UserRole = 'landlord' | 'seeker' | 'agent' | null
 type ViewMode = 'grid' | 'list' | 'compact'
 type SortKey = 'newest' | 'price_asc' | 'price_desc' | 'area_desc' | 'beds_desc'
 
+// ── Currency types (from homepage) ────────────────────────────────────────────
+const SUPPORTED_CURRENCIES = ['LKR', 'USD', 'EUR', 'GBP', 'AUD'] as const
+type CurrencyCode = typeof SUPPORTED_CURRENCIES[number]
+
+const CURRENCY_SYMBOLS: Record<CurrencyCode, string> = {
+  LKR: 'Rs',
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  AUD: 'A$',
+}
+
+const FALLBACK_RATES: Record<CurrencyCode, number> = {
+  LKR: 1,
+  USD: 0.0033,
+  EUR: 0.0031,
+  GBP: 0.0026,
+  AUD: 0.0051,
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 const AVATAR_GRADIENTS = [
   'linear-gradient(135deg,#6366F1,#8B5CF6)',
@@ -66,7 +88,7 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
 const TYPE_ICONS: Record<string, string> = {
   House: '🏡', Apartment: '🏢', Studio: '🛋️', Villa: '🏰', Room: '🚪', Office: '🏗️',
 }
-const PAGE_SIZE = 18
+const PAGE_SIZE = 20
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function initials(name: string) {
@@ -96,7 +118,7 @@ function sortListings(listings: Listing[], sort: SortKey): Listing[] {
   }
 }
 
-// ── Filter Sidebar Content (shared between desktop & mobile drawer) ────────────
+// ── Filter Sidebar Content ────────────────────────────────────────────────────
 function FilterContent({
   search, setSearch,
   selectedTypes, toggleType,
@@ -132,7 +154,6 @@ function FilterContent({
 }) {
   return (
     <div className="filter-content">
-      {/* Header — only shown on desktop sidebar */}
       {!isMobile && (
         <div className="sb-hd">
           <div className="sb-title">Filters</div>
@@ -142,7 +163,6 @@ function FilterContent({
         </div>
       )}
 
-      {/* Search */}
       <div className="sb-section">
         <div className="sb-sec-label">Keyword</div>
         <div className="sb-search-wrap">
@@ -157,7 +177,6 @@ function FilterContent({
         </div>
       </div>
 
-      {/* Property type */}
       <div className="sb-section">
         <div className="sb-sec-label">Property type</div>
         <div className="sb-type-grid">
@@ -174,7 +193,6 @@ function FilterContent({
         </div>
       </div>
 
-      {/* City */}
       <div className="sb-section">
         <div className="sb-sec-label">City</div>
         <select className="sb-select" value={selectedCity} onChange={e => { setSelectedCity(e.target.value); setPage(1) }}>
@@ -183,7 +201,6 @@ function FilterContent({
         </select>
       </div>
 
-      {/* Price */}
       <div className="sb-section">
         <div className="sb-sec-label">Monthly rent (LKR)</div>
         <div className="sb-range-row">
@@ -202,7 +219,6 @@ function FilterContent({
         </div>
       </div>
 
-      {/* Bedrooms */}
       <div className="sb-section">
         <div className="sb-sec-label">Minimum bedrooms</div>
         <div className="sb-option-row">
@@ -213,7 +229,6 @@ function FilterContent({
         </div>
       </div>
 
-      {/* Bathrooms */}
       <div className="sb-section">
         <div className="sb-sec-label">Minimum bathrooms</div>
         <div className="sb-option-row">
@@ -224,7 +239,6 @@ function FilterContent({
         </div>
       </div>
 
-      {/* Area */}
       <div className="sb-section">
         <div className="sb-sec-label">Area (sqft)</div>
         <div className="sb-range-row">
@@ -234,7 +248,6 @@ function FilterContent({
         </div>
       </div>
 
-      {/* Quick toggles */}
       <div className="sb-section">
         <div className="sb-sec-label">Quick filters</div>
         <div className="sb-toggles">
@@ -252,7 +265,6 @@ function FilterContent({
         </div>
       </div>
 
-      {/* Amenities */}
       <div className="sb-section">
         <div className="sb-sec-label">Amenities & features</div>
         <div className="sb-amenity-grid">
@@ -292,6 +304,7 @@ export default function ListingsPage() {
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
   const [listModalOpen, setListModalOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [mobileMenuVisible, setMobileMenuVisible] = useState(false)
 
   // Auth gate
   const [authGateOpen, setAuthGateOpen] = useState(false)
@@ -317,12 +330,76 @@ export default function ListingsPage() {
   const [newOnly, setNewOnly] = useState(false)
   const [hasPhotos, setHasPhotos] = useState(false)
 
+  // Currency (from homepage)
+  const [displayCurrency, setDisplayCurrency] = useState<CurrencyCode>('LKR')
+  const [exchangeRates, setExchangeRates] = useState<Record<CurrencyCode, number>>(FALLBACK_RATES)
+  const [currencyDropOpen, setCurrencyDropOpen] = useState(false)
+  const currencyRef = useRef<HTMLDivElement>(null)
+
+  // ── Currency helpers ──────────────────────────────────────────────────────
+  function convertAndFormat(amountLKR: number): string {
+    const rate = exchangeRates[displayCurrency] ?? 1
+    const converted = amountLKR * rate
+    const sym = CURRENCY_SYMBOLS[displayCurrency]
+    if (displayCurrency === 'LKR') {
+      return `${sym} ${Math.round(converted).toLocaleString()}`
+    }
+    return `${sym}${converted.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+  }
+
+  // Fetch exchange rates
+  useEffect(() => {
+    fetch('https://open.er-api.com/v6/latest/LKR')
+      .then(r => r.json())
+      .then(data => {
+        if (data?.rates) {
+          setExchangeRates({
+            LKR: 1,
+            USD: data.rates.USD ?? FALLBACK_RATES.USD,
+            EUR: data.rates.EUR ?? FALLBACK_RATES.EUR,
+            GBP: data.rates.GBP ?? FALLBACK_RATES.GBP,
+            AUD: data.rates.AUD ?? FALLBACK_RATES.AUD,
+          })
+        }
+      })
+      .catch(() => { /* use fallback */ })
+  }, [])
+
+  // Close currency dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (currencyRef.current && !currencyRef.current.contains(e.target as Node)) {
+        setCurrencyDropOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   // Scroll
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 50)
     window.addEventListener('scroll', fn, { passive: true })
     return () => window.removeEventListener('scroll', fn)
   }, [])
+
+  // Mobile menu helpers
+  function openMobileMenu() {
+    setMobileMenuOpen(true)
+    requestAnimationFrame(() => setMobileMenuVisible(true))
+  }
+  function closeMobileMenu() {
+    setMobileMenuVisible(false)
+    setTimeout(() => setMobileMenuOpen(false), 300)
+  }
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [mobileMenuOpen])
 
   // Auth
   useEffect(() => {
@@ -416,8 +493,8 @@ export default function ListingsPage() {
   }, [allListings, search, selectedTypes, selectedCity, priceMin, priceMax, bedsMin, bathsMin, areaMin, areaMax, selectedTags, availableOnly, newOnly, hasPhotos, sort])
 
   const results = filtered()
-  const paginated = results.slice(0, page * PAGE_SIZE)
-  const hasMore = paginated.length < results.length
+  const totalPages = Math.ceil(results.length / PAGE_SIZE)
+  const paginated = results.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const activeFilterCount = [
     selectedTypes.length > 0,
@@ -446,6 +523,9 @@ export default function ListingsPage() {
     setSelectedTypes(ts => ts.includes(type) ? ts.filter(t => t !== type) : [...ts, type])
     setPage(1)
   }
+
+  // Reset to page 1 when filters/sort change
+  useEffect(() => { setPage(1) }, [search, selectedTypes, selectedCity, priceMin, priceMax, bedsMin, bathsMin, areaMin, areaMax, selectedTags, availableOnly, newOnly, hasPhotos, sort])
 
   async function toggleSave(listingId: string, e: React.MouseEvent) {
     e.stopPropagation()
@@ -480,12 +560,20 @@ export default function ListingsPage() {
     setListModalOpen(true)
   }
 
-  // Navigate to single listing page on card click
   function handleCardClick(listingId: string) {
     router.push(`/seeker/listing-details/${listingId}`)
   }
 
-  // Active chips data
+  function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function handlePageChange(p: number) {
+    setPage(p)
+    scrollToTop()
+  }
+
+  // Active chips
   type Chip = { label: string; onRemove: () => void }
   const activeChips: Chip[] = [
     ...(search ? [{ label: `"${search}"`, onRemove: () => { setSearch(''); setPage(1) } }] : []),
@@ -501,7 +589,6 @@ export default function ListingsPage() {
     ...(hasPhotos ? [{ label: '📷 Has photos', onRemove: () => { setHasPhotos(false); setPage(1) } }] : []),
   ]
 
-  // Shared filter props
   const filterProps = {
     search, setSearch,
     selectedTypes, toggleType,
@@ -517,6 +604,28 @@ export default function ListingsPage() {
     setPage,
   }
 
+  // Pagination helper
+  function renderPaginationButtons() {
+    const buttons: React.ReactNode[] = []
+    for (let i = 1; i <= totalPages; i++) {
+      const show = i === 1 || i === totalPages || Math.abs(i - page) <= 1
+      if (!show) {
+        if (i === 2 || i === totalPages - 1) {
+          buttons.push(<span key={`ellipsis-${i}`} className="pg-ellipsis">…</span>)
+        }
+        continue
+      }
+      buttons.push(
+        <button
+          key={i}
+          className={`pg-btn${page === i ? ' active' : ''}`}
+          onClick={() => handlePageChange(i)}
+        >{i}</button>
+      )
+    }
+    return buttons
+  }
+
   return (
     <>
       <style>{`
@@ -528,7 +637,7 @@ export default function ListingsPage() {
         ::-webkit-scrollbar{width:5px;height:5px}
         ::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:99px}
 
-        /* ═══ NAVBAR ══════════════════════════════════════════════════════════ */
+        /* ═══ NAVBAR (from homepage) ══════════════════════════════════════════ */
         .nav{position:fixed;top:0;left:0;right:0;z-index:500;transition:all .3s ease;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 1px 0 rgba(15,23,42,.08),0 4px 24px rgba(15,23,42,.06)}
         .nav-inner{max-width:1440px;margin:0 auto;padding:0 24px;height:68px;display:flex;align-items:center;gap:14px}
         .nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none;flex-shrink:0}
@@ -556,13 +665,38 @@ export default function ListingsPage() {
         .nav-avatar{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#0EA5E9,#6366F1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;flex-shrink:0;border:2px solid rgba(255,255,255,.4)}
         .hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;padding:4px;color:#475569;flex-shrink:0}
 
+        /* Currency dropdown (from homepage) */
+        .nav-currency{position:relative;flex-shrink:0}
+        .nav-currency-btn{display:flex;align-items:center;gap:5px;padding:7px 11px;border-radius:10px;border:1.5px solid #E2E8F0;background:#F8FAFC;color:#374151;font-size:12.5px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;white-space:nowrap}
+        .nav-currency-btn:hover{border-color:#CBD5E1;background:#F1F5F9}
+        .nav-currency-drop{position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1.5px solid #E2E8F0;border-radius:12px;box-shadow:0 8px 24px rgba(15,23,42,.12);overflow:hidden;min-width:120px;z-index:600}
+        .nav-currency-item{display:block;width:100%;padding:9px 16px;font-size:13px;font-weight:600;color:#374151;background:none;border:none;text-align:left;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:background .12s}
+        .nav-currency-item:hover{background:#F1F5F9}
+        .nav-currency-item.active{color:#2563EB;background:#EFF6FF}
+
         /* ═══ PAGE LAYOUT ═════════════════════════════════════════════════════ */
         .page-layout{display:flex;max-width:1440px;margin:0 auto;padding:88px 24px 48px;gap:0;min-height:100vh;align-items:flex-start}
 
-        /* ═══ DESKTOP SIDEBAR ═════════════════════════════════════════════════ */
-        .desktop-sidebar{width:292px;flex-shrink:0;background:#fff;border:1px solid #E2E8F0;border-radius:20px;overflow:hidden;position:sticky;top:84px;max-height:calc(100vh - 104px);overflow-y:auto;margin-right:24px;box-shadow:0 2px 12px rgba(15,23,42,.05)}
-        .desktop-sidebar::-webkit-scrollbar{width:4px}
-        .desktop-sidebar::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:99px}
+        /* ═══ DESKTOP SIDEBAR ══════════════════════════════════════════════════
+             scrollbar hidden but still scrollable                              */
+        .desktop-sidebar{
+          width:292px;
+          flex-shrink:0;
+          background:#fff;
+          border:1px solid #E2E8F0;
+          border-radius:20px;
+          overflow:hidden;
+          position:sticky;
+          top:84px;
+          max-height:calc(100vh - 104px);
+          overflow-y:auto;
+          margin-right:24px;
+          box-shadow:0 2px 12px rgba(15,23,42,.05);
+          /* Hide scrollbar cross-browser */
+          scrollbar-width:none;
+          -ms-overflow-style:none;
+        }
+        .desktop-sidebar::-webkit-scrollbar{display:none}
 
         /* ═══ FILTER CONTENT (shared) ═════════════════════════════════════════ */
         .filter-content{}
@@ -717,13 +851,14 @@ export default function ListingsPage() {
         .es-sub{font-size:14px;color:#94A3B8;margin-bottom:24px;line-height:1.65;max-width:340px;margin-left:auto;margin-right:auto}
         .es-btn{padding:11px 26px;border-radius:12px;border:none;background:#0F172A;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
 
-        /* ═══ LOAD MORE ═══════════════════════════════════════════════════════ */
-        .load-more-wrap{text-align:center;padding:28px 0 12px}
-        .load-more-btn{padding:12px 36px;border-radius:13px;border:1.5px solid #E2E8F0;background:#fff;color:#374151;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .18s;box-shadow:0 1px 4px rgba(15,23,42,.05)}
-        .load-more-btn:hover{border-color:#0F172A;background:#0F172A;color:#fff;box-shadow:0 4px 16px rgba(15,23,42,.15)}
-        .lm-progress{font-size:12px;color:#94A3B8;margin-top:10px}
-        .lm-bar{height:3px;background:#E2E8F0;border-radius:99px;margin-top:10px;overflow:hidden}
-        .lm-fill{height:100%;background:linear-gradient(90deg,#2563EB,#6366F1);border-radius:99px;transition:width .4s}
+        /* ═══ PAGINATION ══════════════════════════════════════════════════════ */
+        .pagination{display:flex;align-items:center;justify-content:center;gap:6px;padding:28px 0 12px;flex-wrap:wrap}
+        .pg-btn{min-width:36px;height:36px;padding:0 10px;border-radius:9px;border:1.5px solid #E2E8F0;background:#fff;color:#374151;font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;display:flex;align-items:center;justify-content:center}
+        .pg-btn:hover:not([disabled]){border-color:#CBD5E1;background:#F8FAFC}
+        .pg-btn.active{background:#0F172A;border-color:#0F172A;color:#fff}
+        .pg-btn:disabled{opacity:.4;cursor:not-allowed}
+        .pg-ellipsis{padding:0 6px;color:#94A3B8;font-size:13px;font-weight:600}
+        .pg-info{text-align:center;font-size:12px;color:#94A3B8;margin-top:8px;font-weight:500}
 
         /* ═══ AUTH GATE ════════════════════════════════════════════════════════ */
         .ag-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:700;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(6px)}
@@ -756,9 +891,7 @@ export default function ListingsPage() {
         .lm-opt-desc{font-size:12px;color:#94A3B8;line-height:1.5}
         .lm-cancel{width:100%;padding:12px;border-radius:12px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:14px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:background .15s}
 
-        /* ═══ MOBILE FILTER DRAWER ════════════════════════════════════════════
-             Fixed: overlay covers full screen, panel slides up from bottom,
-             filter content renders directly (no nested sidebar component) */
+        /* ═══ MOBILE FILTER DRAWER ════════════════════════════════════════════ */
         .mf-overlay{
           visibility:hidden;
           opacity:0;
@@ -784,12 +917,14 @@ export default function ListingsPage() {
           z-index:1;
           transform:translateY(100%);
           transition:transform .3s cubic-bezier(.32,.72,0,1);
+          /* Hide scrollbar in drawer too */
+          scrollbar-width:none;
+          -ms-overflow-style:none;
         }
+        .mf-panel::-webkit-scrollbar{display:none}
         .mf-overlay.open .mf-panel{
           transform:translateY(0);
         }
-        .mf-panel::-webkit-scrollbar{width:4px}
-        .mf-panel::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:99px}
         .mf-hd{
           display:flex;
           align-items:center;
@@ -816,44 +951,40 @@ export default function ListingsPage() {
         .mf-apply{flex:1;padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 2px 12px rgba(37,99,235,.3)}
         .mf-clear{padding:13px 20px;border-radius:12px;border:1.5px solid #E2E8F0;background:#fff;color:#EF4444;font-size:14px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
 
-        /* ═══ MOBILE MENU — slide in from right with smooth animation ═════════ */
-        .mm-overlay{
-          visibility:hidden;
-          opacity:0;
-          position:fixed;
-          inset:0;
-          z-index:1000;
-          transition:opacity .25s ease, visibility .25s ease;
-        }
-        .mm-overlay.open{
-          visibility:visible;
-          opacity:1;
-        }
-        .mm-bg{position:absolute;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(4px)}
-        .mm-panel{
-          position:absolute;
-          top:0;
-          right:0;
-          bottom:0;
-          width:min(300px,88vw);
-          background:#fff;
-          padding:24px 20px;
-          display:flex;
-          flex-direction:column;
-          gap:4px;
-          box-shadow:-8px 0 40px rgba(0,0,0,.12);
-          transform:translateX(100%);
-          transition:transform .32s cubic-bezier(.32,.72,0,1);
-        }
-        .mm-overlay.open .mm-panel{
-          transform:translateX(0);
-        }
+        /* ═══ MOBILE MENU ═════════════════════════════════════════════════════ */
+        .mm-overlay{display:none;position:fixed;inset:0;z-index:1000}
+        .mm-overlay.open{display:flex}
+        .mm-bg{position:absolute;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);opacity:0;transition:opacity .3s ease}
+        .mm-overlay.visible .mm-bg{opacity:1}
+        .mm-panel{position:absolute;top:0;right:0;bottom:0;width:min(300px,88vw);background:#fff;padding:24px 20px;display:flex;flex-direction:column;gap:4px;box-shadow:-8px 0 40px rgba(0,0,0,.12);transform:translateX(100%);transition:transform .32s cubic-bezier(.32,.72,0,1)}
+        .mm-overlay.visible .mm-panel{transform:translateX(0)}
         .mm-close{align-self:flex-end;background:none;border:none;font-size:22px;cursor:pointer;color:#64748B;margin-bottom:8px}
         .mm-link{font-size:15px;font-weight:600;color:#374151;padding:11px 14px;border-radius:10px;text-decoration:none;display:block;transition:background .15s}
         .mm-link:hover{background:#F1F5F9}
         .mm-link.active{background:#EFF6FF;color:#2563EB}
         .mm-div{height:1px;background:#F1F5F9;margin:8px 0}
         .mm-cta{font-size:14px;font-weight:700;color:#fff;padding:13px;border-radius:12px;background:linear-gradient(135deg,#2563EB,#6366F1);text-align:center;text-decoration:none;display:block;margin-top:8px}
+        .mm-currency-row{display:flex;align-items:center;gap:8px;padding:10px 14px;flex-wrap:wrap}
+        .mm-currency-lbl{font-size:12px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.5px}
+        .mm-currency-pill{padding:5px 12px;border-radius:99px;border:1.5px solid #E2E8F0;background:#fff;color:#475569;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;font-family:'Plus Jakarta Sans',sans-serif}
+        .mm-currency-pill.active{background:#EFF6FF;border-color:#93C5FD;color:#2563EB}
+
+        /* ═══ FOOTER (from homepage) ══════════════════════════════════════════ */
+        .footer{background:#0F172A;border-top:1px solid #E2E8F0;padding:48px 0 24px;margin-top:48px}
+        .footer-inner{max-width:1440px;margin:0 auto;padding:0 24px}
+        .footer-top{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:36px;margin-bottom:36px}
+        .footer-logo{display:flex;align-items:center;gap:9px;margin-bottom:12px}
+        .footer-logo-icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#2563EB,#6366F1);display:flex;align-items:center;justify-content:center}
+        .footer-logo-name{font-family:'Fraunces',serif;font-size:22px;font-weight:700;color:#fff}
+        .footer-tagline{font-size:13px;color:#94A3B8;line-height:1.65;max-width:210px}
+        .footer-col-title{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#F8FAFC;margin-bottom:14px}
+        .footer-link{display:block;font-size:13.5px;color:#94A3B8;text-decoration:none;margin-bottom:9px;transition:color .15s}
+        .footer-link:hover{color:#F8FAFC}
+        .footer-bottom{border-top:1px solid rgba(255,255,255,.1);padding-top:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+        .footer-copy{font-size:13px;color:#94A3B8}
+        .footer-legal{display:flex;gap:16px}
+        .footer-legal a{font-size:13px;color:#94A3B8;text-decoration:none}
+        .footer-legal a:hover{color:#F8FAFC}
 
         /* ═══ RESPONSIVE ══════════════════════════════════════════════════════ */
         @media(max-width:1200px){
@@ -867,10 +998,11 @@ export default function ListingsPage() {
           .listing-grid.view-compact{grid-template-columns:repeat(2,1fr)}
           .nav-breadcrumb{display:none}
           .page-layout{padding:80px 16px 48px}
+          .footer-top{grid-template-columns:1fr 1fr;gap:24px}
         }
         @media(max-width:768px){
           .hamburger{display:block}
-          .nav-link,.nav-list-btn{display:none}
+          .nav-link,.nav-list-btn,.nav-currency{display:none}
           .nav-search-wrap{flex:1}
           .page-layout{padding:76px 12px 48px}
           .listing-grid.view-list .lcard{flex-direction:column}
@@ -878,6 +1010,7 @@ export default function ListingsPage() {
           .toolbar{gap:8px}
           .tb-sort-lbl{display:none}
           .lm-options{grid-template-columns:1fr}
+          .footer-top{grid-template-columns:1fr 1fr;gap:20px}
         }
         @media(max-width:520px){
           .listing-grid,.listing-grid.view-compact{grid-template-columns:1fr}
@@ -886,6 +1019,10 @@ export default function ListingsPage() {
           .nav-search-wrap{display:none}
           .toolbar{flex-direction:column;align-items:flex-start;gap:10px}
           .tb-right{width:100%;justify-content:space-between}
+          .footer-top{grid-template-columns:1fr}
+          .footer-bottom{justify-content:center}
+          .pagination{gap:4px}
+          .pg-btn{min-width:32px;height:32px;font-size:12px}
         }
       `}</style>
 
@@ -946,10 +1083,9 @@ export default function ListingsPage() {
             </div>
             <button className="mf-close" onClick={() => setMobileFilterOpen(false)}>✕</button>
           </div>
-          {/* Filter content rendered directly — no nested sidebar wrapper */}
           <FilterContent {...filterProps} isMobile />
           <div className="mf-footer">
-            <button className="mf-clear" onClick={() => { clearAll(); }}>Clear all</button>
+            <button className="mf-clear" onClick={() => { clearAll() }}>Clear all</button>
             <button className="mf-apply" onClick={() => setMobileFilterOpen(false)}>
               Show {results.length} result{results.length !== 1 ? 's' : ''}
             </button>
@@ -958,29 +1094,42 @@ export default function ListingsPage() {
       </div>
 
       {/* ═══ MOBILE MENU ════════════════════════════════════════════════════════ */}
-      <div className={`mm-overlay${mobileMenuOpen ? ' open' : ''}`}>
-        <div className="mm-bg" onClick={() => setMobileMenuOpen(false)} />
-        <div className="mm-panel">
-          <button className="mm-close" onClick={() => setMobileMenuOpen(false)}>✕</button>
-          <a href="/seeker" className="mm-link">🔍 Browse Homes</a>
-          <a href="/seeker/listings" className="mm-link active">📋 All Listings</a>
-          <a href="/seeker/map" className="mm-link">🗺️ Map View</a>
-          <div className="mm-div" />
-          <button
-            className="mm-link"
-            style={{ background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', width: '100%', fontFamily: 'inherit', fontWeight: 600, color: '#374151', padding: '11px 14px', borderRadius: 10, fontSize: 15 }}
-            onClick={(e) => { setMobileMenuOpen(false); handleListProperty(e as any) }}
-          >🏡 List Your Property</button>
-          <div className="mm-div" />
-          {userId
-            ? <a href="/seeker/messages" className="mm-link">💬 Messages</a>
-            : <a href="/login" className="mm-link">Sign In</a>
-          }
-          {!userId && <a href="/signup" className="mm-cta">Get Started Free →</a>}
+      {mobileMenuOpen && (
+        <div className={`mm-overlay open${mobileMenuVisible ? ' visible' : ''}`}>
+          <div className="mm-bg" onClick={closeMobileMenu} />
+          <div className="mm-panel">
+            <button className="mm-close" onClick={closeMobileMenu}>✕</button>
+            <a href="/seeker" className="mm-link">🔍 Browse Homes</a>
+            <a href="/seeker/listings" className="mm-link active">📋 All Listings</a>
+            <a href="/seeker/map" className="mm-link">🗺️ Map View</a>
+            <div className="mm-div" />
+            <button
+              className="mm-link"
+              style={{ background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', width: '100%', fontFamily: 'inherit', fontWeight: 600, color: '#374151', padding: '11px 14px', borderRadius: 10, fontSize: 15 }}
+              onClick={(e) => { closeMobileMenu(); handleListProperty(e as any) }}
+            >🏡 List Your Property</button>
+            <div className="mm-div" />
+            <div className="mm-currency-row">
+              <span className="mm-currency-lbl">Currency:</span>
+              {SUPPORTED_CURRENCIES.map(c => (
+                <button
+                  key={c}
+                  className={`mm-currency-pill${displayCurrency === c ? ' active' : ''}`}
+                  onClick={() => setDisplayCurrency(c)}
+                >{c}</button>
+              ))}
+            </div>
+            <div className="mm-div" />
+            {userId
+              ? <a href="/seeker/messages" className="mm-link">💬 Messages</a>
+              : <a href="/login" className="mm-link">Sign In</a>
+            }
+            {!userId && <a href="/signup" className="mm-cta">Get Started Free →</a>}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* ═══ NAVBAR ════════════════════════════════════════════════════════════ */}
+      {/* ═══ NAVBAR (matches homepage) ═════════════════════════════════════════ */}
       <nav className="nav">
         <div className="nav-inner">
           <a href="/" className="nav-logo">
@@ -1014,11 +1163,35 @@ export default function ListingsPage() {
             <a href="/seeker/listings" className="nav-link active">Listings</a>
             <a href="/seeker/map" className="nav-link">Map</a>
             <button className="nav-list-btn" onClick={handleListProperty}>List Property</button>
+
+            {/* Currency dropdown — same as homepage */}
+            <div className="nav-currency" ref={currencyRef}>
+              <button
+                className="nav-currency-btn"
+                onClick={() => setCurrencyDropOpen(v => !v)}
+              >
+                {CURRENCY_SYMBOLS[displayCurrency]} {displayCurrency} ▾
+              </button>
+              {currencyDropOpen && (
+                <div className="nav-currency-drop">
+                  {SUPPORTED_CURRENCIES.map(c => (
+                    <button
+                      key={c}
+                      className={`nav-currency-item${displayCurrency === c ? ' active' : ''}`}
+                      onClick={() => { setDisplayCurrency(c); setCurrencyDropOpen(false) }}
+                    >
+                      {CURRENCY_SYMBOLS[c]} {c}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {userId
               ? <a href="/seeker" className="nav-avatar">{userInitials}</a>
               : <a href="/login" className="nav-signin">Sign In</a>
             }
-            <button className="hamburger" onClick={() => setMobileMenuOpen(true)}>☰</button>
+            <button className="hamburger" onClick={openMobileMenu}>☰</button>
           </div>
         </div>
       </nav>
@@ -1142,7 +1315,6 @@ export default function ListingsPage() {
                           ? <img className="lcard-img" src={l.photos[0]} alt={l.title} loading="lazy" />
                           : <div className="lcard-ph">{TYPE_ICONS[l.property_type] || '🏠'}</div>
                         }
-                        {/* Badges */}
                         <div className="lcard-badges">
                           {isNew(l.created_at) && <span className="badge badge-blue">New</span>}
                           {isAvailableSoon(l.available_from) && <span className="badge badge-green">Soon</span>}
@@ -1163,7 +1335,7 @@ export default function ListingsPage() {
                         </div>
                         <div className="lcard-title">{l.title}</div>
                         <div className="lcard-price-row">
-                          <span className="lcard-price">{fmtMoney(l.rent_amount)}</span>
+                          <span className="lcard-price">{convertAndFormat(l.rent_amount)}</span>
                           <span className="lcard-price-unit">/mo</span>
                         </div>
                         <div className="lcard-facts">
@@ -1203,26 +1375,81 @@ export default function ListingsPage() {
             }
           </div>
 
-          {/* Load more */}
-          {!loading && hasMore && (
-            <div className="load-more-wrap">
-              <button className="load-more-btn" onClick={() => setPage(p => p + 1)}>
-                Load more properties
-              </button>
-              <div className="lm-progress">{paginated.length} of {results.length} shown</div>
-              <div className="lm-bar">
-                <div className="lm-fill" style={{ width: `${Math.round((paginated.length / results.length) * 100)}%` }} />
+          {/* Pagination */}
+          {!loading && totalPages > 1 && (
+            <>
+              <div className="pagination">
+                <button
+                  className="pg-btn"
+                  onClick={() => handlePageChange(Math.max(1, page - 1))}
+                  disabled={page === 1}
+                >← Prev</button>
+
+                {renderPaginationButtons()}
+
+                <button
+                  className="pg-btn"
+                  onClick={() => handlePageChange(Math.min(totalPages, page + 1))}
+                  disabled={page === totalPages}
+                >Next →</button>
               </div>
-            </div>
+              <div className="pg-info">
+                Showing {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, results.length)} of {results.length} properties
+              </div>
+            </>
           )}
 
-          {!loading && !hasMore && results.length > 0 && (
+          {!loading && totalPages <= 1 && results.length > 0 && (
             <div style={{ textAlign: 'center', padding: '28px 0 12px', fontSize: 13, color: '#94A3B8', fontWeight: 500 }}>
-              ✓ You've seen all {results.length} propert{results.length !== 1 ? 'ies' : 'y'}
+              ✓ Showing all {results.length} propert{results.length !== 1 ? 'ies' : 'y'}
             </div>
           )}
         </main>
       </div>
+
+      {/* ═══ FOOTER (matches homepage) ═════════════════════════════════════════ */}
+      <footer className="footer">
+        <div className="footer-inner">
+          <div className="footer-top">
+            <div>
+              <div className="footer-logo">
+                <div className="footer-logo-icon">
+                  <Image src="/icon.png" alt="Rentura" width={20} height={20} />
+                </div>
+                <span className="footer-logo-name">Rentura</span>
+              </div>
+              <p className="footer-tagline">The smarter way to find and list rental homes in Sri Lanka.</p>
+            </div>
+            <div>
+              <div className="footer-col-title">Explore</div>
+              <a href="/seeker" className="footer-link">Browse Listings</a>
+              <a href="/seeker/listings" className="footer-link">All Properties</a>
+              <a href="/seeker/map" className="footer-link">Map View</a>
+            </div>
+            <div>
+              <div className="footer-col-title">Landlords</div>
+              <a href="/landlord" onClick={handleListProperty} className="footer-link">List Your Property</a>
+              <a href="/landlord" className="footer-link">Landlord Dashboard</a>
+              <a href="/onboarding" className="footer-link">Get Started</a>
+            </div>
+            <div>
+              <div className="footer-col-title">Company</div>
+              <a href="/about" className="footer-link">About</a>
+              <a href="/contact" className="footer-link">Contact</a>
+              <a href="/privacy" className="footer-link">Privacy Policy</a>
+              <a href="/terms" className="footer-link">Terms</a>
+            </div>
+          </div>
+          <div className="footer-bottom">
+            <span className="footer-copy">© {new Date().getFullYear()} Rentura. All rights reserved.</span>
+            <div className="footer-legal">
+              <a href="/terms">Terms</a>
+              <a href="/privacy">Privacy</a>
+              <a href="/cookies">Cookies</a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </>
   )
 }
