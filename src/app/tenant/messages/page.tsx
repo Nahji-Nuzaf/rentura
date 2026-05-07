@@ -81,7 +81,6 @@ export default function TenantMessagesPage() {
 
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeRole, setActiveRole] = useState('tenant')
 
   // Threads & messages
   const [threads, setThreads] = useState<Thread[]>([])
@@ -94,33 +93,120 @@ export default function TenantMessagesPage() {
 
   // UI
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [rolePopoverOpen, setRolePopoverOpen] = useState(false)
   const [mobileShowChat, setMobileShowChat] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
+  // Keep a ref to the active thread partner ID so the realtime handler can read it
+  const activeThreadPartnerIdRef = useRef<string | null>(null)
+  const profileRef = useRef<Profile | null>(null)
+
+  useEffect(() => {
+    activeThreadPartnerIdRef.current = activeThread?.partnerId ?? null
+  }, [activeThread?.partnerId])
+
+  useEffect(() => {
+    profileRef.current = profile
+  }, [profile])
+
   // ── Load ───────────────────────────────────────────────────────────────
   useEffect(() => {
-    ; (async () => {
+    let realtimeChannel: ReturnType<ReturnType<typeof createClient>['channel']> | null = null
+
+    ;(async () => {
       try {
         const sb = createClient()
         const { data: { user } } = await sb.auth.getUser()
         if (!user) { router.push('/login'); return }
 
         const { data: prof } = await sb.from('profiles').select('*').eq('id', user.id).single()
-        if (prof) { setProfile(prof); setActiveRole(prof.active_role || 'tenant') }
+        if (prof) {
+          setProfile(prof)
+          profileRef.current = prof
+        }
 
-        await loadThreads(user.id, prof)
-      } catch (e) { console.error(e) }
-      finally { setLoading(false) }
+        await loadThreads(user.id)
+
+        // ── Real-time subscription ──────────────────────────────────────
+        // Listen for any INSERT on messages where this user is sender or receiver
+        realtimeChannel = sb
+          .channel(`messages-user-${user.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'messages',
+              filter: `receiver_id=eq.${user.id}`,
+            },
+            async (payload) => {
+              const newMsg = payload.new as Message
+              const currentProfile = profileRef.current
+              if (!currentProfile) return
+
+              // Fetch sender profile if we don't have it
+              const senderId = newMsg.sender_id
+
+              setThreads(prev => {
+                const existingThread = prev.find(t => t.partnerId === senderId)
+                const isActive = activeThreadPartnerIdRef.current === senderId
+
+                if (existingThread) {
+                  // Add message to existing thread
+                  const updatedThread = {
+                    ...existingThread,
+                    messages: [...existingThread.messages, newMsg],
+                    lastMessage: newMsg.content,
+                    lastMessageTime: newMsg.created_at,
+                    unreadCount: isActive ? 0 : existingThread.unreadCount + 1,
+                  }
+                  const filtered = prev.filter(t => t.partnerId !== senderId)
+                  return [updatedThread, ...filtered]
+                } else {
+                  // New conversation partner — reload threads to get profile info
+                  loadThreads(currentProfile.id)
+                  return prev
+                }
+              })
+
+              // If this thread is currently active, update it live & mark read
+              if (activeThreadPartnerIdRef.current === senderId) {
+                setActiveThread(prev => prev ? {
+                  ...prev,
+                  messages: [...prev.messages, newMsg],
+                  lastMessage: newMsg.content,
+                  lastMessageTime: newMsg.created_at,
+                } : prev)
+
+                // Mark as read immediately
+                const sbInner = createClient()
+                await sbInner.from('messages')
+                  .update({ read: true })
+                  .eq('id', newMsg.id)
+              }
+            }
+          )
+          .subscribe()
+
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setLoading(false)
+      }
     })()
+
+    return () => {
+      if (realtimeChannel) {
+        const sb = createClient()
+        sb.removeChannel(realtimeChannel)
+      }
+    }
   }, [router])
 
-  const loadThreads = useCallback(async (userId: string, prof: Profile | null) => {
+  const loadThreads = useCallback(async (userId: string) => {
     setThreadsLoading(true)
     try {
       const sb = createClient()
 
-      // Fetch all messages involving this user
       const [{ data: sent }, { data: received }] = await Promise.all([
         sb.from('messages').select('*').eq('sender_id', userId).order('created_at', { ascending: true }),
         sb.from('messages').select('*').eq('receiver_id', userId).order('created_at', { ascending: true }),
@@ -129,19 +215,16 @@ export default function TenantMessagesPage() {
       const allMessages: Message[] = [...(sent || []), ...(received || [])]
       allMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 
-      // Find unique partner IDs
       const partnerIds = [...new Set(allMessages.map(m =>
         m.sender_id === userId ? m.receiver_id : m.sender_id
       ))]
 
       if (!partnerIds.length) { setThreads([]); setThreadsLoading(false); return }
 
-      // Fetch partner profiles
       const { data: partners } = await sb.from('profiles').select('id,full_name,email,avatar_url').in('id', partnerIds)
       const partnerMap: Record<string, { full_name: string; email: string; avatar_url?: string }> = {}
-        ; (partners || []).forEach((p: any) => { partnerMap[p.id] = p })
+      ;(partners || []).forEach((p: any) => { partnerMap[p.id] = p })
 
-      // Build threads
       const threadMap: Record<string, Thread> = {}
       for (const msg of allMessages) {
         const partnerId = msg.sender_id === userId ? msg.receiver_id : msg.sender_id
@@ -172,14 +255,24 @@ export default function TenantMessagesPage() {
 
       setThreads(sortedThreads)
 
-      // Auto-select first thread
-      if (sortedThreads.length > 0 && !activeThread) {
-        setActiveThread(sortedThreads[0])
-        // Mark as read
-        await markThreadRead(sortedThreads[0].partnerId, userId)
-      }
-    } catch (e) { console.error(e) }
-    finally { setThreadsLoading(false) }
+      // Auto-select first thread only on initial load
+      setActiveThread(prev => {
+        if (!prev && sortedThreads.length > 0) {
+          markThreadRead(sortedThreads[0].partnerId, userId)
+          return sortedThreads[0]
+        }
+        // If we already have an active thread, refresh it with new data
+        if (prev) {
+          const refreshed = sortedThreads.find(t => t.partnerId === prev.partnerId)
+          return refreshed ?? prev
+        }
+        return prev
+      })
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setThreadsLoading(false)
+    }
   }, [])
 
   async function markThreadRead(partnerId: string, userId: string) {
@@ -191,7 +284,6 @@ export default function TenantMessagesPage() {
       .eq('read', false)
       .select()
 
-    // Update local state
     setThreads(prev => prev.map(t =>
       t.partnerId === partnerId ? { ...t, unreadCount: 0 } : t
     ))
@@ -219,7 +311,6 @@ export default function TenantMessagesPage() {
       created_at: new Date().toISOString(),
     }
 
-    // Optimistic update
     setActiveThread(prev => prev ? { ...prev, messages: [...prev.messages, optimistic], lastMessage: content, lastMessageTime: optimistic.created_at } : prev)
     setThreads(prev => prev.map(t => t.partnerId === activeThread.partnerId
       ? { ...t, messages: [...t.messages, optimistic], lastMessage: content, lastMessageTime: optimistic.created_at }
@@ -237,7 +328,6 @@ export default function TenantMessagesPage() {
 
       if (error) throw error
 
-      // Replace optimistic with real
       const replace = (msgs: Message[]) => msgs.map(m => m.id === optimistic.id ? data : m)
       setActiveThread(prev => prev ? { ...prev, messages: replace(prev.messages) } : prev)
       setThreads(prev => prev.map(t => t.partnerId === activeThread.partnerId
@@ -246,7 +336,6 @@ export default function TenantMessagesPage() {
       ))
     } catch (e) {
       console.error(e)
-      // Revert optimistic
       const revert = (msgs: Message[]) => msgs.filter(m => m.id !== optimistic.id)
       setActiveThread(prev => prev ? { ...prev, messages: revert(prev.messages) } : prev)
       setThreads(prev => prev.map(t => t.partnerId === activeThread.partnerId
@@ -259,27 +348,22 @@ export default function TenantMessagesPage() {
     }
   }
 
-  // Scroll to bottom when messages change
+  // Auto-resize textarea
+  function handleDraftChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setDraft(e.target.value)
+    e.target.style.height = 'auto'
+    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+  }
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [activeThread?.messages.length])
 
-  // Handle Enter key
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
     }
-  }
-
-  async function handleRoleSwitch(role: string) {
-    if (!profile) return
-    setActiveRole(role)
-    setRolePopoverOpen(false)
-    const sb = createClient()
-    await sb.from('profiles').update({ active_role: role }).eq('id', profile.id).select()
-    if (role === 'landlord') window.location.href = '/landlord'
-    else if (role === 'seeker') window.location.href = '/seeker'
   }
 
   const totalUnread = threads.reduce((s, t) => s + t.unreadCount, 0)
@@ -303,6 +387,7 @@ export default function TenantMessagesPage() {
         html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;overflow-x:hidden;max-width:100vw}
         .shell{display:flex;min-height:100vh;position:relative}
 
+        /* ── Sidebar ── */
         .sidebar{width:260px;background:#0F172A;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:200;transition:transform .25s ease}
         .sb-logo{display:flex;align-items:center;gap:12px;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,0.07)}
         .sb-logo-icon{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center}
@@ -316,31 +401,21 @@ export default function TenantMessagesPage() {
         .sb-ico{font-size:16px;width:20px;text-align:center;flex-shrink:0}
         .sb-count{margin-left:auto;background:#DC2626;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px}
         .sb-footer{border-top:2px solid rgba(255,255,255,0.07)}
-        .sb-role-wrap{position:relative;padding:12px}
-        .sb-user{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;cursor:pointer;transition:background .15s}
-        .sb-user:hover{background:rgba(255,255,255,.06)}
+        .sb-user{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;margin:12px}
         .sb-av{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#10B981,#34D399);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0}
-        .sb-uinfo{flex:1;min-width:0}
         .sb-uname{font-size:13px;font-weight:700;color:#E2E8F0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .sb-uemail{font-size:11px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .sb-role-badge{display:inline-block;font-size:9.5px;font-weight:700;color:#34D399;background:rgba(16,185,129,.14);border:1px solid rgba(16,185,129,.25);border-radius:4px;padding:1px 6px;margin-top:2px}
-        .sb-switch-ico{color:#64748B;flex-shrink:0}
-        .role-popover{position:absolute;bottom:100%;left:12px;right:12px;background:#1E293B;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:8px;margin-bottom:6px;box-shadow:0 20px 40px rgba(0,0,0,.4);z-index:300}
-        .rp-title{font-size:10px;color:#64748B;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:4px 8px 8px}
-        .rp-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;color:#CBD5E1;font-size:13px;font-weight:500;transition:background .15s}
-        .rp-item:hover{background:rgba(255,255,255,.06)}
-        .rp-check{width:16px;height:16px;margin-left:auto;color:#2563EB}
-        .rp-divider{height:1px;background:rgba(255,255,255,.06);margin:4px 0}
+        .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:199;backdrop-filter:blur(2px)}
+        .sb-overlay.open{display:block}
 
+        /* ── Main ── */
         .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:hidden;width:calc(100% - 260px)}
         .topbar{height:56px;background:#fff;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(15,23,42,.04)}
         .breadcrumb{font-size:13px;color:#94A3B8;font-weight:500}
         .breadcrumb b{color:#0F172A}
-        .hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;color:#475569;padding:4px}
-        .notif-btn{width:34px;height:34px;border-radius:9px;background:#F1F5F9;border:none;cursor:pointer;font-size:15px;position:relative;display:flex;align-items:center;justify-content:center}
+        .hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;color:#475569;padding:4px;line-height:1}
+        .notif-btn{width:34px;height:34px;border-radius:9px;background:#F1F5F9;border:none;cursor:pointer;font-size:15px;position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0}
         .notif-dot{width:8px;height:8px;background:#DC2626;border-radius:50%;position:absolute;top:5px;right:5px;border:1.5px solid #fff}
-        .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:199}
-        .sb-overlay.open{display:block}
 
         /* ── Chat layout ── */
         .chat-shell{display:flex;flex:1;height:calc(100vh - 56px);overflow:hidden;padding:16px;gap:14px}
@@ -354,7 +429,8 @@ export default function TenantMessagesPage() {
         .tp-search-wrap{position:relative}
         .tp-search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none}
         .thread-list{flex:1;overflow-y:auto}
-        .thread-list::-webkit-scrollbar{width:0}
+        .thread-list::-webkit-scrollbar{width:4px}
+        .thread-list::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:99px}
         .thread-item{display:flex;align-items:center;gap:11px;padding:13px 16px;cursor:pointer;transition:background .12s;border-bottom:1px solid #F8FAFC;position:relative}
         .thread-item:hover{background:#F8FAFC}
         .thread-item.active{background:#EFF6FF}
@@ -373,7 +449,7 @@ export default function TenantMessagesPage() {
         /* ── Chat panel ── */
         .chat-panel{flex:1;background:#fff;border:1px solid #E2E8F0;border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 1px 4px rgba(15,23,42,.04);min-width:0}
         .chat-header{padding:14px 20px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:12px;background:#fff;flex-shrink:0}
-        .ch-back{display:none;background:none;border:none;font-size:20px;cursor:pointer;color:#475569;padding:0 6px 0 0;flex-shrink:0}
+        .ch-back{display:none;background:none;border:none;font-size:20px;cursor:pointer;color:#475569;padding:0 6px 0 0;flex-shrink:0;line-height:1}
         .ch-av{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,#2563EB,#6366F1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;flex-shrink:0;overflow:hidden}
         .ch-av img{width:100%;height:100%;object-fit:cover}
         .ch-name{font-size:15px;font-weight:700;color:#0F172A}
@@ -383,7 +459,7 @@ export default function TenantMessagesPage() {
         .ch-action-btn:hover{border-color:#BFDBFE;background:#EFF6FF}
 
         /* Messages area */
-        .messages-area{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:2px}
+        .messages-area{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:2px;-webkit-overflow-scrolling:touch}
         .messages-area::-webkit-scrollbar{width:4px}
         .messages-area::-webkit-scrollbar-track{background:transparent}
         .messages-area::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:99px}
@@ -404,44 +480,115 @@ export default function TenantMessagesPage() {
         .bubble.mine .bubble-time{color:rgba(255,255,255,.8)}
         .bubble.theirs .bubble-time{color:#94A3B8}
 
-        /* Sending indicator */
+        /* New message animation */
+        @keyframes slideInLeft{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
+        @keyframes slideInRight{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:translateX(0)}}
+        .bubble-row.new-incoming{animation:slideInLeft .25s ease forwards}
+        .bubble-row.new-outgoing{animation:slideInRight .25s ease forwards}
+
+        /* Typing / sending indicator */
         .sending-dots{display:inline-flex;gap:3px;padding:10px 14px;background:#F1F5F9;border-radius:16px;border-bottom-left-radius:4px}
         .sending-dots span{width:6px;height:6px;background:#94A3B8;border-radius:50%;animation:bounce .9s ease infinite}
         .sending-dots span:nth-child(2){animation-delay:.15s}
         .sending-dots span:nth-child(3){animation-delay:.3s}
         @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
 
-        /* Empty chat */
+        /* Empty states */
         .chat-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#94A3B8;text-align:center;padding:40px}
         .ce-icon{font-size:48px;margin-bottom:14px}
         .ce-title{font-family:'Fraunces',serif;font-size:20px;color:#475569;margin-bottom:6px}
         .ce-sub{font-size:13px;line-height:1.6}
+        .no-selection{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#94A3B8;text-align:center;padding:40px}
 
         /* Input bar */
-        .input-bar{padding:14px 16px;border-top:1px solid #E2E8F0;display:flex;align-items:flex-end;gap:10px;background:#fff;flex-shrink:0}
-        .input-textarea{flex:1;padding:10px 14px;border:1.5px solid #E2E8F0;border-radius:12px;font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;color:#0F172A;outline:none;resize:none;line-height:1.5;max-height:120px;transition:border .15s;background:#F8FAFC}
+        .input-bar{padding:12px 16px;border-top:1px solid #E2E8F0;display:flex;align-items:flex-end;gap:10px;background:#fff;flex-shrink:0}
+        .input-textarea{flex:1;padding:10px 14px;border:1.5px solid #E2E8F0;border-radius:12px;font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;color:#0F172A;outline:none;resize:none;line-height:1.5;max-height:120px;min-height:42px;transition:border .15s;background:#F8FAFC;-webkit-appearance:none}
         .input-textarea:focus{border-color:#2563EB;background:#fff}
-        .send-btn{width:42px;height:42px;border-radius:12px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(37,99,235,.3);transition:opacity .15s}
+        .send-btn{width:42px;height:42px;border-radius:12px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(37,99,235,.3);transition:opacity .15s;-webkit-appearance:none}
         .send-btn:hover{opacity:.9}
         .send-btn:disabled{opacity:.4;cursor:not-allowed}
 
-        /* No selection state */
-        .no-selection{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#94A3B8;text-align:center;padding:40px}
-
-        @media(max-width:900px){
+        /* ── Responsive ── */
+        @media(max-width:1024px){
           .thread-panel{width:260px}
         }
         @media(max-width:768px){
+          /* Sidebar: slide off-screen on mobile */
           .sidebar{transform:translateX(-100%)}
           .sidebar.open{transform:translateX(0)}
           .main{margin-left:0!important;width:100%!important}
-          .hamburger{display:block}
-          .topbar{padding:0 16px}
-          .chat-shell{padding:10px;gap:0}
-          .thread-panel{width:100%;border-radius:12px;position:absolute;top:10px;left:10px;right:10px;bottom:10px;z-index:10;transition:transform .25s}
-          .thread-panel.hidden-mobile{transform:translateX(-110%)}
-          .chat-panel{border-radius:12px}
+          .hamburger{display:flex;align-items:center;justify-content:center}
+          .topbar{padding:0 14px}
+          .breadcrumb{font-size:12px}
+
+          /* Chat shell: full height, no padding, column */
+          .chat-shell{
+            padding:0;
+            gap:0;
+            flex-direction:column;
+            height:calc(100vh - 56px);
+            position:relative;
+            overflow:hidden;
+          }
+
+          /* Thread panel: full width, slides in/out */
+          .thread-panel{
+            width:100%;
+            border-radius:0;
+            border:none;
+            border-bottom:1px solid #E2E8F0;
+            box-shadow:none;
+            position:absolute;
+            top:0;left:0;right:0;bottom:0;
+            z-index:10;
+            transition:transform .3s cubic-bezier(.4,0,.2,1);
+          }
+          .thread-panel.hidden-mobile{
+            transform:translateX(-100%);
+            pointer-events:none;
+          }
+
+          /* Chat panel: full screen when thread selected */
+          .chat-panel{
+            border-radius:0;
+            border:none;
+            box-shadow:none;
+            position:absolute;
+            top:0;left:0;right:0;bottom:0;
+            z-index:11;
+            transform:translateX(100%);
+            transition:transform .3s cubic-bezier(.4,0,.2,1);
+          }
+          .chat-panel.mobile-active{
+            transform:translateX(0);
+          }
+
+          /* Show back button on mobile */
           .ch-back{display:flex}
+
+          /* Larger tap targets */
+          .thread-item{padding:14px 16px;min-height:68px}
+          .th-av{width:46px;height:46px}
+          .send-btn{width:44px;height:44px}
+          .input-bar{padding:10px 12px;padding-bottom:max(10px, env(safe-area-inset-bottom))}
+
+          /* Bubbles: slightly wider on mobile */
+          .bubble{max-width:82%}
+
+          /* Messages area padding */
+          .messages-area{padding:16px 12px}
+        }
+
+        @media(max-width:480px){
+          .th-time{display:none}
+          .chat-header{padding:12px 14px;gap:10px}
+          .ch-name{font-size:14px}
+          .ch-status{font-size:11px}
+        }
+
+        /* Safe area for notch devices */
+        @supports(padding-bottom:env(safe-area-inset-bottom)){
+          .input-bar{padding-bottom:calc(12px + env(safe-area-inset-bottom))}
         }
       `}</style>
 
@@ -452,19 +599,14 @@ export default function TenantMessagesPage() {
         <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="sb-logo">
             <div className="sb-logo-icon">
-              <Image
-                src="/icon.png"
-                alt="Rentura Logo"
-                width={24}
-                height={24}
-              />
+              <Image src="/icon.png" alt="Rentura Logo" width={24} height={24} />
             </div>
             <span className="sb-logo-name">Rentura</span>
           </div>
           <nav className="sb-nav">
             <span className="sb-section">My Home</span>
             <a href="/tenant" className="sb-item"><span className="sb-ico">⊞</span> Dashboard</a>
-            <a href="/tenant/rent" className="sb-item"><span className="sb-ico">💰</span> Rent & Payments</a>
+            <a href="/tenant/rent" className="sb-item"><span className="sb-ico">💰</span> Rent &amp; Payments</a>
             <a href="/tenant/lease" className="sb-item"><span className="sb-ico">📋</span> My Lease</a>
             <a href="/tenant/maintenance" className="sb-item"><span className="sb-ico">🔧</span> Maintenance</a>
             <a href="/tenant/documents" className="sb-item"><span className="sb-ico">📁</span> Documents</a>
@@ -478,7 +620,7 @@ export default function TenantMessagesPage() {
           <div className="sb-footer">
             <div className="sb-user">
               <div className="sb-av">{profile ? initials(profile.full_name) : '?'}</div>
-              <div>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="sb-uname">{profile?.full_name || 'Loading...'}</div>
                 <div className="sb-uemail">{profile?.email || ''}</div>
               </div>
@@ -490,10 +632,10 @@ export default function TenantMessagesPage() {
         <div className="main">
           <div className="topbar">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
+              <button className="hamburger" onClick={() => setSidebarOpen(true)} aria-label="Open menu">☰</button>
               <div className="breadcrumb">Rentura &nbsp;/&nbsp; <b>Messages</b></div>
             </div>
-            <button className="notif-btn">
+            <button className="notif-btn" aria-label="Notifications">
               🔔{totalUnread > 0 && <div className="notif-dot" />}
             </button>
           </div>
@@ -562,7 +704,7 @@ export default function TenantMessagesPage() {
             </div>
 
             {/* Chat panel */}
-            <div className="chat-panel">
+            <div className={`chat-panel${mobileShowChat ? ' mobile-active' : ''}`}>
               {!activeThread ? (
                 <div className="no-selection">
                   <div style={{ fontSize: 48, marginBottom: 14 }}>💬</div>
@@ -577,14 +719,14 @@ export default function TenantMessagesPage() {
                 <>
                   {/* Chat header */}
                   <div className="chat-header">
-                    <button className="ch-back" onClick={() => setMobileShowChat(false)}>←</button>
+                    <button className="ch-back" onClick={() => setMobileShowChat(false)} aria-label="Back">←</button>
                     <div className="ch-av">
                       {activeThread.partnerAvatar
                         ? <img src={activeThread.partnerAvatar} alt={activeThread.partnerName} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
                         : initials(activeThread.partnerName)
                       }
                     </div>
-                    <div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <div className="ch-name">{activeThread.partnerName}</div>
                       <div className="ch-status">{activeThread.partnerEmail}</div>
                     </div>
@@ -613,7 +755,10 @@ export default function TenantMessagesPage() {
                             return (
                               <div key={msg.id} className={`bubble-row${isMine ? ' mine' : ''}`}>
                                 {!isMine && (
-                                  <div className="bubble-av" style={{ background: 'linear-gradient(135deg,#2563EB,#6366F1)', visibility: showAv ? 'visible' : 'hidden' }}>
+                                  <div
+                                    className="bubble-av"
+                                    style={{ background: 'linear-gradient(135deg,#2563EB,#6366F1)', visibility: showAv ? 'visible' : 'hidden' }}
+                                  >
                                     {activeThread.partnerAvatar
                                       ? <img src={activeThread.partnerAvatar} alt="" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
                                       : initials(activeThread.partnerName)
@@ -625,7 +770,11 @@ export default function TenantMessagesPage() {
                                     {msg.content}
                                     <div className={`bubble-time${isMine ? ' mine' : ''}`}>
                                       {fmtMsgTime(msg.created_at)}
-                                      {isMine && <span style={{ marginLeft: 4 }}>{msg.id.startsWith('opt-') ? '○' : '✓'}</span>}
+                                      {isMine && (
+                                        <span style={{ marginLeft: 4 }}>
+                                          {msg.id.startsWith('opt-') ? '○' : '✓'}
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
@@ -645,11 +794,16 @@ export default function TenantMessagesPage() {
                       className="input-textarea"
                       placeholder={`Message ${activeThread.partnerName}...`}
                       value={draft}
-                      onChange={e => setDraft(e.target.value)}
+                      onChange={handleDraftChange}
                       onKeyDown={handleKeyDown}
                       rows={1}
                     />
-                    <button className="send-btn" disabled={!draft.trim() || sending} onClick={handleSend}>
+                    <button
+                      className="send-btn"
+                      disabled={!draft.trim() || sending}
+                      onClick={handleSend}
+                      aria-label="Send message"
+                    >
                       ➤
                     </button>
                   </div>
