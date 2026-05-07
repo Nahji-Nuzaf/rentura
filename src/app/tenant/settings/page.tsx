@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Image from 'next/image'
 
 type Profile = {
   id: string
@@ -20,59 +21,59 @@ function initials(name: string) {
 type SettingsSection = 'profile' | 'notifications' | 'security' | 'account'
 
 const NAV_ITEMS: { id: SettingsSection; icon: string; label: string }[] = [
-  { id: 'profile',       icon: '👤', label: 'Profile'       },
+  { id: 'profile', icon: '👤', label: 'Profile' },
   { id: 'notifications', icon: '🔔', label: 'Notifications' },
-  { id: 'security',      icon: '🔒', label: 'Security'      },
-  { id: 'account',       icon: '⚙️', label: 'Account'       },
+  { id: 'security', icon: '🔒', label: 'Security' },
+  { id: 'account', icon: '⚙️', label: 'Account' },
 ]
 
 export default function TenantSettingsPage() {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [profile, setProfile]       = useState<Profile | null>(null)
-  const [loading, setLoading]       = useState(true)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [loading, setLoading] = useState(true)
   const [activeRole, setActiveRole] = useState('tenant')
   const [unreadCount, setUnreadCount] = useState(0)
   const [activeSection, setActiveSection] = useState<SettingsSection>('profile')
 
   // Sidebar
-  const [sidebarOpen, setSidebarOpen]         = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [rolePopoverOpen, setRolePopoverOpen] = useState(false)
 
   // Profile form
   const [fullName, setFullName] = useState('')
-  const [phone, setPhone]       = useState('')
+  const [phone, setPhone] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [profileSaving, setProfileSaving] = useState(false)
-  const [profileMsg, setProfileMsg]       = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [profileMsg, setProfileMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
 
   // Notifications
-  const [notifRentReminder, setNotifRentReminder]   = useState(true)
-  const [notifMaintUpdate, setNotifMaintUpdate]     = useState(true)
-  const [notifMessages, setNotifMessages]           = useState(true)
-  const [notifLeaseExpiry, setNotifLeaseExpiry]     = useState(true)
-  const [notifDocuments, setNotifDocuments]         = useState(false)
-  const [notifSaving, setNotifSaving]               = useState(false)
-  const [notifMsg, setNotifMsg]                     = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [notifRentReminder, setNotifRentReminder] = useState(true)
+  const [notifMaintUpdate, setNotifMaintUpdate] = useState(true)
+  const [notifMessages, setNotifMessages] = useState(true)
+  const [notifLeaseExpiry, setNotifLeaseExpiry] = useState(true)
+  const [notifDocuments, setNotifDocuments] = useState(false)
+  const [notifSaving, setNotifSaving] = useState(false)
+  const [notifMsg, setNotifMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   // Security
-  const [currentPwd, setCurrentPwd]   = useState('')
-  const [newPwd, setNewPwd]           = useState('')
-  const [confirmPwd, setConfirmPwd]   = useState('')
-  const [pwdSaving, setPwdSaving]     = useState(false)
-  const [pwdMsg, setPwdMsg]           = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [currentPwd, setCurrentPwd] = useState('')
+  const [newPwd, setNewPwd] = useState('')
+  const [confirmPwd, setConfirmPwd] = useState('')
+  const [pwdSaving, setPwdSaving] = useState(false)
+  const [pwdMsg, setPwdMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [showCurrentPwd, setShowCurrentPwd] = useState(false)
-  const [showNewPwd, setShowNewPwd]         = useState(false)
+  const [showNewPwd, setShowNewPwd] = useState(false)
   const [showConfirmPwd, setShowConfirmPwd] = useState(false)
 
   // Account / danger zone
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [deleteInput, setDeleteInput]             = useState('')
+  const [deleteInput, setDeleteInput] = useState('')
 
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       try {
         const sb = createClient()
         const { data: { user } } = await sb.auth.getUser()
@@ -194,8 +195,8 @@ export default function TenantSettingsPage() {
         .shell{display:flex;min-height:100vh;position:relative}
 
         .sidebar{width:260px;background:#0F172A;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:200;transition:transform .25s ease}
-        .sb-logo{display:flex;align-items:center;gap:12px;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.07)}
-        .sb-logo-icon{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#3B82F6,#6366F1);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+        .sb-logo{display:flex;align-items:center;gap:12px;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,0.07)}
+        .sb-logo-icon{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center}
         .sb-logo-name{font-family:'Fraunces',serif;font-size:19px;font-weight:700;color:#F8FAFC}
         .sb-nav{flex:1;padding:14px 12px;overflow-y:auto}
         .sb-nav::-webkit-scrollbar{width:0}
@@ -368,7 +369,14 @@ export default function TenantSettingsPage() {
         {/* ── Sidebar ── */}
         <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="sb-logo">
-            <div className="sb-logo-icon">🏘️</div>
+            <div className="sb-logo-icon">
+              <Image
+                src="/icon.png"
+                alt="Rentura Logo"
+                width={24}
+                height={24}
+              />
+            </div>
             <span className="sb-logo-name">Rentura</span>
           </div>
           <nav className="sb-nav">
@@ -633,8 +641,8 @@ export default function TenantSettingsPage() {
                     <div className="role-cards">
                       {[
                         { id: 'landlord', icon: '🏠', label: 'Landlord' },
-                        { id: 'tenant',   icon: '🔑', label: 'Tenant'   },
-                        { id: 'seeker',   icon: '🔍', label: 'Seeker'   },
+                        { id: 'tenant', icon: '🔑', label: 'Tenant' },
+                        { id: 'seeker', icon: '🔍', label: 'Seeker' },
                       ].map(r => (
                         <div
                           key={r.id}
@@ -653,9 +661,9 @@ export default function TenantSettingsPage() {
                     {/* Account info */}
                     <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 12 }}>Account Info</div>
                     {[
-                      { label: 'Full Name',    val: profile?.full_name || '—' },
-                      { label: 'Email',        val: profile?.email || '—'    },
-                      { label: 'Phone',        val: profile?.phone || '—'    },
+                      { label: 'Full Name', val: profile?.full_name || '—' },
+                      { label: 'Email', val: profile?.email || '—' },
+                      { label: 'Phone', val: profile?.phone || '—' },
                       { label: 'Current Role', val: activeRole.charAt(0).toUpperCase() + activeRole.slice(1) },
                     ].map(row => (
                       <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #F1F5F9' }}>

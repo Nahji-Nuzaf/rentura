@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Image from 'next/image'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Profile = {
@@ -57,44 +58,44 @@ function fmtTimeAgo(s: string) {
 }
 
 const PRIORITY_CONFIG = {
-  high:   { label: 'High',   color: '#DC2626', bg: '#FEE2E2', dot: '#DC2626' },
+  high: { label: 'High', color: '#DC2626', bg: '#FEE2E2', dot: '#DC2626' },
   medium: { label: 'Medium', color: '#D97706', bg: '#FEF9C3', dot: '#D97706' },
-  low:    { label: 'Low',    color: '#16A34A', bg: '#DCFCE7', dot: '#16A34A' },
+  low: { label: 'Low', color: '#16A34A', bg: '#DCFCE7', dot: '#16A34A' },
 }
 
 const STATUS_CONFIG = {
-  open:        { label: 'Open',        color: '#DC2626', bg: '#FEE2E2', step: 0 },
+  open: { label: 'Open', color: '#DC2626', bg: '#FEE2E2', step: 0 },
   in_progress: { label: 'In Progress', color: '#D97706', bg: '#FEF9C3', step: 1 },
-  resolved:    { label: 'Resolved',    color: '#16A34A', bg: '#DCFCE7', step: 2 },
+  resolved: { label: 'Resolved', color: '#16A34A', bg: '#DCFCE7', step: 2 },
 }
 
 export default function TenantMaintenancePage() {
   const router = useRouter()
 
-  const [profile, setProfile]       = useState<Profile | null>(null)
-  const [tenantRow, setTenantRow]   = useState<TenantRow | null>(null)
-  const [requests, setRequests]     = useState<MaintenanceRequest[]>([])
-  const [loading, setLoading]       = useState(true)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [tenantRow, setTenantRow] = useState<TenantRow | null>(null)
+  const [requests, setRequests] = useState<MaintenanceRequest[]>([])
+  const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [activeRole, setActiveRole] = useState('tenant')
   const [unreadCount, setUnreadCount] = useState(0)
 
   // UI state
-  const [sidebarOpen, setSidebarOpen]         = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [rolePopoverOpen, setRolePopoverOpen] = useState(false)
-  const [filter, setFilter]                   = useState<'all' | 'open' | 'in_progress' | 'resolved'>('all')
-  const [showForm, setShowForm]               = useState(false)
-  const [detailRequest, setDetailRequest]     = useState<MaintenanceRequest | null>(null)
+  const [filter, setFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved'>('all')
+  const [showForm, setShowForm] = useState(false)
+  const [detailRequest, setDetailRequest] = useState<MaintenanceRequest | null>(null)
 
   // Form state
-  const [formTitle, setFormTitle]       = useState('')
-  const [formDesc, setFormDesc]         = useState('')
+  const [formTitle, setFormTitle] = useState('')
+  const [formDesc, setFormDesc] = useState('')
   const [formPriority, setFormPriority] = useState<'low' | 'medium' | 'high'>('medium')
-  const [formError, setFormError]       = useState('')
-  const [formSuccess, setFormSuccess]   = useState(false)
+  const [formError, setFormError] = useState('')
+  const [formSuccess, setFormSuccess] = useState(false)
 
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       try {
         const sb = createClient()
         const { data: { user } } = await sb.auth.getUser()
@@ -167,8 +168,8 @@ export default function TenantMaintenancePage() {
   }
 
   // Derived
-  const total      = requests.length
-  const openCount  = requests.filter(r => r.status === 'open').length
+  const total = requests.length
+  const openCount = requests.filter(r => r.status === 'open').length
   const inProgCount = requests.filter(r => r.status === 'in_progress').length
   const resolvedCount = requests.filter(r => r.status === 'resolved').length
 
@@ -189,8 +190,8 @@ export default function TenantMaintenancePage() {
         .shell{display:flex;min-height:100vh;position:relative}
 
         .sidebar{width:260px;background:#0F172A;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:200;transition:transform .25s ease}
-        .sb-logo{display:flex;align-items:center;gap:12px;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.07)}
-        .sb-logo-icon{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#3B82F6,#6366F1);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+        .sb-logo{display:flex;align-items:center;gap:12px;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,0.07)}
+        .sb-logo-icon{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center}
         .sb-logo-name{font-family:'Fraunces',serif;font-size:19px;font-weight:700;color:#F8FAFC}
         .sb-nav{flex:1;padding:14px 12px;overflow-y:auto}
         .sb-nav::-webkit-scrollbar{width:0}
@@ -489,7 +490,14 @@ export default function TenantMaintenancePage() {
         {/* ── Sidebar ── */}
         <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="sb-logo">
-            <div className="sb-logo-icon">🏘️</div>
+            <div className="sb-logo-icon">
+              <Image
+                src="/icon.png"
+                alt="Rentura Logo"
+                width={24}
+                height={24}
+              />
+            </div>
             <span className="sb-logo-name">Rentura</span>
           </div>
           <nav className="sb-nav">

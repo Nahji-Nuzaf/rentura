@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Image from 'next/image'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Profile = {
@@ -76,30 +77,30 @@ function groupByDate(messages: Message[]) {
 export default function TenantMessagesPage() {
   const router = useRouter()
   const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef  = useRef<HTMLTextAreaElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  const [profile, setProfile]       = useState<Profile | null>(null)
-  const [loading, setLoading]       = useState(true)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [loading, setLoading] = useState(true)
   const [activeRole, setActiveRole] = useState('tenant')
 
   // Threads & messages
-  const [threads, setThreads]             = useState<Thread[]>([])
-  const [activeThread, setActiveThread]   = useState<Thread | null>(null)
+  const [threads, setThreads] = useState<Thread[]>([])
+  const [activeThread, setActiveThread] = useState<Thread | null>(null)
   const [threadsLoading, setThreadsLoading] = useState(true)
 
   // Compose
-  const [draft, setDraft]       = useState('')
-  const [sending, setSending]   = useState(false)
+  const [draft, setDraft] = useState('')
+  const [sending, setSending] = useState(false)
 
   // UI
-  const [sidebarOpen, setSidebarOpen]         = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [rolePopoverOpen, setRolePopoverOpen] = useState(false)
-  const [mobileShowChat, setMobileShowChat]   = useState(false)
-  const [searchQuery, setSearchQuery]         = useState('')
+  const [mobileShowChat, setMobileShowChat] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   // ── Load ───────────────────────────────────────────────────────────────
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       try {
         const sb = createClient()
         const { data: { user } } = await sb.auth.getUser()
@@ -138,7 +139,7 @@ export default function TenantMessagesPage() {
       // Fetch partner profiles
       const { data: partners } = await sb.from('profiles').select('id,full_name,email,avatar_url').in('id', partnerIds)
       const partnerMap: Record<string, { full_name: string; email: string; avatar_url?: string }> = {}
-      ;(partners || []).forEach((p: any) => { partnerMap[p.id] = p })
+        ; (partners || []).forEach((p: any) => { partnerMap[p.id] = p })
 
       // Build threads
       const threadMap: Record<string, Thread> = {}
@@ -303,8 +304,8 @@ export default function TenantMessagesPage() {
         .shell{display:flex;min-height:100vh;position:relative}
 
         .sidebar{width:260px;background:#0F172A;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:200;transition:transform .25s ease}
-        .sb-logo{display:flex;align-items:center;gap:12px;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.07)}
-        .sb-logo-icon{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#3B82F6,#6366F1);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+        .sb-logo{display:flex;align-items:center;gap:12px;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,0.07)}
+        .sb-logo-icon{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center}
         .sb-logo-name{font-family:'Fraunces',serif;font-size:19px;font-weight:700;color:#F8FAFC}
         .sb-nav{flex:1;padding:14px 12px;overflow-y:auto}
         .sb-nav::-webkit-scrollbar{width:0}
@@ -450,7 +451,14 @@ export default function TenantMessagesPage() {
         {/* ── Sidebar ── */}
         <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="sb-logo">
-            <div className="sb-logo-icon">🏘️</div>
+            <div className="sb-logo-icon">
+              <Image
+                src="/icon.png"
+                alt="Rentura Logo"
+                width={24}
+                height={24}
+              />
+            </div>
             <span className="sb-logo-name">Rentura</span>
           </div>
           <nav className="sb-nav">

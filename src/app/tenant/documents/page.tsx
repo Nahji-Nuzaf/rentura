@@ -435,7 +435,7 @@ export default function TenantDocumentsPage() {
             <span className="sb-section">Account</span>
             <a href="/tenant/settings" className="sb-item"><span className="sb-ico">⚙️</span> Settings</a>
           </nav>
-          <div className="sb-footer">
+          {/* <div className="sb-footer">
             <div className="sb-role-wrap">
               {rolePopoverOpen && (
                 <div className="role-popover">
@@ -464,6 +464,15 @@ export default function TenantDocumentsPage() {
                   <span className="sb-role-badge">Tenant</span>
                 </div>
                 <span style={{ color: '#64748B', fontSize: 12, flexShrink: 0 }}>⇅</span>
+              </div>
+            </div>
+          </div> */}
+          <div className="sb-footer">
+            <div className="sb-user">
+              <div className="sb-av">{profile ? initials(profile.full_name) : '?'}</div>
+              <div>
+                <div className="sb-uname">{profile?.full_name || 'Loading...'}</div>
+                <div className="sb-uemail">{profile?.email || ''}</div>
               </div>
             </div>
           </div>
