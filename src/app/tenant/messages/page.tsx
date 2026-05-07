@@ -77,7 +77,7 @@ function groupByDate(messages: Message[]) {
 export default function TenantMessagesPage() {
   const router = useRouter()
   const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
@@ -93,7 +93,7 @@ export default function TenantMessagesPage() {
 
   // UI
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [mobileShowChat, setMobileShowChat] = useState(false)
+  const [showMobileChat, setShowMobileChat] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
   // Keep a ref to the active thread partner ID so the realtime handler can read it
@@ -127,7 +127,6 @@ export default function TenantMessagesPage() {
         await loadThreads(user.id)
 
         // ── Real-time subscription ──────────────────────────────────────
-        // Listen for any INSERT on messages where this user is sender or receiver
         realtimeChannel = sb
           .channel(`messages-user-${user.id}`)
           .on(
@@ -143,7 +142,6 @@ export default function TenantMessagesPage() {
               const currentProfile = profileRef.current
               if (!currentProfile) return
 
-              // Fetch sender profile if we don't have it
               const senderId = newMsg.sender_id
 
               setThreads(prev => {
@@ -151,7 +149,6 @@ export default function TenantMessagesPage() {
                 const isActive = activeThreadPartnerIdRef.current === senderId
 
                 if (existingThread) {
-                  // Add message to existing thread
                   const updatedThread = {
                     ...existingThread,
                     messages: [...existingThread.messages, newMsg],
@@ -162,13 +159,11 @@ export default function TenantMessagesPage() {
                   const filtered = prev.filter(t => t.partnerId !== senderId)
                   return [updatedThread, ...filtered]
                 } else {
-                  // New conversation partner — reload threads to get profile info
                   loadThreads(currentProfile.id)
                   return prev
                 }
               })
 
-              // If this thread is currently active, update it live & mark read
               if (activeThreadPartnerIdRef.current === senderId) {
                 setActiveThread(prev => prev ? {
                   ...prev,
@@ -177,7 +172,6 @@ export default function TenantMessagesPage() {
                   lastMessageTime: newMsg.created_at,
                 } : prev)
 
-                // Mark as read immediately
                 const sbInner = createClient()
                 await sbInner.from('messages')
                   .update({ read: true })
@@ -255,13 +249,11 @@ export default function TenantMessagesPage() {
 
       setThreads(sortedThreads)
 
-      // Auto-select first thread only on initial load
       setActiveThread(prev => {
         if (!prev && sortedThreads.length > 0) {
           markThreadRead(sortedThreads[0].partnerId, userId)
           return sortedThreads[0]
         }
-        // If we already have an active thread, refresh it with new data
         if (prev) {
           const refreshed = sortedThreads.find(t => t.partnerId === prev.partnerId)
           return refreshed ?? prev
@@ -291,7 +283,7 @@ export default function TenantMessagesPage() {
 
   async function selectThread(thread: Thread) {
     setActiveThread(thread)
-    setMobileShowChat(true)
+    setShowMobileChat(true)
     if (!profile) return
     await markThreadRead(thread.partnerId, profile.id)
   }
@@ -348,13 +340,6 @@ export default function TenantMessagesPage() {
     }
   }
 
-  // Auto-resize textarea
-  function handleDraftChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    setDraft(e.target.value)
-    e.target.style.height = 'auto'
-    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
-  }
-
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [activeThread?.messages.length])
@@ -384,8 +369,8 @@ export default function TenantMessagesPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-        html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;overflow-x:hidden;max-width:100vw}
-        .shell{display:flex;min-height:100vh;position:relative}
+        html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;overflow:hidden}
+        .shell{display:flex;height:100vh;height:100dvh;overflow:hidden;position:relative}
 
         /* ── Sidebar ── */
         .sidebar{width:260px;background:#0F172A;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:200;transition:transform .25s ease}
@@ -400,8 +385,8 @@ export default function TenantMessagesPage() {
         .sb-item.active{background:rgba(59,130,246,.16);color:#93C5FD;font-weight:700;border:1px solid rgba(59,130,246,.22)}
         .sb-ico{font-size:16px;width:20px;text-align:center;flex-shrink:0}
         .sb-count{margin-left:auto;background:#DC2626;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px}
-        .sb-footer{border-top:2px solid rgba(255,255,255,0.07)}
-        .sb-user{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;margin:12px}
+        .sb-footer{border-top:1px solid rgba(255,255,255,0.07)}
+        .sb-user{display:flex;align-items:center;gap:10px;padding:14px 18px}
         .sb-av{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#10B981,#34D399);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0}
         .sb-uname{font-size:13px;font-weight:700;color:#E2E8F0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .sb-uemail{font-size:11px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -409,186 +394,155 @@ export default function TenantMessagesPage() {
         .sb-overlay.open{display:block}
 
         /* ── Main ── */
-        .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:hidden;width:calc(100% - 260px)}
-        .topbar{height:56px;background:#fff;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(15,23,42,.04)}
+        .main{margin-left:260px;flex:1;display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden}
+        .topbar{height:58px;background:#fff;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;flex-shrink:0;box-shadow:0 1px 4px rgba(15,23,42,.04)}
         .breadcrumb{font-size:13px;color:#94A3B8;font-weight:500}
         .breadcrumb b{color:#0F172A}
-        .hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;color:#475569;padding:4px;line-height:1}
+        .hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;color:#475569;padding:4px;line-height:1;flex-shrink:0}
         .notif-btn{width:34px;height:34px;border-radius:9px;background:#F1F5F9;border:none;cursor:pointer;font-size:15px;position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0}
         .notif-dot{width:8px;height:8px;background:#DC2626;border-radius:50%;position:absolute;top:5px;right:5px;border:1.5px solid #fff}
 
-        /* ── Chat layout ── */
-        .chat-shell{display:flex;flex:1;height:calc(100vh - 56px);overflow:hidden;padding:16px;gap:14px}
+        /* ── Msg layout — mirrors landlord grid ── */
+        .msg-layout{display:grid;grid-template-columns:300px 1fr;flex:1;overflow:hidden;min-height:0}
 
-        /* ── Thread list ── */
-        .thread-panel{width:300px;flex-shrink:0;background:#fff;border:1px solid #E2E8F0;border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 1px 4px rgba(15,23,42,.04)}
-        .tp-header{padding:16px}
-        .tp-title{font-family:'Fraunces',serif;font-size:18px;font-weight:700;color:#0F172A;margin-bottom:10px;display:flex;align-items:center;gap:8px}
-        .tp-search{width:100%;padding:8px 12px 8px 34px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;color:#0F172A;outline:none;background:#F8FAFC;transition:border .15s}
-        .tp-search:focus{border-color:#2563EB;background:#fff}
-        .tp-search-wrap{position:relative}
-        .tp-search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none}
-        .thread-list{flex:1;overflow-y:auto}
-        .thread-list::-webkit-scrollbar{width:4px}
-        .thread-list::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:99px}
-        .thread-item{display:flex;align-items:center;gap:11px;padding:13px 16px;cursor:pointer;transition:background .12s;border-bottom:1px solid #F8FAFC;position:relative}
-        .thread-item:hover{background:#F8FAFC}
-        .thread-item.active{background:#EFF6FF}
-        .thread-item.active::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,#2563EB,#6366F1);border-radius:0 4px 4px 0}
-        .th-av{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#2563EB,#6366F1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;flex-shrink:0;overflow:hidden}
-        .th-av img{width:100%;height:100%;object-fit:cover}
-        .th-info{flex:1;min-width:0}
-        .th-name{font-size:13.5px;font-weight:700;color:#0F172A;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .th-preview{font-size:12px;color:#94A3B8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .th-preview.unread{color:#475569;font-weight:600}
-        .th-meta{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
-        .th-time{font-size:11px;color:#94A3B8}
-        .th-badge{width:18px;height:18px;background:#2563EB;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:9.5px;font-weight:700}
+        /* ── Thread / convo list ── */
+        .convo-list{border-right:1px solid #E2E8F0;background:#fff;display:flex;flex-direction:column;overflow:hidden}
+        .cl-head{padding:14px 16px;border-bottom:1px solid #E2E8F0;flex-shrink:0}
+        .cl-title{font-size:15px;font-weight:700;color:#0F172A;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+        .unread-badge{background:#EF4444;color:#fff;font-size:10px;font-weight:700;border-radius:99px;padding:2px 7px}
+        .cl-search{width:100%;padding:8px 12px;border-radius:10px;border:1.5px solid #E2E8F0;font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;outline:none;transition:border-color .15s;background:#F8FAFC;color:#0F172A}
+        .cl-search:focus{border-color:#2563EB;background:#fff}
+        .cl-items{flex:1;overflow-y:auto}
+        .cl-items::-webkit-scrollbar{width:0}
+
+        .convo-item{display:flex;align-items:flex-start;gap:11px;padding:13px 16px;cursor:pointer;border-bottom:1px solid #F8FAFC;transition:background .12s;position:relative}
+        .convo-item:hover{background:#F8FAFC}
+        .convo-item.active{background:#EFF6FF;border-left:3px solid #2563EB}
+        .ci-av{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#2563EB,#6366F1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;flex-shrink:0;overflow:hidden}
+        .ci-av img{width:100%;height:100%;object-fit:cover}
+        .ci-body{flex:1;min-width:0}
+        .ci-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px}
+        .ci-name{font-size:13.5px;font-weight:700;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .ci-time{font-size:11px;color:#94A3B8;flex-shrink:0;margin-left:4px}
+        .ci-preview{font-size:12.5px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+        .ci-preview.unread{color:#0F172A;font-weight:600}
+        .ci-unread{background:#2563EB;color:#fff;font-size:10px;font-weight:700;border-radius:99px;padding:1px 6px;flex-shrink:0;margin-left:6px}
         .thread-empty{text-align:center;padding:48px 16px;color:#94A3B8;font-size:13px}
 
-        /* ── Chat panel ── */
-        .chat-panel{flex:1;background:#fff;border:1px solid #E2E8F0;border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 1px 4px rgba(15,23,42,.04);min-width:0}
-        .chat-header{padding:14px 20px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:12px;background:#fff;flex-shrink:0}
-        .ch-back{display:none;background:none;border:none;font-size:20px;cursor:pointer;color:#475569;padding:0 6px 0 0;flex-shrink:0;line-height:1}
-        .ch-av{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,#2563EB,#6366F1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;flex-shrink:0;overflow:hidden}
+        /* ── Chat area ── */
+        .chat-area{display:flex;flex-direction:column;overflow:hidden;min-height:0;background:#F4F6FA;position:relative}
+        .chat-head{padding:14px 20px;background:#fff;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:12px;flex-shrink:0}
+        .mobile-back{display:none;background:none;border:none;font-size:20px;cursor:pointer;color:#475569;margin-right:2px;padding:4px;flex-shrink:0;line-height:1}
+        .ch-av{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#2563EB,#6366F1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;flex-shrink:0;overflow:hidden}
         .ch-av img{width:100%;height:100%;object-fit:cover}
-        .ch-name{font-size:15px;font-weight:700;color:#0F172A}
-        .ch-status{font-size:12px;color:#94A3B8;margin-top:1px}
+        .ch-name{font-size:14px;font-weight:700;color:#0F172A}
+        .ch-sub{font-size:12px;color:#94A3B8;margin-top:1px}
         .ch-actions{margin-left:auto;display:flex;gap:8px}
         .ch-action-btn{width:34px;height:34px;border-radius:9px;border:1.5px solid #E2E8F0;background:#F8FAFC;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;text-decoration:none;color:#475569;transition:all .15s}
         .ch-action-btn:hover{border-color:#BFDBFE;background:#EFF6FF}
 
         /* Messages area */
-        .messages-area{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:2px;-webkit-overflow-scrolling:touch}
-        .messages-area::-webkit-scrollbar{width:4px}
-        .messages-area::-webkit-scrollbar-track{background:transparent}
-        .messages-area::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:99px}
+        .chat-messages{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+        .chat-messages::-webkit-scrollbar{width:4px}
+        .chat-messages::-webkit-scrollbar-track{background:transparent}
+        .chat-messages::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:99px}
 
-        .date-header{text-align:center;margin:14px 0 10px;position:relative}
-        .date-header::before{content:'';position:absolute;left:0;right:0;top:50%;height:1px;background:#F1F5F9}
-        .date-header span{position:relative;background:#fff;padding:0 12px;font-size:11.5px;color:#94A3B8;font-weight:600}
+        .date-header{text-align:center;margin:6px 0 10px;position:relative}
+        .date-header::before{content:'';position:absolute;left:0;right:0;top:50%;height:1px;background:#E2E8F0}
+        .date-header span{position:relative;background:#F4F6FA;padding:0 12px;font-size:11.5px;color:#94A3B8;font-weight:600}
 
-        .bubble-row{display:flex;align-items:flex-end;gap:8px;margin-bottom:6px}
-        .bubble-row.mine{flex-direction:row-reverse}
-        .bubble-av{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;overflow:hidden}
-        .bubble-av img{width:100%;height:100%;object-fit:cover}
-        .bubble{max-width:72%;padding:10px 14px;border-radius:16px;font-size:13.5px;line-height:1.55;word-break:break-word;position:relative}
-        .bubble.theirs{background:#F1F5F9;color:#0F172A;border-bottom-left-radius:4px}
-        .bubble.mine{background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;border-bottom-right-radius:4px;box-shadow:0 2px 8px rgba(37,99,235,.2)}
-        .bubble-time{font-size:10.5px;margin-top:4px;opacity:.65}
-        .bubble-time.mine{text-align:right}
-        .bubble.mine .bubble-time{color:rgba(255,255,255,.8)}
-        .bubble.theirs .bubble-time{color:#94A3B8}
-
-        /* New message animation */
-        @keyframes slideInLeft{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
-        @keyframes slideInRight{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:translateX(0)}}
-        .bubble-row.new-incoming{animation:slideInLeft .25s ease forwards}
-        .bubble-row.new-outgoing{animation:slideInRight .25s ease forwards}
-
-        /* Typing / sending indicator */
-        .sending-dots{display:inline-flex;gap:3px;padding:10px 14px;background:#F1F5F9;border-radius:16px;border-bottom-left-radius:4px}
-        .sending-dots span{width:6px;height:6px;background:#94A3B8;border-radius:50%;animation:bounce .9s ease infinite}
-        .sending-dots span:nth-child(2){animation-delay:.15s}
-        .sending-dots span:nth-child(3){animation-delay:.3s}
-        @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
+        .bubble-wrap{display:flex;flex-direction:column}
+        .bubble-wrap.me{align-items:flex-end}
+        .bubble-wrap.them{align-items:flex-start}
+        .bubble{max-width:85%;padding:11px 15px;border-radius:14px;font-size:13.5px;line-height:1.5;word-break:break-word}
+        .bubble.me{background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;border-bottom-right-radius:4px;box-shadow:0 2px 8px rgba(37,99,235,.2)}
+        .bubble.them{background:#fff;color:#0F172A;border-bottom-left-radius:4px;box-shadow:0 1px 4px rgba(15,23,42,.08)}
+        .bubble-time{font-size:11px;color:#94A3B8;margin-top:3px;padding:0 2px;display:flex;align-items:center;gap:4px}
+        .bubble-time.me{justify-content:flex-end}
 
         /* Empty states */
-        .chat-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#94A3B8;text-align:center;padding:40px}
-        .ce-icon{font-size:48px;margin-bottom:14px}
-        .ce-title{font-family:'Fraunces',serif;font-size:20px;color:#475569;margin-bottom:6px}
-        .ce-sub{font-size:13px;line-height:1.6}
-        .no-selection{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#94A3B8;text-align:center;padding:40px}
+        .empty-chat{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#94A3B8;gap:10px;background:#fff}
 
-        /* Input bar */
-        .input-bar{padding:12px 16px;border-top:1px solid #E2E8F0;display:flex;align-items:flex-end;gap:10px;background:#fff;flex-shrink:0}
-        .input-textarea{flex:1;padding:10px 14px;border:1.5px solid #E2E8F0;border-radius:12px;font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;color:#0F172A;outline:none;resize:none;line-height:1.5;max-height:120px;min-height:42px;transition:border .15s;background:#F8FAFC;-webkit-appearance:none}
-        .input-textarea:focus{border-color:#2563EB;background:#fff}
-        .send-btn{width:42px;height:42px;border-radius:12px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(37,99,235,.3);transition:opacity .15s;-webkit-appearance:none}
-        .send-btn:hover{opacity:.9}
+        /* ── Input area ── */
+        .chat-input-area{flex-shrink:0;background:#fff;border-top:1px solid #E2E8F0}
+        .chat-input-row{padding:12px 16px;display:flex;gap:10px;align-items:center}
+        .chat-input{flex:1;padding:10px 14px;border-radius:12px;border:1.5px solid #E2E8F0;font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;outline:none;transition:border-color .15s;background:#F8FAFC;color:#0F172A}
+        .chat-input:focus{border-color:#2563EB;background:#fff}
+        .send-btn{width:40px;height:40px;border-radius:12px;border:none;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(37,99,235,.25);transition:all .15s}
+        .send-btn:hover:not(:disabled){transform:scale(1.05)}
         .send-btn:disabled{opacity:.4;cursor:not-allowed}
+
+        /* Skeleton */
+        @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+        .skeleton{border-radius:8px;background:linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}
 
         /* ── Responsive ── */
         @media(max-width:1024px){
-          .thread-panel{width:260px}
+          .msg-layout{grid-template-columns:260px 1fr}
         }
+
         @media(max-width:768px){
-          /* Sidebar: slide off-screen on mobile */
+          /* Sidebar: slide off-screen */
           .sidebar{transform:translateX(-100%)}
           .sidebar.open{transform:translateX(0)}
-          .main{margin-left:0!important;width:100%!important}
-          .hamburger{display:flex;align-items:center;justify-content:center}
+          .main{margin-left:0!important}
+          .hamburger{display:block}
           .topbar{padding:0 14px}
           .breadcrumb{font-size:12px}
 
-          /* Chat shell: full height, no padding, column */
-          .chat-shell{
-            padding:0;
-            gap:0;
-            flex-direction:column;
-            height:calc(100vh - 56px);
-            position:relative;
-            overflow:hidden;
-          }
+          /* Stack the grid */
+          .msg-layout{display:block;position:relative;height:100%;overflow:hidden}
 
-          /* Thread panel: full width, slides in/out */
-          .thread-panel{
+          /* Thread list: full screen, slides left when chat opens */
+          .convo-list{
             width:100%;
-            border-radius:0;
-            border:none;
-            border-bottom:1px solid #E2E8F0;
-            box-shadow:none;
+            height:100%;
             position:absolute;
-            top:0;left:0;right:0;bottom:0;
-            z-index:10;
+            inset:0;
+            display:flex;
+            flex-direction:column;
             transition:transform .3s cubic-bezier(.4,0,.2,1);
+            z-index:1;
           }
-          .thread-panel.hidden-mobile{
+          .convo-list.hidden{
             transform:translateX(-100%);
             pointer-events:none;
           }
 
-          /* Chat panel: full screen when thread selected */
-          .chat-panel{
-            border-radius:0;
-            border:none;
-            box-shadow:none;
+          /* Chat area: slides in from right */
+          .chat-area{
             position:absolute;
-            top:0;left:0;right:0;bottom:0;
-            z-index:11;
+            inset:0;
+            z-index:2;
+            display:flex;
+            flex-direction:column;
             transform:translateX(100%);
             transition:transform .3s cubic-bezier(.4,0,.2,1);
           }
-          .chat-panel.mobile-active{
+          .chat-area.visible{
             transform:translateX(0);
           }
 
-          /* Show back button on mobile */
-          .ch-back{display:flex}
+          /* Show back button */
+          .mobile-back{display:flex;align-items:center;justify-content:center}
 
-          /* Larger tap targets */
-          .thread-item{padding:14px 16px;min-height:68px}
-          .th-av{width:46px;height:46px}
-          .send-btn{width:44px;height:44px}
-          .input-bar{padding:10px 12px;padding-bottom:max(10px, env(safe-area-inset-bottom))}
+          /* Wider bubbles on mobile */
+          .bubble{max-width:90%}
 
-          /* Bubbles: slightly wider on mobile */
-          .bubble{max-width:82%}
-
-          /* Messages area padding */
-          .messages-area{padding:16px 12px}
+          /* Comfortable tap targets */
+          .convo-item{min-height:68px}
+          .ci-av{width:46px;height:46px}
+          .chat-messages{padding:12px 14px}
         }
 
         @media(max-width:480px){
-          .th-time{display:none}
-          .chat-header{padding:12px 14px;gap:10px}
-          .ch-name{font-size:14px}
-          .ch-status{font-size:11px}
+          .ci-time{display:none}
+          .chat-head{padding:12px 14px}
         }
 
         /* Safe area for notch devices */
         @supports(padding-bottom:env(safe-area-inset-bottom)){
-          .input-bar{padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+          .chat-input-row{padding-bottom:calc(12px + env(safe-area-inset-bottom))}
         }
       `}</style>
 
@@ -630,6 +584,7 @@ export default function TenantMessagesPage() {
 
         {/* ── Main ── */}
         <div className="main">
+          {/* Topbar */}
           <div className="topbar">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <button className="hamburger" onClick={() => setSidebarOpen(true)} aria-label="Open menu">☰</button>
@@ -640,62 +595,65 @@ export default function TenantMessagesPage() {
             </button>
           </div>
 
-          {/* ── Chat shell ── */}
-          <div className="chat-shell">
+          {/* ── Msg layout ── */}
+          <div className="msg-layout">
 
             {/* Thread list */}
-            <div className={`thread-panel${mobileShowChat ? ' hidden-mobile' : ''}`}>
-              <div className="tp-header">
-                <div className="tp-title">
-                  Messages
-                  {totalUnread > 0 && (
-                    <span style={{ background: '#DC2626', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 99 }}>
-                      {totalUnread}
-                    </span>
-                  )}
+            <div className={`convo-list${showMobileChat ? ' hidden' : ''}`}>
+              <div className="cl-head">
+                <div className="cl-title">
+                  Conversations
+                  {totalUnread > 0 && <span className="unread-badge">{totalUnread}</span>}
                 </div>
-                <div className="tp-search-wrap">
-                  <span className="tp-search-icon">🔍</span>
-                  <input
-                    className="tp-search"
-                    placeholder="Search conversations..."
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                  />
-                </div>
+                <input
+                  className="cl-search"
+                  placeholder="Search conversations..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                />
               </div>
 
-              <div className="thread-list">
+              <div className="cl-items">
                 {threadsLoading ? (
-                  <div className="thread-empty">Loading...</div>
+                  [1, 2, 3].map(i => (
+                    <div key={i} style={{ padding: '13px 16px', display: 'flex', gap: 11, borderBottom: '1px solid #F8FAFC' }}>
+                      <div className="skeleton" style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0 }} />
+                      <div style={{ flex: 1 }}>
+                        <div className="skeleton" style={{ height: 12, width: '70%', marginBottom: 7 }} />
+                        <div className="skeleton" style={{ height: 10, width: '90%' }} />
+                      </div>
+                    </div>
+                  ))
                 ) : filteredThreads.length === 0 ? (
                   <div className="thread-empty">
-                    {searchQuery ? `No results for "${searchQuery}"` : 'No conversations yet'}
+                    {searchQuery ? `No results for "${searchQuery}"` : 'No conversations yet.\nYour landlord will message you here.'}
                   </div>
                 ) : (
                   filteredThreads.map(thread => (
                     <div
                       key={thread.partnerId}
-                      className={`thread-item${activeThread?.partnerId === thread.partnerId ? ' active' : ''}`}
+                      className={`convo-item${activeThread?.partnerId === thread.partnerId ? ' active' : ''}`}
                       onClick={() => selectThread(thread)}
                     >
-                      <div className="th-av">
+                      <div className="ci-av">
                         {thread.partnerAvatar
                           ? <img src={thread.partnerAvatar} alt={thread.partnerName} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
                           : initials(thread.partnerName)
                         }
                       </div>
-                      <div className="th-info">
-                        <div className="th-name">{thread.partnerName}</div>
-                        <div className={`th-preview${thread.unreadCount > 0 ? ' unread' : ''}`}>
-                          {thread.lastMessage}
+                      <div className="ci-body">
+                        <div className="ci-top">
+                          <span className="ci-name">{thread.partnerName}</span>
+                          <span className="ci-time">{fmtTime(thread.lastMessageTime)}</span>
                         </div>
-                      </div>
-                      <div className="th-meta">
-                        <div className="th-time">{fmtTime(thread.lastMessageTime)}</div>
-                        {thread.unreadCount > 0 && (
-                          <div className="th-badge">{thread.unreadCount}</div>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span className={`ci-preview${thread.unreadCount > 0 ? ' unread' : ''}`}>
+                            {thread.lastMessage}
+                          </span>
+                          {thread.unreadCount > 0 && (
+                            <span className="ci-unread">{thread.unreadCount}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))
@@ -703,23 +661,23 @@ export default function TenantMessagesPage() {
               </div>
             </div>
 
-            {/* Chat panel */}
-            <div className={`chat-panel${mobileShowChat ? ' mobile-active' : ''}`}>
+            {/* Chat area */}
+            <div className={`chat-area${showMobileChat ? ' visible' : ''}`}>
               {!activeThread ? (
-                <div className="no-selection">
-                  <div style={{ fontSize: 48, marginBottom: 14 }}>💬</div>
-                  <div style={{ fontFamily: "'Fraunces',serif", fontSize: 20, color: '#475569', marginBottom: 6 }}>Your Messages</div>
-                  <div style={{ fontSize: 13, color: '#94A3B8', lineHeight: 1.6 }}>
+                <div className="empty-chat">
+                  <div style={{ fontSize: 40 }}>💬</div>
+                  <div style={{ fontWeight: 700, color: '#0F172A' }}>Your Messages</div>
+                  <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', lineHeight: 1.6 }}>
                     {threads.length === 0
-                      ? "You don't have any messages yet. Your landlord will be able to message you here."
+                      ? "You don't have any messages yet.\nYour landlord will be able to message you here."
                       : 'Select a conversation to start reading.'}
                   </div>
                 </div>
               ) : (
                 <>
                   {/* Chat header */}
-                  <div className="chat-header">
-                    <button className="ch-back" onClick={() => setMobileShowChat(false)} aria-label="Back">←</button>
+                  <div className="chat-head">
+                    <button className="mobile-back" onClick={() => setShowMobileChat(false)} aria-label="Back">←</button>
                     <div className="ch-av">
                       {activeThread.partnerAvatar
                         ? <img src={activeThread.partnerAvatar} alt={activeThread.partnerName} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
@@ -728,7 +686,7 @@ export default function TenantMessagesPage() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div className="ch-name">{activeThread.partnerName}</div>
-                      <div className="ch-status">{activeThread.partnerEmail}</div>
+                      <div className="ch-sub">{activeThread.partnerEmail}</div>
                     </div>
                     <div className="ch-actions">
                       <a href={`mailto:${activeThread.partnerEmail}`} className="ch-action-btn" title="Send email">✉️</a>
@@ -736,12 +694,10 @@ export default function TenantMessagesPage() {
                   </div>
 
                   {/* Messages */}
-                  <div className="messages-area">
+                  <div className="chat-messages">
                     {grouped.length === 0 ? (
-                      <div className="chat-empty">
-                        <div className="ce-icon">💬</div>
-                        <div className="ce-title">No messages yet</div>
-                        <div className="ce-sub">Send a message to start the conversation.</div>
+                      <div style={{ textAlign: 'center', color: '#94A3B8', marginTop: 40, fontSize: 13 }}>
+                        No messages yet. Say hello! 👋
                       </div>
                     ) : (
                       grouped.map((group, gi) => (
@@ -749,34 +705,20 @@ export default function TenantMessagesPage() {
                           <div className="date-header">
                             <span>{fmtDateHeader(group.date)}</span>
                           </div>
-                          {group.messages.map((msg, mi) => {
+                          {group.messages.map((msg) => {
                             const isMine = msg.sender_id === profile?.id
-                            const showAv = !isMine && (mi === group.messages.length - 1 || group.messages[mi + 1]?.sender_id !== msg.sender_id)
                             return (
-                              <div key={msg.id} className={`bubble-row${isMine ? ' mine' : ''}`}>
-                                {!isMine && (
-                                  <div
-                                    className="bubble-av"
-                                    style={{ background: 'linear-gradient(135deg,#2563EB,#6366F1)', visibility: showAv ? 'visible' : 'hidden' }}
-                                  >
-                                    {activeThread.partnerAvatar
-                                      ? <img src={activeThread.partnerAvatar} alt="" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                                      : initials(activeThread.partnerName)
-                                    }
-                                  </div>
-                                )}
-                                <div>
-                                  <div className={`bubble${isMine ? ' mine' : ' theirs'}`}>
-                                    {msg.content}
-                                    <div className={`bubble-time${isMine ? ' mine' : ''}`}>
-                                      {fmtMsgTime(msg.created_at)}
-                                      {isMine && (
-                                        <span style={{ marginLeft: 4 }}>
-                                          {msg.id.startsWith('opt-') ? '○' : '✓'}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
+                              <div key={msg.id} className={`bubble-wrap ${isMine ? 'me' : 'them'}`}>
+                                <div className={`bubble ${isMine ? 'me' : 'them'}`}>
+                                  {msg.content}
+                                </div>
+                                <div className={`bubble-time${isMine ? ' me' : ''}`}>
+                                  {fmtMsgTime(msg.created_at)}
+                                  {isMine && (
+                                    <span style={{ fontSize: 10, opacity: 0.7 }}>
+                                      {msg.id.startsWith('opt-') ? '○' : '✓'}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             )
@@ -787,25 +729,26 @@ export default function TenantMessagesPage() {
                     <div ref={bottomRef} />
                   </div>
 
-                  {/* Input bar */}
-                  <div className="input-bar">
-                    <textarea
-                      ref={inputRef}
-                      className="input-textarea"
-                      placeholder={`Message ${activeThread.partnerName}...`}
-                      value={draft}
-                      onChange={handleDraftChange}
-                      onKeyDown={handleKeyDown}
-                      rows={1}
-                    />
-                    <button
-                      className="send-btn"
-                      disabled={!draft.trim() || sending}
-                      onClick={handleSend}
-                      aria-label="Send message"
-                    >
-                      ➤
-                    </button>
+                  {/* Input area */}
+                  <div className="chat-input-area">
+                    <div className="chat-input-row">
+                      <input
+                        ref={inputRef}
+                        className="chat-input"
+                        placeholder={`Message ${activeThread.partnerName}...`}
+                        value={draft}
+                        onChange={e => setDraft(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                      />
+                      <button
+                        className="send-btn"
+                        disabled={!draft.trim() || sending}
+                        onClick={handleSend}
+                        aria-label="Send message"
+                      >
+                        ➤
+                      </button>
+                    </div>
                   </div>
                 </>
               )}
