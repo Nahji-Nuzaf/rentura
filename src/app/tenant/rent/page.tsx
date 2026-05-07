@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Image from 'next/image'
+import { useCurrency } from '@/lib/useCurrency'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Profile = {
@@ -51,10 +53,6 @@ type RentPayment = {
 // ── Helpers ────────────────────────────────────────────────────────────────
 function initials(name: string) {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-}
-
-function fmtCurrency(amount: number, currency = 'USD') {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount)
 }
 
 function fmtDate(s?: string) {
@@ -110,13 +108,15 @@ export default function TenantRentPage() {
   const [activeRole, setActiveRole] = useState('tenant')
 
   // UI
-  const [sidebarOpen, setSidebarOpen]         = useState(false)
-  const [rolePopoverOpen, setRolePopoverOpen] = useState(false)
-  const [filter, setFilter]                   = useState<'all' | 'paid' | 'pending' | 'overdue'>('all')
-  const [showPayModal, setShowPayModal]       = useState(false)
+  const [sidebarOpen, setSidebarOpen]           = useState(false)
+  const [rolePopoverOpen, setRolePopoverOpen]   = useState(false)
+  const [filter, setFilter]                     = useState<'all' | 'paid' | 'pending' | 'overdue'>('all')
+  const [showPayModal, setShowPayModal]         = useState(false)
   const [showReceiptModal, setShowReceiptModal] = useState(false)
-  const [receiptPayment, setReceiptPayment]   = useState<RentPayment | null>(null)
-  const [unreadCount, setUnreadCount]         = useState(0)
+  const [receiptPayment, setReceiptPayment]     = useState<RentPayment | null>(null)
+  const [unreadCount, setUnreadCount]           = useState(0)
+
+  const { fmtMoney } = useCurrency()
 
   // ── Load ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -194,12 +194,12 @@ export default function TenantRentPage() {
         html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;overflow-x:hidden;max-width:100vw}
         .shell{display:flex;min-height:100vh;position:relative}
 
+        /* ── SIDEBAR ── */
         .sidebar{width:260px;background:#0F172A;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:200;transition:transform .25s ease}
-        .sb-logo{display:flex;align-items:center;gap:12px;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.07)}
-        .sb-logo-icon{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#3B82F6,#6366F1);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+        .sb-logo{display:flex;align-items:center;gap:12px;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,0.07)}
+        .sb-logo-icon{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center}
         .sb-logo-name{font-family:'Fraunces',serif;font-size:19px;font-weight:700;color:#F8FAFC}
-        .sb-nav{flex:1;padding:14px 12px;overflow-y:auto}
-        .sb-nav::-webkit-scrollbar{width:0}
+        .sb-nav{flex:1;padding:14px 12px;overflow-y:auto}.sb-nav::-webkit-scrollbar{width:0}
         .sb-section{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#4B6587;padding:16px 10px 7px;display:block}
         .sb-item{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;color:#94A3B8;font-size:13.5px;font-weight:500;cursor:pointer;transition:all .15s;margin-bottom:2px;text-decoration:none}
         .sb-item:hover{background:rgba(255,255,255,.07);color:#CBD5E1}
@@ -215,27 +215,25 @@ export default function TenantRentPage() {
         .sb-uname{font-size:13px;font-weight:700;color:#E2E8F0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .sb-uemail{font-size:11px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .sb-role-badge{display:inline-block;font-size:9.5px;font-weight:700;color:#34D399;background:rgba(16,185,129,.14);border:1px solid rgba(16,185,129,.25);border-radius:4px;padding:1px 6px;margin-top:2px}
-        .sb-switch-ico{color:#64748B;flex-shrink:0}
         .role-popover{position:absolute;bottom:100%;left:12px;right:12px;background:#1E293B;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:8px;margin-bottom:6px;box-shadow:0 20px 40px rgba(0,0,0,.4);z-index:300}
         .rp-title{font-size:10px;color:#64748B;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:4px 8px 8px}
         .rp-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;color:#CBD5E1;font-size:13px;font-weight:500;transition:background .15s}
         .rp-item:hover{background:rgba(255,255,255,.06)}
-        .rp-check{width:16px;height:16px;margin-left:auto;color:#2563EB}
         .rp-divider{height:1px;background:rgba(255,255,255,.06);margin:4px 0}
 
+        /* ── MAIN AREA ── */
         .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:hidden;width:calc(100% - 260px)}
-        .topbar{height:56px;background:#fff;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(15,23,42,.04)}
-        .breadcrumb{font-size:13px;color:#94A3B8;font-weight:500}
-        .breadcrumb b{color:#0F172A}
+        .topbar{height:58px;background:#fff;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(15,23,42,.04)}
+        .tb-left{display:flex;align-items:center;gap:8px}
+        .breadcrumb{font-size:13px;color:#94A3B8;font-weight:500}.breadcrumb b{color:#0F172A}
         .hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;color:#475569;padding:4px}
         .notif-btn{width:34px;height:34px;border-radius:9px;background:#F1F5F9;border:none;cursor:pointer;font-size:15px;position:relative;display:flex;align-items:center;justify-content:center}
         .notif-dot{width:8px;height:8px;background:#DC2626;border-radius:50%;position:absolute;top:5px;right:5px;border:1.5px solid #fff}
-        .content{padding:28px;flex:1}
-        .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:199}
-        .sb-overlay.open{display:block}
+        .content{padding:22px 20px;flex:1}
+        .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:199}.sb-overlay.open{display:block}
 
         /* ── Hero ── */
-        .rent-hero{background:linear-gradient(135deg,#0F172A 0%,#1E293B 55%,#1a3354 100%);border-radius:20px;padding:28px 32px;margin-bottom:22px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;position:relative;overflow:hidden}
+        .rent-hero{background:linear-gradient(135deg,#0F172A 0%,#1E293B 55%,#1a3354 100%);border-radius:20px;padding:24px 28px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;position:relative;overflow:hidden}
         .rent-hero::before{content:'';position:absolute;top:-60px;right:-60px;width:240px;height:240px;background:radial-gradient(circle,rgba(99,102,241,.2),transparent 65%);pointer-events:none}
         .rh-label{font-size:12px;color:#64748B;margin-bottom:4px}
         .rh-amount{font-family:'Fraunces',serif;font-size:42px;font-weight:700;color:#fff;line-height:1;margin-bottom:6px}
@@ -247,7 +245,7 @@ export default function TenantRentPage() {
         .pay-btn-big.paid{background:linear-gradient(135deg,#16A34A,#15803D);box-shadow:0 4px 16px rgba(22,163,74,.3)}
 
         /* ── Stats ── */
-        .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:22px}
+        .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
         .stat-card{background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:18px;box-shadow:0 1px 4px rgba(15,23,42,.04)}
         .stat-val{font-family:'Fraunces',serif;font-size:26px;font-weight:700;color:#0F172A;line-height:1;margin-bottom:4px}
         .stat-label{font-size:11px;color:#94A3B8;font-weight:500}
@@ -304,23 +302,62 @@ export default function TenantRentPage() {
         .receipt-val{font-size:13px;font-weight:700;color:#0F172A}
         .receipt-amount{font-family:'Fraunces',serif;font-size:32px;font-weight:700;color:#16A34A;text-align:center;margin:16px 0}
 
-        @media(min-width:1100px){.stats{grid-template-columns:repeat(3,1fr)}}
-        @media(max-width:768px){
+        /* ════════════════════════════════════════════
+           RESPONSIVE BREAKPOINTS
+           ════════════════════════════════════════════ */
+
+        /* ── TABLET LANDSCAPE + SMALL DESKTOP (1024px – 1279px) ── */
+        @media(max-width:1279px){
+          .stats{grid-template-columns:repeat(3,1fr)}
+        }
+
+        /* ── TABLET PORTRAIT (768px – 1023px) ── */
+        @media(max-width:1023px){
           .sidebar{transform:translateX(-100%)}
           .sidebar.open{transform:translateX(0)}
           .main{margin-left:0!important;width:100%!important}
           .hamburger{display:block}
           .topbar{padding:0 16px}
-          .content{padding:16px}
-          .rent-hero{padding:20px}
-          .rh-right{width:100%}
-          .stats{grid-template-columns:repeat(2,1fr)}
-          .payment-row{flex-wrap:wrap}
-          .pr-right{align-items:flex-start;width:100%;flex-direction:row;justify-content:space-between}
-        }
-        @media(max-width:480px){
+          .content{padding:18px 16px}
+          .rent-hero{padding:20px 22px;gap:16px}
           .rh-amount{font-size:32px}
-          .stats{grid-template-columns:1fr 1fr}
+          .stats{grid-template-columns:repeat(3,1fr)}
+          .payment-row{flex-wrap:wrap}
+        }
+
+        /* ── TABLET PORTRAIT NARROW (600px – 767px) ── */
+        @media(max-width:767px){
+          .content{padding:14px 14px}
+          .rent-hero{padding:18px 18px;flex-direction:column;align-items:flex-start;gap:14px}
+          .rh-right{text-align:left;width:100%}
+          .rh-amount{font-size:28px}
+          .stats{grid-template-columns:repeat(2,1fr);gap:8px}
+          .pr-right{align-items:flex-start;width:100%;flex-direction:row;justify-content:space-between}
+          .filter-tabs{flex-wrap:wrap}
+        }
+
+        /* ── MOBILE (up to 599px) ── */
+        @media(max-width:599px){
+          .topbar{padding:0 12px}
+          .content{padding:12px 12px}
+          .rent-hero{padding:16px 16px;border-radius:16px}
+          .rh-amount{font-size:26px}
+          .stats{grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+          .stat-card{padding:13px 12px}
+          .stat-val{font-size:20px}
+          .payment-row{padding:12px 14px}
+          .modal{padding:24px 20px}
+          .modal-title{font-size:19px}
+          .receipt{padding:24px 18px}
+          .pay-btn-big{width:100%;text-align:center}
+        }
+
+        /* ── VERY SMALL MOBILE (up to 380px) ── */
+        @media(max-width:380px){
+          .rh-amount{font-size:22px}
+          .stat-val{font-size:18px}
+          .content{padding:10px 10px}
+          .ftab{padding:6px 10px;font-size:11.5px}
         }
       `}</style>
 
@@ -350,7 +387,7 @@ export default function TenantRentPage() {
                 <span className="receipt-status">✓ Paid</span>
               </div>
             </div>
-            <div className="receipt-amount">{fmtCurrency(receiptPayment.amount, unit?.currency)}</div>
+            <div className="receipt-amount">{fmtMoney(receiptPayment.amount)}</div>
             <div className="receipt-row">
               <span className="receipt-key">Period</span>
               <span className="receipt-val">{fmtMonth(receiptPayment.due_date)}</span>
@@ -391,10 +428,17 @@ export default function TenantRentPage() {
       </div>
 
       <div className="shell">
-        {/* ── Sidebar ── */}
+        {/* ── Sidebar (identical to dashboard) ── */}
         <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="sb-logo">
-            <div className="sb-logo-icon">🏘️</div>
+            <div className="sb-logo-icon">
+              <Image
+                src="/icon.png"
+                alt="Rentura Logo"
+                width={24}
+                height={24}
+              />
+            </div>
             <span className="sb-logo-name">Rentura</span>
           </div>
           <nav className="sb-nav">
@@ -412,11 +456,34 @@ export default function TenantRentPage() {
             <a href="/tenant/settings" className="sb-item"><span className="sb-ico">⚙️</span> Settings</a>
           </nav>
           <div className="sb-footer">
-            <div className="sb-user">
-              <div className="sb-av">{profile ? initials(profile.full_name) : '?'}</div>
-              <div>
-                <div className="sb-uname">{profile?.full_name || 'Loading...'}</div>
-                <div className="sb-uemail">{profile?.email || ''}</div>
+            <div className="sb-role-wrap">
+              {rolePopoverOpen && (
+                <div className="role-popover">
+                  <div className="rp-title">Switch Role</div>
+                  <div className="rp-item" onClick={() => handleRoleSwitch('tenant')}>
+                    <span>🏠</span> Tenant
+                    {activeRole === 'tenant' && <span style={{ marginLeft: 'auto', color: '#2563EB', fontWeight: 700, fontSize: 12 }}>✓</span>}
+                  </div>
+                  <div className="rp-divider" />
+                  <div className="rp-item" onClick={() => handleRoleSwitch('landlord')}>
+                    <span>🏢</span> Landlord
+                    {activeRole === 'landlord' && <span style={{ marginLeft: 'auto', color: '#2563EB', fontWeight: 700, fontSize: 12 }}>✓</span>}
+                  </div>
+                  <div className="rp-divider" />
+                  <div className="rp-item" onClick={() => handleRoleSwitch('seeker')}>
+                    <span>🔍</span> Property Seeker
+                    {activeRole === 'seeker' && <span style={{ marginLeft: 'auto', color: '#2563EB', fontWeight: 700, fontSize: 12 }}>✓</span>}
+                  </div>
+                </div>
+              )}
+              <div className="sb-user" onClick={() => setRolePopoverOpen(v => !v)}>
+                <div className="sb-av">{profile ? initials(profile.full_name) : '?'}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="sb-uname">{profile?.full_name || 'Loading...'}</div>
+                  <div className="sb-uemail">{profile?.email || ''}</div>
+                  <span className="sb-role-badge">Tenant</span>
+                </div>
+                <span style={{ color: '#64748B', fontSize: 12, flexShrink: 0 }}>⇅</span>
               </div>
             </div>
           </div>
@@ -425,7 +492,7 @@ export default function TenantRentPage() {
         {/* ── Main ── */}
         <div className="main">
           <div className="topbar">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div className="tb-left">
               <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
               <div className="breadcrumb">Rentura &nbsp;/&nbsp; <b>Rent & Payments</b></div>
             </div>
@@ -445,7 +512,7 @@ export default function TenantRentPage() {
                   {property && ` · ${property.name}`}
                   {unit && ` · Unit ${unit.unit_number}`}
                 </div>
-                <div className="rh-amount">{unit ? fmtCurrency(unit.monthly_rent, unit.currency) : '—'}</div>
+                <div className="rh-amount">{unit ? fmtMoney(unit.monthly_rent) : '—'}</div>
                 <div className="rh-meta">Due on the {unit?.rent_due_day || '—'}{unit?.rent_due_day === 1 ? 'st' : unit?.rent_due_day === 2 ? 'nd' : unit?.rent_due_day === 3 ? 'rd' : 'th'} of each month</div>
               </div>
               <div className="rh-right">
@@ -470,7 +537,7 @@ export default function TenantRentPage() {
             {/* Stats */}
             <div className="stats">
               <div className="stat-card">
-                <div className="stat-val">{fmtCurrency(totalPaid, unit?.currency)}</div>
+                <div className="stat-val">{fmtMoney(totalPaid)}</div>
                 <div className="stat-label">Total Paid (All Time)</div>
                 <div className="stat-sub" style={{ color: '#16A34A' }}>{onTimeCount} payment{onTimeCount !== 1 ? 's' : ''}</div>
               </div>
@@ -529,7 +596,7 @@ export default function TenantRentPage() {
                           {p.note && <div className="pr-method" style={{ fontStyle: 'italic' }}>"{p.note}"</div>}
                         </div>
                         <div className="pr-right">
-                          <div className="pr-amount">{fmtCurrency(p.amount, unit?.currency)}</div>
+                          <div className="pr-amount">{fmtMoney(p.amount)}</div>
                           <span className="badge" style={{ background: sc.bg, color: sc.color }}>
                             {ds.charAt(0).toUpperCase() + ds.slice(1)}
                           </span>

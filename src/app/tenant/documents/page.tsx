@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Image from 'next/image'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Profile = {
@@ -86,11 +87,11 @@ const FILTER_LABELS: Record<FilterTab, string> = {
 export default function TenantDocumentsPage() {
   const router = useRouter()
 
-  const [profile, setProfile]       = useState<Profile | null>(null)
-  const [tenantRow, setTenantRow]   = useState<TenantRow | null>(null)
-  const [documents, setDocuments]   = useState<Document[]>([])
-  const [loading, setLoading]       = useState(true)
-  const [activeRole, setActiveRole] = useState('tenant')
+  const [profile, setProfile]         = useState<Profile | null>(null)
+  const [tenantRow, setTenantRow]     = useState<TenantRow | null>(null)
+  const [documents, setDocuments]     = useState<Document[]>([])
+  const [loading, setLoading]         = useState(true)
+  const [activeRole, setActiveRole]   = useState('tenant')
   const [unreadCount, setUnreadCount] = useState(0)
 
   // UI
@@ -115,14 +116,12 @@ export default function TenantDocumentsPage() {
         if (!tRow) { setLoading(false); return }
         setTenantRow(tRow)
 
-        // Fetch docs shared with this tenant (by tenant_id) OR shared with their unit
         const [{ data: tenantDocs }, { data: unitDocs }, { data: msgData }] = await Promise.all([
           sb.from('documents').select('*').eq('tenant_id', tRow.id).order('created_at', { ascending: false }),
           sb.from('documents').select('*').eq('unit_id', tRow.unit_id).order('created_at', { ascending: false }),
           sb.from('messages').select('id').eq('receiver_id', user.id).eq('read', false),
         ])
 
-        // Merge and deduplicate by id
         const allDocs = [...(tenantDocs || []), ...(unitDocs || [])]
         const seen = new Set<string>()
         const dedupedDocs = allDocs.filter(d => {
@@ -153,7 +152,6 @@ export default function TenantDocumentsPage() {
   const leaseCount   = documents.filter(d => getDocCategory(d.type, d.name) === 'lease').length
   const receiptCount = documents.filter(d => getDocCategory(d.type, d.name) === 'receipts').length
   const noticeCount  = documents.filter(d => getDocCategory(d.type, d.name) === 'notices').length
-  const otherCount   = documents.filter(d => getDocCategory(d.type, d.name) === 'other').length
 
   const filtered = documents.filter(d => {
     const matchesFilter = filter === 'all' || getDocCategory(d.type, d.name) === filter
@@ -175,12 +173,12 @@ export default function TenantDocumentsPage() {
         html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:#F4F6FA;overflow-x:hidden;max-width:100vw}
         .shell{display:flex;min-height:100vh;position:relative}
 
+        /* ── SIDEBAR ── */
         .sidebar{width:260px;background:#0F172A;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:200;transition:transform .25s ease}
-        .sb-logo{display:flex;align-items:center;gap:12px;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.07)}
-        .sb-logo-icon{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#3B82F6,#6366F1);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+        .sb-logo{display:flex;align-items:center;gap:12px;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,0.07)}
+        .sb-logo-icon{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center}
         .sb-logo-name{font-family:'Fraunces',serif;font-size:19px;font-weight:700;color:#F8FAFC}
-        .sb-nav{flex:1;padding:14px 12px;overflow-y:auto}
-        .sb-nav::-webkit-scrollbar{width:0}
+        .sb-nav{flex:1;padding:14px 12px;overflow-y:auto}.sb-nav::-webkit-scrollbar{width:0}
         .sb-section{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#4B6587;padding:16px 10px 7px;display:block}
         .sb-item{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;color:#94A3B8;font-size:13.5px;font-weight:500;cursor:pointer;transition:all .15s;margin-bottom:2px;text-decoration:none}
         .sb-item:hover{background:rgba(255,255,255,.07);color:#CBD5E1}
@@ -192,36 +190,33 @@ export default function TenantDocumentsPage() {
         .sb-user{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;cursor:pointer;transition:background .15s}
         .sb-user:hover{background:rgba(255,255,255,.06)}
         .sb-av{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#10B981,#34D399);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0}
-        .sb-uinfo{flex:1;min-width:0}
         .sb-uname{font-size:13px;font-weight:700;color:#E2E8F0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .sb-uemail{font-size:11px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .sb-role-badge{display:inline-block;font-size:9.5px;font-weight:700;color:#34D399;background:rgba(16,185,129,.14);border:1px solid rgba(16,185,129,.25);border-radius:4px;padding:1px 6px;margin-top:2px}
-        .sb-switch-ico{color:#64748B;flex-shrink:0}
         .role-popover{position:absolute;bottom:100%;left:12px;right:12px;background:#1E293B;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:8px;margin-bottom:6px;box-shadow:0 20px 40px rgba(0,0,0,.4);z-index:300}
         .rp-title{font-size:10px;color:#64748B;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:4px 8px 8px}
         .rp-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;color:#CBD5E1;font-size:13px;font-weight:500;transition:background .15s}
         .rp-item:hover{background:rgba(255,255,255,.06)}
-        .rp-check{width:16px;height:16px;margin-left:auto;color:#2563EB}
         .rp-divider{height:1px;background:rgba(255,255,255,.06);margin:4px 0}
 
+        /* ── MAIN AREA ── */
         .main{margin-left:260px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:hidden;width:calc(100% - 260px)}
-        .topbar{height:56px;background:#fff;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(15,23,42,.04)}
-        .breadcrumb{font-size:13px;color:#94A3B8;font-weight:500}
-        .breadcrumb b{color:#0F172A}
+        .topbar{height:58px;background:#fff;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(15,23,42,.04)}
+        .tb-left{display:flex;align-items:center;gap:8px}
+        .breadcrumb{font-size:13px;color:#94A3B8;font-weight:500}.breadcrumb b{color:#0F172A}
         .hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;color:#475569;padding:4px}
         .notif-btn{width:34px;height:34px;border-radius:9px;background:#F1F5F9;border:none;cursor:pointer;font-size:15px;position:relative;display:flex;align-items:center;justify-content:center}
         .notif-dot{width:8px;height:8px;background:#DC2626;border-radius:50%;position:absolute;top:5px;right:5px;border:1.5px solid #fff}
-        .content{padding:28px;flex:1}
-        .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:199}
-        .sb-overlay.open{display:block}
+        .content{padding:22px 20px;flex:1}
+        .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:199}.sb-overlay.open{display:block}
 
         /* ── Page header ── */
-        .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px}
+        .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
         .page-title{font-family:'Fraunces',serif;font-size:26px;font-weight:700;color:#0F172A}
         .page-sub{font-size:13px;color:#94A3B8;margin-top:2px}
 
         /* ── Stats ── */
-        .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}
+        .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
         .stat-card{background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:16px 18px;box-shadow:0 1px 4px rgba(15,23,42,.04);cursor:pointer;transition:all .15s}
         .stat-card:hover{border-color:#BFDBFE;box-shadow:0 4px 14px rgba(37,99,235,.1)}
         .stat-card.active-filter{border-color:#2563EB;background:#EFF6FF}
@@ -294,22 +289,54 @@ export default function TenantDocumentsPage() {
         .empty-title{font-size:16px;font-weight:700;color:#475569;margin-bottom:6px}
         .empty-sub{font-size:13px;color:#94A3B8;line-height:1.6}
 
-        @media(max-width:900px){.stats{grid-template-columns:repeat(2,1fr)}}
-        @media(max-width:768px){
+        /* ════════════════════════════════════════════
+           RESPONSIVE BREAKPOINTS
+           ════════════════════════════════════════════ */
+
+        /* ── TABLET LANDSCAPE + SMALL DESKTOP (1024px – 1279px) ── */
+        @media(max-width:1279px){
+          .stats{grid-template-columns:repeat(4,1fr)}
+        }
+
+        /* ── TABLET PORTRAIT (768px – 1023px) ── */
+        @media(max-width:1023px){
           .sidebar{transform:translateX(-100%)}
           .sidebar.open{transform:translateX(0)}
           .main{margin-left:0!important;width:100%!important}
           .hamburger{display:block}
           .topbar{padding:0 16px}
-          .content{padding:16px}
+          .content{padding:18px 16px}
           .stats{grid-template-columns:repeat(2,1fr)}
+        }
+
+        /* ── TABLET PORTRAIT NARROW (600px – 767px) ── */
+        @media(max-width:767px){
+          .content{padding:14px 14px}
+          .stats{grid-template-columns:repeat(2,1fr);gap:8px}
           .toolbar{gap:8px}
           .search-wrap{min-width:100%;order:-1}
         }
-        @media(max-width:480px){
-          .stats{grid-template-columns:1fr 1fr}
+
+        /* ── MOBILE (up to 599px) ── */
+        @media(max-width:599px){
+          .topbar{padding:0 12px}
+          .content{padding:12px 12px}
+          .page-title{font-size:22px}
+          .stats{grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+          .stat-card{padding:13px 12px}
+          .stat-val{font-size:20px}
           .doc-row{flex-wrap:wrap}
           .doc-actions{width:100%;justify-content:flex-end}
+          .drawer{width:100vw}
+        }
+
+        /* ── VERY SMALL MOBILE (up to 380px) ── */
+        @media(max-width:380px){
+          .content{padding:10px 10px}
+          .stats{grid-template-columns:1fr 1fr}
+          .stat-val{font-size:18px}
+          .filter-tabs{font-size:11px}
+          .ftab{padding:6px 10px;font-size:11.5px}
         }
       `}</style>
 
@@ -337,7 +364,6 @@ export default function TenantDocumentsPage() {
                   {previewDoc.type || 'Document'}
                 </span>
               </div>
-
               <div className="d-section">
                 <div className="d-section-title">Details</div>
                 <div className="d-row">
@@ -359,7 +385,6 @@ export default function TenantDocumentsPage() {
                   </div>
                 )}
               </div>
-
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <a
                   href={previewDoc.file_url}
@@ -383,10 +408,17 @@ export default function TenantDocumentsPage() {
       </div>
 
       <div className="shell">
-        {/* ── Sidebar ── */}
+        {/* ── Sidebar (identical to dashboard) ── */}
         <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="sb-logo">
-            <div className="sb-logo-icon">🏘️</div>
+            <div className="sb-logo-icon">
+              <Image
+                src="/icon.png"
+                alt="Rentura Logo"
+                width={24}
+                height={24}
+              />
+            </div>
             <span className="sb-logo-name">Rentura</span>
           </div>
           <nav className="sb-nav">
@@ -404,11 +436,34 @@ export default function TenantDocumentsPage() {
             <a href="/tenant/settings" className="sb-item"><span className="sb-ico">⚙️</span> Settings</a>
           </nav>
           <div className="sb-footer">
-            <div className="sb-user">
-              <div className="sb-av">{profile ? initials(profile.full_name) : '?'}</div>
-              <div>
-                <div className="sb-uname">{profile?.full_name || 'Loading...'}</div>
-                <div className="sb-uemail">{profile?.email || ''}</div>
+            <div className="sb-role-wrap">
+              {rolePopoverOpen && (
+                <div className="role-popover">
+                  <div className="rp-title">Switch Role</div>
+                  <div className="rp-item" onClick={() => handleRoleSwitch('tenant')}>
+                    <span>🏠</span> Tenant
+                    {activeRole === 'tenant' && <span style={{ marginLeft: 'auto', color: '#2563EB', fontWeight: 700, fontSize: 12 }}>✓</span>}
+                  </div>
+                  <div className="rp-divider" />
+                  <div className="rp-item" onClick={() => handleRoleSwitch('landlord')}>
+                    <span>🏢</span> Landlord
+                    {activeRole === 'landlord' && <span style={{ marginLeft: 'auto', color: '#2563EB', fontWeight: 700, fontSize: 12 }}>✓</span>}
+                  </div>
+                  <div className="rp-divider" />
+                  <div className="rp-item" onClick={() => handleRoleSwitch('seeker')}>
+                    <span>🔍</span> Property Seeker
+                    {activeRole === 'seeker' && <span style={{ marginLeft: 'auto', color: '#2563EB', fontWeight: 700, fontSize: 12 }}>✓</span>}
+                  </div>
+                </div>
+              )}
+              <div className="sb-user" onClick={() => setRolePopoverOpen(v => !v)}>
+                <div className="sb-av">{profile ? initials(profile.full_name) : '?'}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="sb-uname">{profile?.full_name || 'Loading...'}</div>
+                  <div className="sb-uemail">{profile?.email || ''}</div>
+                  <span className="sb-role-badge">Tenant</span>
+                </div>
+                <span style={{ color: '#64748B', fontSize: 12, flexShrink: 0 }}>⇅</span>
               </div>
             </div>
           </div>
@@ -417,7 +472,7 @@ export default function TenantDocumentsPage() {
         {/* ── Main ── */}
         <div className="main">
           <div className="topbar">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div className="tb-left">
               <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
               <div className="breadcrumb">Rentura &nbsp;/&nbsp; <b>Documents</b></div>
             </div>
