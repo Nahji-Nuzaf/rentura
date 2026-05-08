@@ -426,7 +426,7 @@ export default function SettingsPage() {
                     </div>
 
                     {/* Role switching */}
-                    <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: '14px 16px', marginBottom: 18 }}>
+                    {/* <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: '14px 16px', marginBottom: 18 }}>
                       <div style={{ fontSize: 12.5, fontWeight: 700, color: '#374151', marginBottom: 10 }}>Switch Role</div>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         {Object.entries(ROLE_INFO).map(([role, info]) => (
@@ -448,7 +448,7 @@ export default function SettingsPage() {
                       <div style={{ fontSize: 11.5, color: '#94A3B8', marginTop: 8 }}>
                         You have access to {userRoles.length} role{userRoles.length > 1 ? 's' : ''}. Click to switch dashboards.
                       </div>
-                    </div>
+                    </div> */}
 
                     <div className="field-row">
                       <div className="field">
