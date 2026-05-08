@@ -23,7 +23,6 @@ type Listing = {
   status: 'active' | 'pending' | 'taken' | 'draft'
   photos: string[]
   tags: string[]
-  nearby_places: string[]
   created_at: string
   area_sqft: number | null
   deposit_amount: number | null
@@ -47,30 +46,6 @@ const SUGGESTED_TAGS = [
   'Swimming Pool', 'Security Guard', 'Generator', 'Water Heater', 'CCTV',
   'Balcony', 'Garden', 'Gym', 'Internet Included', 'Washing Machine',
 ]
-
-const SUGGESTED_NEARBY_PLACES = [
-  'Schools nearby', 'Hospital', 'Supermarket', 'Bus stop', 'Bank / ATM',
-  'Park / Recreation', 'Pharmacy', 'Restaurant', 'Shopping Mall', 'Train Station',
-  'Police Station', 'Post Office', 'Mosque', 'Temple', 'Church',
-]
-
-const NEARBY_PLACE_ICONS: Record<string, string> = {
-  'Schools nearby': '🏫',
-  'Hospital': '🏥',
-  'Supermarket': '🛒',
-  'Bus stop': '🚌',
-  'Bank / ATM': '🏦',
-  'Park / Recreation': '🌳',
-  'Pharmacy': '💊',
-  'Restaurant': '🍽️',
-  'Shopping Mall': '🛍️',
-  'Train Station': '🚂',
-  'Police Station': '🚔',
-  'Post Office': '📮',
-  'Mosque': '🕌',
-  'Temple': '🛕',
-  'Church': '⛪',
-}
 
 function fmtDate(s: string) {
   if (!s) return ''
@@ -117,11 +92,6 @@ export default function ListingsPage() {
   const [tagInput, setTagInput] = useState('')
   const [showTagInput, setShowTagInput] = useState(false)
 
-  // Nearby places state
-  const [nearbyPlaces, setNearbyPlaces] = useState<string[]>([])
-  const [nearbyInput, setNearbyInput] = useState('')
-  const [showNearbyInput, setShowNearbyInput] = useState(false)
-
   const planLabel = isPro ? plan.toUpperCase() : 'FREE'
   const planColor = isPro
     ? { color: '#FCD34D', bg: 'rgba(251,191,36,.14)', border: 'rgba(251,191,36,.3)' }
@@ -156,7 +126,7 @@ export default function ListingsPage() {
 
       const { data, error } = await sb
         .from('listings')
-        .select('id,title,description,property_id,unit_id,bedrooms,bathrooms,rent_amount,currency,available_from,status,photos,tags,nearby_places,created_at,area_sqft,deposit_amount,address,property_type,city')
+        .select('id,title,description,property_id,unit_id,bedrooms,bathrooms,rent_amount,currency,available_from,status,photos,tags,created_at,area_sqft,deposit_amount,address')
         .eq('landlord_id', uid)
         .order('created_at', { ascending: false })
       if (error) throw error
@@ -168,8 +138,7 @@ export default function ListingsPage() {
         bedrooms: row.bedrooms || 0, bathrooms: row.bathrooms || 1,
         rent_amount: row.rent_amount || 0, currency: row.currency || 'USD',
         available_from: row.available_from || '', status: row.status || 'draft',
-        photos: row.photos || [], tags: row.tags || [], nearby_places: row.nearby_places || [],
-        created_at: row.created_at || '',
+        photos: row.photos || [], tags: row.tags || [], created_at: row.created_at || '',
         area_sqft: row.area_sqft || null, deposit_amount: row.deposit_amount || null,
         address: row.address || '', property_type: row.property_type || null, city: row.city || null
       })))
@@ -325,24 +294,6 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
     if (e.key === 'Escape') { setShowTagInput(false); setTagInput('') }
   }
 
-  // ── NEARBY PLACES HANDLING ────────────────────────────────────────
-  function addNearbyPlace(place: string) {
-    const trimmed = place.trim()
-    if (!trimmed || nearbyPlaces.includes(trimmed)) return
-    setNearbyPlaces(prev => [...prev, trimmed])
-    setNearbyInput('')
-    setShowNearbyInput(false)
-  }
-
-  function removeNearbyPlace(place: string) {
-    setNearbyPlaces(prev => prev.filter(p => p !== place))
-  }
-
-  function handleNearbyKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') { e.preventDefault(); addNearbyPlace(nearbyInput) }
-    if (e.key === 'Escape') { setShowNearbyInput(false); setNearbyInput('') }
-  }
-
   // ── SAVE ─────────────────────────────────────────────────
   async function handleSave() {
     if (!form.title || !form.property_id) { alert('Please fill in title and property.'); return }
@@ -368,7 +319,6 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
         status: form.status,
         photos: allPhotos,
         tags: tags,
-        nearby_places: nearbyPlaces,
         area_sqft: form.area_sqft ? parseFloat(form.area_sqft) : null,
         deposit_amount: form.deposit_amount ? parseFloat(form.deposit_amount) : null,
         address: form.address || null, property_type: form.property_type || null, city: form.city || null
@@ -383,7 +333,6 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
       await loadAll(userId)
       setDrawer(null); setPhotoFiles([]); setPhotoPreviews([]); setExistingPhotos([])
       setTags([]); setTagInput(''); setShowTagInput(false)
-      setNearbyPlaces([]); setNearbyInput(''); setShowNearbyInput(false)
     } catch (e: any) { alert('Error: ' + (e?.message || 'Failed to save')) }
     finally { setSaving(false); setUploadingPhotos(false) }
   }
@@ -415,7 +364,6 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
     if (properties[0]?.id) loadUnitsForProperty(properties[0].id)
     setPhotoFiles([]); setPhotoPreviews([]); setExistingPhotos([])
     setTags([]); setTagInput(''); setShowTagInput(false)
-    setNearbyPlaces([]); setNearbyInput(''); setShowNearbyInput(false)
     setAiError(''); setAiSuccess(false)
     setEditing(null); setDrawer('add')
   }
@@ -427,15 +375,11 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
       rent_amount: String(l.rent_amount), available_from: l.available_from, status: l.status,
       area_sqft: l.area_sqft != null ? String(l.area_sqft) : '',
       deposit_amount: l.deposit_amount != null ? String(l.deposit_amount) : '',
-      address: l.address || '',
-      // FIX: load property_type and city from the listing record
-      property_type: l.property_type || '',
-      city: l.city || ''
+      address: l.address || '', property_type: l.property_type || '', city: l.city || ''
     })
     loadUnitsForProperty(l.property_id, l.unit_id)
     setPhotoFiles([]); setPhotoPreviews([]); setExistingPhotos(l.photos || [])
     setTags(l.tags || []); setTagInput(''); setShowTagInput(false)
-    setNearbyPlaces(l.nearby_places || []); setNearbyInput(''); setShowNearbyInput(false)
     setAiError(''); setAiSuccess(false)
     setEditing(l); setDrawer('edit')
   }
@@ -491,7 +435,6 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
 
   // Suggestions filtered out already-added tags
   const filteredSuggestions = SUGGESTED_TAGS.filter(t => !tags.includes(t))
-  const filteredNearbySuggestions = SUGGESTED_NEARBY_PLACES.filter(p => !nearbyPlaces.includes(p))
 
   return (
     <>
@@ -608,17 +551,6 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
         .tag-suggestions{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
         .tag-sug{font-size:11.5px;font-weight:600;color:#64748B;background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:99px;padding:3px 10px;cursor:pointer;transition:all .15s}
         .tag-sug:hover{background:#EFF6FF;border-color:#BFDBFE;color:#2563EB}
-
-        /* NEARBY PLACES SECTION */
-        .nearby-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#0369A1;background:rgba(3,105,161,.07);border:1.5px solid rgba(3,105,161,.18);border-radius:99px;padding:4px 10px;cursor:default}
-        .nearby-chip-del{background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:13px;line-height:1;padding:0;display:flex;align-items:center;transition:color .15s}
-        .nearby-chip-del:hover{color:#DC2626}
-        .nearby-add-btn{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:#0369A1;background:#F0F9FF;border:1.5px dashed #BAE6FD;border-radius:99px;padding:4px 12px;cursor:pointer;transition:all .15s}
-        .nearby-add-btn:hover{background:#E0F2FE;border-color:#7DD3FC}
-        .nearby-input:focus{border-color:#0369A1;box-shadow:0 0 0 3px rgba(3,105,161,.08)}
-        .nearby-input-add{padding:8px 14px;border-radius:10px;border:none;background:linear-gradient(135deg,#0369A1,#0284C7);color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;white-space:nowrap}
-        .nearby-sug{font-size:11.5px;font-weight:600;color:#64748B;background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:99px;padding:3px 10px;cursor:pointer;transition:all .15s}
-        .nearby-sug:hover{background:#F0F9FF;border-color:#BAE6FD;color:#0369A1}
 
         /* SHARE MODAL */
         .share-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;align-items:center;justify-content:center;padding:16px}
@@ -942,59 +874,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
             )}
           </div>
 
-          {/* ── 4. Nearby Places ── */}
-          <div className="section-divider">
-            <div className="section-divider-label">
-              🗺️ Nearby Places
-            </div>
-            <div style={{ fontSize: 12, color: '#94A3B8', marginBottom: 10, lineHeight: 1.5 }}>
-              Help tenants discover what's close to this property.
-            </div>
-            {nearbyPlaces.length > 0 && (
-              <div className="tags-wrap" style={{ marginBottom: 10 }}>
-                {nearbyPlaces.map(place => (
-                  <span key={place} className="nearby-chip">
-                    {NEARBY_PLACE_ICONS[place] || '📍'} {place}
-                    <button className="nearby-chip-del" onClick={() => removeNearbyPlace(place)}>✕</button>
-                  </span>
-                ))}
-              </div>
-            )}
-            {filteredNearbySuggestions.length > 0 && (
-              <div style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 6, fontWeight: 600 }}>QUICK ADD</div>
-                <div className="tag-suggestions">
-                  {filteredNearbySuggestions.slice(0, 8).map(p => (
-                    <button key={p} className="nearby-sug" onClick={() => addNearbyPlace(p)}>
-                      {NEARBY_PLACE_ICONS[p] || '📍'} {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {showNearbyInput ? (
-              <div className="tag-input-row">
-                <input
-                  autoFocus
-                  className="tag-input nearby-input"
-                  placeholder="e.g. University, Harbor"
-                  value={nearbyInput}
-                  onChange={e => setNearbyInput(e.target.value)}
-                  onKeyDown={handleNearbyKeyDown}
-                />
-                <button className="nearby-input-add" onClick={() => addNearbyPlace(nearbyInput)}>Add</button>
-                <button
-                  onClick={() => { setShowNearbyInput(false); setNearbyInput('') }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', fontSize: 18, padding: '0 4px' }}>✕</button>
-              </div>
-            ) : (
-              <button className="nearby-add-btn" onClick={() => setShowNearbyInput(true)}>
-                <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Add custom place
-              </button>
-            )}
-          </div>
-
-          {/* ── 5. AI Writer ── */}
+          {/* ── 4. AI Writer ── */}
           <div className="section-divider">
             <div style={{ background: 'linear-gradient(135deg,rgba(124,58,237,.06),rgba(37,99,235,.06))', border: '1.5px solid rgba(124,58,237,.15)', borderRadius: 14, padding: '14px 16px' }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#4C1D95', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1020,7 +900,7 @@ The tone should be professional yet approachable. Focus on the lifestyle and con
             </div>
           </div>
 
-          {/* ── 6. Content (Title + Description) — at the bottom ── */}
+          {/* ── 5. Content (Title + Description) — at the bottom ── */}
           <div className="section-divider">
             <div className="section-divider-label">
               Content
