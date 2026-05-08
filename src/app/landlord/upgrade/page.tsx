@@ -1,10 +1,28 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
 
+// ── Currency system (same as seeker marketplace) ────────────────────────────
+const SUPPORTED_CURRENCIES = ['LKR', 'USD', 'EUR', 'GBP', 'AUD'] as const
+type CurrencyCode = typeof SUPPORTED_CURRENCIES[number]
+
+const CURRENCY_SYMBOLS: Record<CurrencyCode, string> = {
+  LKR: 'Rs', USD: '$', EUR: '€', GBP: '£', AUD: 'A$',
+}
+
+// Base prices are in USD; we convert to selected currency
+const FALLBACK_RATES_FROM_USD: Record<CurrencyCode, number> = {
+  USD: 1,
+  LKR: 300,
+  EUR: 0.93,
+  GBP: 0.79,
+  AUD: 1.53,
+}
+
+// ── Plan feature lists ───────────────────────────────────────────────────────
 const FREE_FEATURES = [
   { text: '3 properties', included: true },
   { text: 'Up to 10 units', included: true },
@@ -52,6 +70,10 @@ const FAQS = [
   { q: 'Can I upgrade mid-month?', a: "Yes — you'll be charged a prorated amount for the rest of the current billing cycle." },
 ]
 
+// Base prices in USD
+const PRO_PRICE_USD = 20
+const BIZ_PRICE_USD = 24
+
 export default function UpgradePage() {
   const router = useRouter()
   const [initials, setInitials] = useState('NN')
@@ -66,9 +88,61 @@ export default function UpgradePage() {
   const [activating, setActivating] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
-  const monthlyPrice = 20.00
-  const annualPrice = parseFloat((monthlyPrice * 10 / 12).toFixed(2))
+  // ── Currency state ──────────────────────────────────────────────────────────
+  const [displayCurrency, setDisplayCurrency] = useState<CurrencyCode>('USD')
+  const [exchangeRates, setExchangeRates] = useState<Record<CurrencyCode, number>>(FALLBACK_RATES_FROM_USD)
+  const [currencyDropOpen, setCurrencyDropOpen] = useState(false)
+  const currencyRef = useRef<HTMLDivElement>(null)
 
+  // ── Derived prices ──────────────────────────────────────────────────────────
+  function convertPrice(usd: number): string {
+    const rate = exchangeRates[displayCurrency] ?? 1
+    const converted = usd * rate
+    const sym = CURRENCY_SYMBOLS[displayCurrency]
+    if (displayCurrency === 'LKR') {
+      return `${sym} ${Math.round(converted).toLocaleString()}`
+    }
+    return `${sym}${converted.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+  }
+
+  const proMonthlyUSD = PRO_PRICE_USD
+  const proAnnualUSD  = parseFloat((PRO_PRICE_USD * 10 / 12).toFixed(2))
+  const bizMonthlyUSD = BIZ_PRICE_USD
+  const bizAnnualUSD  = parseFloat((BIZ_PRICE_USD * 10 / 12).toFixed(2))
+
+  const proPrice  = billing === 'annual' ? proAnnualUSD  : proMonthlyUSD
+  const bizPrice  = billing === 'annual' ? bizAnnualUSD  : bizMonthlyUSD
+
+  // ── Fetch live exchange rates on mount (USD base) ───────────────────────────
+  useEffect(() => {
+    fetch('https://open.er-api.com/v6/latest/USD')
+      .then(r => r.json())
+      .then(data => {
+        if (data?.rates) {
+          setExchangeRates({
+            USD: 1,
+            LKR: data.rates.LKR ?? FALLBACK_RATES_FROM_USD.LKR,
+            EUR: data.rates.EUR ?? FALLBACK_RATES_FROM_USD.EUR,
+            GBP: data.rates.GBP ?? FALLBACK_RATES_FROM_USD.GBP,
+            AUD: data.rates.AUD ?? FALLBACK_RATES_FROM_USD.AUD,
+          })
+        }
+      })
+      .catch(() => {/* use fallback */ })
+  }, [])
+
+  // Close currency dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (currencyRef.current && !currencyRef.current.contains(e.target as Node)) {
+        setCurrencyDropOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // ── Existing toast / data loading logic ─────────────────────────────────────
   function showToast(msg: string, type: 'success' | 'error' = 'success') {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 6000)
@@ -85,13 +159,11 @@ export default function UpgradePage() {
       setFullName(name)
       setInitials(name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2))
 
-      // Check current plan
       const { data: sub } = await supabase
         .from('subscriptions').select('plan,status')
         .eq('profile_id', user.id).eq('status', 'active').maybeSingle()
       if (sub?.plan) setCurrentPlan(sub.plan)
 
-      // Open maintenance count
       const { data: props } = await supabase.from('properties').select('id').eq('landlord_id', user.id)
       const propIds = (props || []).map((p: any) => p.id)
       if (propIds.length > 0) {
@@ -100,7 +172,6 @@ export default function UpgradePage() {
         setOpenMaint(count || 0)
       }
 
-      // ── Handle Stripe success redirect ──
       const params = new URLSearchParams(window.location.search)
       const sessionId = params.get('session_id')
       const successParam = params.get('success')
@@ -109,23 +180,16 @@ export default function UpgradePage() {
       if (successParam === 'true' && sessionId) {
         setActivating(true)
         showToast('⏳ Verifying payment...', 'success')
-
         try {
-          // Call our activate API to verify payment with Stripe and update DB
           const res = await fetch('/api/stripe/activate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sessionId,
-              userId: user.id,
-              plan: planParam,
-            }),
+            body: JSON.stringify({ sessionId, userId: user.id, plan: planParam }),
           })
           const data = await res.json()
-
           if (data.success) {
             setCurrentPlan(data.plan)
-            showToast(`🎉 You're now on ${data.plan.charAt(0).toUpperCase() + data.plan.slice(1)}! All Pro features are unlocked.`, 'success')
+            showToast(`🎉 You're now on ${data.plan.charAt(0).toUpperCase() + data.plan.slice(1)}! All features are unlocked.`, 'success')
           } else {
             showToast('Payment verified but activation failed. Please contact support.', 'error')
           }
@@ -136,7 +200,6 @@ export default function UpgradePage() {
           window.history.replaceState({}, '', '/landlord/upgrade')
         }
       } else if (successParam === 'true') {
-        // Fallback: no session_id, just re-fetch plan
         setTimeout(async () => {
           const { data: newSub } = await supabase.from('subscriptions')
             .select('plan,status').eq('profile_id', user.id).eq('status', 'active').maybeSingle()
@@ -154,6 +217,7 @@ export default function UpgradePage() {
     load()
   }, [router])
 
+  // ── Upgrade handler — graceful fallback for missing env vars ────────────────
   async function handleUpgrade(plan: 'pro' | 'business') {
     if (currentPlan === plan) { showToast('You are already on this plan.', 'error'); return }
 
@@ -162,7 +226,15 @@ export default function UpgradePage() {
       : process.env.NEXT_PUBLIC_STRIPE_BUSINESS_PRICE_ID
 
     if (!priceId) {
-      showToast('Plan price not configured. Add NEXT_PUBLIC_STRIPE_PRO_PRICE_ID to .env.local', 'error')
+      // Graceful fallback: open a mailto or contact page instead of a hard error
+      if (plan === 'business') {
+        showToast('To upgrade to Business, please contact us at hello@rentura.app', 'error')
+        setTimeout(() => {
+          window.location.href = 'mailto:hello@rentura.app?subject=Business Plan Inquiry'
+        }, 1800)
+      } else {
+        showToast('Pro plan is not yet configured. Please contact support.', 'error')
+      }
       return
     }
 
@@ -192,10 +264,8 @@ export default function UpgradePage() {
       if (!user) return
       const fetchUnread = async () => {
         const { count } = await supabase
-          .from('messages')
-          .select('id', { count: 'exact', head: true })
-          .eq('receiver_id', user.id)
-          .eq('read', false)
+          .from('messages').select('id', { count: 'exact', head: true })
+          .eq('receiver_id', user.id).eq('read', false)
         setUnreadMessages(count || 0)
       }
       await fetchUnread()
@@ -245,7 +315,17 @@ export default function UpgradePage() {
         .topbar{height:58px;display:flex;align-items:center;gap:10px;padding:0 20px;background:#fff;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(15,23,42,.04);width:100%}
         .hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;color:#475569;padding:4px;flex-shrink:0}
         .breadcrumb{font-size:13px;color:#94A3B8;font-weight:500}.breadcrumb b{color:#0F172A;font-weight:700}
+        .topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
         .content{padding:22px 20px 60px;flex:1;width:100%;min-width:0;overflow-x:hidden}
+
+        /* ── Currency Picker ── */
+        .currency-wrap{position:relative;flex-shrink:0}
+        .currency-btn{display:flex;align-items:center;gap:5px;padding:7px 11px;border-radius:10px;border:1.5px solid #E2E8F0;background:#F8FAFC;color:#374151;font-size:12.5px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;white-space:nowrap}
+        .currency-btn:hover{border-color:#CBD5E1;background:#F1F5F9}
+        .currency-drop{position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1.5px solid #E2E8F0;border-radius:12px;box-shadow:0 8px 24px rgba(15,23,42,.12);overflow:hidden;min-width:120px;z-index:600}
+        .currency-item{display:block;width:100%;padding:9px 16px;font-size:13px;font-weight:600;color:#374151;background:none;border:none;text-align:left;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:background .12s}
+        .currency-item:hover{background:#F1F5F9}
+        .currency-item.active{color:#2563EB;background:#EFF6FF}
 
         .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:13px 24px;border-radius:13px;font-size:14px;font-weight:600;color:#fff;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.2);white-space:nowrap;animation:toastIn .25s ease;max-width:90vw;text-align:center}
         .toast.success{background:linear-gradient(135deg,#16A34A,#15803D)}
@@ -265,10 +345,10 @@ export default function UpgradePage() {
         .pab-title{font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:#F1F5F9;margin-bottom:4px}
         .pab-sub{font-size:13px;color:#64748B}
         .pab-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:12px;font-weight:700;padding:6px 16px;border-radius:99px;box-shadow:0 4px 12px rgba(37,99,235,.3)}
-        .pab-features{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px; justify-content:center}
+        .pab-features{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;justify-content:center}
         .pab-feat{font-size:12px;color:#93C5FD;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);border-radius:6px;padding:3px 10px}
 
-        .sandbox-banner{background:#FEF9C3; justify-content:center; border:1px solid #FDE68A;border-radius:12px;padding:12px 18px;margin-bottom:24px;font-size:13px;color:#D97706;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap;max-width:960px;margin-left:auto;margin-right:auto}
+        .sandbox-banner{background:#FEF9C3;justify-content:center;border:1px solid #FDE68A;border-radius:12px;padding:12px 18px;margin-bottom:24px;font-size:13px;color:#D97706;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap;max-width:960px;margin-left:auto;margin-right:auto}
 
         .hero{text-align:center;padding:32px 20px 40px;max-width:600px;margin:0 auto}
         .hero-eyebrow{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;background:linear-gradient(135deg,rgba(37,99,235,.1),rgba(99,102,241,.1));color:#2563EB;border:1px solid rgba(37,99,235,.2);border-radius:99px;padding:5px 14px;margin-bottom:16px}
@@ -291,9 +371,9 @@ export default function UpgradePage() {
         .plan.featured .plan-name{color:#F1F5F9}
         .plan-desc{font-size:13px;color:#94A3B8;margin-bottom:18px;line-height:1.5}
         .plan-price-row{display:flex;align-items:flex-end;gap:4px;margin-bottom:4px}
-        .plan-price{font-family:'Fraunces',serif;font-size:40px;font-weight:700;color:#0F172A;line-height:1;letter-spacing:-2px}
+        .plan-price{font-family:'Fraunces',serif;font-size:36px;font-weight:700;color:#0F172A;line-height:1;letter-spacing:-1.5px}
         .plan.featured .plan-price{color:#F1F5F9}
-        .plan-price-unit{font-size:14px;color:#94A3B8;margin-bottom:6px;font-weight:500}
+        .plan-price-unit{font-size:14px;color:#94A3B8;margin-bottom:5px;font-weight:500}
         .plan-billed{font-size:12px;color:#94A3B8;margin-bottom:20px}
         .plan-divider{height:1px;background:rgba(255,255,255,.08);margin:18px 0}
         .plan-divider.light{background:#F1F5F9}
@@ -316,9 +396,15 @@ export default function UpgradePage() {
         .plan-cta.current-cta{background:rgba(255,255,255,.1);color:#93C5FD;cursor:default;border:1px solid rgba(255,255,255,.15)}
         .plan-cta.current-cta:hover{transform:none}
         .plan-cta.biz-cta{background:#fff;color:#0F172A;border:2px solid #E2E8F0}
+        .plan-cta.biz-cta:hover:not(:disabled){background:#F8FAFC;border-color:#CBD5E1}
+        .plan-cta.biz-contact{background:linear-gradient(135deg,#D97706,#F59E0B);color:#fff;border:none}
+        .plan-cta.biz-contact:hover:not(:disabled){box-shadow:0 4px 14px rgba(217,119,6,.35)}
         .plan-cta.biz-current{background:#F1F5F9;color:#64748B;cursor:default}
         .plan-cta.biz-current:hover{transform:none}
         .popular-badge{position:absolute;top:-14px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#2563EB,#6366F1);color:#fff;font-size:11px;font-weight:700;padding:5px 18px;border-radius:99px;white-space:nowrap;box-shadow:0 4px 12px rgba(37,99,235,.4)}
+
+        /* Business "contact us" note */
+        .biz-note{font-size:11px;color:#94A3B8;text-align:center;margin-top:8px;line-height:1.4}
 
         .trust{display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap;padding:24px 0 40px;border-top:1px solid #E2E8F0;border-bottom:1px solid #E2E8F0;margin:0 auto 40px;max-width:900px}
         .trust-item{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#475569;white-space:nowrap}
@@ -366,12 +452,12 @@ export default function UpgradePage() {
         }
         @media(max-width:480px){
           .content{padding:12px 12px 40px}.hero-title{font-size:24px}.hero-sub{font-size:13.5px}
+          .currency-btn span.currency-label{display:none}
         }
       `}</style>
 
       {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
 
-      {/* Activating overlay */}
       {activating && (
         <div className="activating-overlay">
           <div className="activating-box">
@@ -449,6 +535,34 @@ export default function UpgradePage() {
           <div className="topbar">
             <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
             <div className="breadcrumb">Rentura &nbsp;/&nbsp; <b>Upgrade to Pro</b></div>
+
+            {/* ── Currency Picker in topbar ── */}
+            <div className="topbar-right">
+              <div className="currency-wrap" ref={currencyRef}>
+                <button
+                  className="currency-btn"
+                  onClick={() => setCurrencyDropOpen(v => !v)}
+                  title="Change display currency"
+                >
+                  <span>{CURRENCY_SYMBOLS[displayCurrency]}</span>
+                  <span className="currency-label">{displayCurrency}</span>
+                  <span style={{ fontSize: 10, opacity: 0.6 }}>▾</span>
+                </button>
+                {currencyDropOpen && (
+                  <div className="currency-drop">
+                    {SUPPORTED_CURRENCIES.map(c => (
+                      <button
+                        key={c}
+                        className={`currency-item${displayCurrency === c ? ' active' : ''}`}
+                        onClick={() => { setDisplayCurrency(c); setCurrencyDropOpen(false) }}
+                      >
+                        {CURRENCY_SYMBOLS[c]} {c}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="content">
@@ -460,7 +574,7 @@ export default function UpgradePage() {
                   <div className="pab-icon">⭐</div>
                   <div>
                     <div className="pab-title">You're on {currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}!</div>
-                    <div className="pab-sub">All Pro features are active. Enjoy your upgraded account.</div>
+                    <div className="pab-sub">All features are active. Enjoy your upgraded account.</div>
                     <div className="pab-features">
                       {['Unlimited everything', 'CSV exports', 'Advanced analytics'].map(f => (
                         <span key={f} className="pab-feat">✓ {f}</span>
@@ -481,7 +595,11 @@ export default function UpgradePage() {
             <div className="hero">
               <div className="hero-eyebrow">⭐ Simple, transparent pricing</div>
               <h1 className="hero-title">Grow your portfolio<br />with <span>Rentura Pro</span></h1>
-              <p className="hero-sub">Everything you need to manage properties like a pro - from ${billing === 'annual' ? annualPrice.toFixed(2) : monthlyPrice}/month. No hidden fees, cancel anytime.</p>
+              <p className="hero-sub">
+                Everything you need to manage properties like a pro — from{' '}
+                <strong>{convertPrice(billing === 'annual' ? proAnnualUSD : proMonthlyUSD)}</strong>/month.
+                No hidden fees, cancel anytime.
+              </p>
             </div>
 
             {/* Billing toggle */}
@@ -490,7 +608,7 @@ export default function UpgradePage() {
                 <button className={`bt-opt${billing === 'monthly' ? ' active' : ''}`} onClick={() => setBilling('monthly')}>Monthly</button>
                 <button className={`bt-opt${billing === 'annual' ? ' active' : ''}`} onClick={() => setBilling('annual')}>
                   Annual
-                  <span className="save-chip">Save 15%</span>
+                  <span className="save-chip">Save 17%</span>
                 </button>
               </div>
             </div>
@@ -504,7 +622,7 @@ export default function UpgradePage() {
                 <div className="plan-name">Starter</div>
                 <div className="plan-desc">Perfect for landlords just getting started.</div>
                 <div className="plan-price-row">
-                  <div className="plan-price">$0</div>
+                  <div className="plan-price">{convertPrice(0)}</div>
                   <div className="plan-price-unit">/mo</div>
                 </div>
                 <div className="plan-billed">Free forever</div>
@@ -529,13 +647,13 @@ export default function UpgradePage() {
                 <div className="plan-name">Pro</div>
                 <div className="plan-desc" style={{ color: '#93C5FD' }}>For serious landlords who want full control.</div>
                 <div className="plan-price-row">
-                  <div className="plan-price">${billing === 'annual' ? annualPrice.toFixed(2) : monthlyPrice}</div>
+                  <div className="plan-price">{convertPrice(proPrice)}</div>
                   <div className="plan-price-unit">/mo</div>
                 </div>
                 <div className="plan-billed" style={{ color: '#64748B' }}>
                   {billing === 'annual'
-                    ? `Billed $${(annualPrice * 12).toFixed(2)}/year`
-                    : 'Billed monthly'}
+                    ? `Billed ${convertPrice(proAnnualUSD * 12)}/year`
+                    : 'Billed monthly · in USD'}
                 </div>
                 <div className="plan-divider" />
                 <div className="plan-feature-list">
@@ -560,10 +678,12 @@ export default function UpgradePage() {
                 <div className="plan-name">Business</div>
                 <div className="plan-desc">For agencies and large-scale property managers.</div>
                 <div className="plan-price-row">
-                  <div className="plan-price">$24</div>
+                  <div className="plan-price">{convertPrice(bizPrice)}</div>
                   <div className="plan-price-unit">/mo</div>
                 </div>
-                <div className="plan-billed">{billing === 'annual' ? 'Billed $240/year' : 'Billed monthly'}</div>
+                <div className="plan-billed">
+                  {billing === 'annual' ? `Billed ${convertPrice(bizAnnualUSD * 12)}/year` : 'Billed monthly · in USD'}
+                </div>
                 <div className="plan-divider light" />
                 <div className="plan-feature-list">
                   {BUSINESS_FEATURES.map((f, i) => (
@@ -575,9 +695,16 @@ export default function UpgradePage() {
                 </div>
                 {currentPlan === 'business'
                   ? <button className="plan-cta biz-current">✓ Current Plan</button>
-                  : <button className="plan-cta biz-cta" disabled={!!loadingPlan || activating} onClick={() => handleUpgrade('business')}>
-                    {loadingPlan === 'business' ? '⏳ Redirecting...' : 'Upgrade to Business →'}
-                  </button>
+                  : process.env.NEXT_PUBLIC_STRIPE_BUSINESS_PRICE_ID
+                    ? <button className="plan-cta biz-cta" disabled={!!loadingPlan || activating} onClick={() => handleUpgrade('business')}>
+                        {loadingPlan === 'business' ? '⏳ Redirecting...' : 'Upgrade to Business →'}
+                      </button>
+                    : <>
+                        <button className="plan-cta biz-contact" disabled={!!loadingPlan || activating} onClick={() => handleUpgrade('business')}>
+                          📩 Contact Us to Upgrade
+                        </button>
+                        <div className="biz-note">Our team will set you up personally.</div>
+                      </>
                 }
               </div>
             </div>
@@ -649,9 +776,9 @@ export default function UpgradePage() {
                 <div className="bc-title">Ready to scale up?</div>
                 <div className="bc-sub">Join landlords using Rentura Pro to manage their portfolios smarter. Start today — cancel anytime.</div>
                 <button className="bc-btn" disabled={!!loadingPlan || activating} onClick={() => handleUpgrade('pro')}>
-                  {loadingPlan === 'pro' ? '⏳ Redirecting to Stripe...' : '⭐ Get Rentura Pro →'}
+                  {loadingPlan === 'pro' ? '⏳ Redirecting to Stripe...' : `⭐ Get Rentura Pro — ${convertPrice(proPrice)}/mo →`}
                 </button>
-                <div className="bc-note">Test: 4242 4242 4242 4242 · Any future date · Any CVC</div>
+                <div className="bc-note">Prices shown in {displayCurrency}. Charged in USD via Stripe.</div>
               </div>
             )}
 
