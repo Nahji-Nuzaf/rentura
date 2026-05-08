@@ -73,6 +73,8 @@ const CATEGORY_ICONS: Record<string, string> = {
   All: '🏘️', House: '🏡', Apartment: '🏢', Studio: '🛋️', Villa: '🏰', Room: '🚪', Office: '🏗️',
 }
 
+// ── FIX 2: limit city cards to 6 max ──
+const MAX_CITY_CARDS = 6
 const ITEMS_PER_PAGE = 15
 
 function initials(name: string) {
@@ -135,9 +137,9 @@ export default function SeekerMarketplace() {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
 
-  // ── Carousel state ──────────────────────────────────────────────────────────
+  // ── Carousel state ──
   const [featIdx, setFeatIdx] = useState(0)
-  const [visibleCount, setVisibleCount] = useState(4)
+  const [visibleCount, setVisibleCount] = useState(3)
   const touchStartX = useRef(0)
 
   // Currency state
@@ -146,11 +148,12 @@ export default function SeekerMarketplace() {
   const [currencyDropOpen, setCurrencyDropOpen] = useState(false)
   const currencyRef = useRef<HTMLDivElement>(null)
 
-  // ── Responsive visibleCount ─────────────────────────────────────────────────
+  // ── FIX 1: Responsive visibleCount for carousel ──
   useEffect(() => {
     function updateVisible() {
       const w = window.innerWidth
-      const next = w <= 520 ? 2 : w <= 768 ? 2 : 4
+      // mobile: 1.2 cards (peek), tablet: 2, desktop: 3
+      const next = w <= 480 ? 1 : w <= 768 ? 2 : 3
       setVisibleCount(next)
       setFeatIdx(0)
     }
@@ -238,10 +241,11 @@ export default function SeekerMarketplace() {
             .single()
           setUserRole((profile?.role as UserRole) || 'seeker')
 
+          // ── FIX 3: use correct column names user_id + listing_id ──
           const { data: savedRows } = await sb
             .from('saved_listings')
             .select('listing_id, listings(tags, city)')
-            .eq('seeker_id', user.id)
+            .eq('user_id', user.id)
           const savedSet = new Set((savedRows || []).map((s: any) => s.listing_id))
           setSavedIds(savedSet)
 
@@ -308,8 +312,10 @@ export default function SeekerMarketplace() {
         const cityMap: Record<string, number> = {}
         mapped.forEach(l => { if (l.city) cityMap[l.city] = (cityMap[l.city] || 0) + 1 })
         setCities(Object.keys(cityMap))
+
+        // ── FIX 2: limit city cards to MAX_CITY_CARDS ──
         setCityCards(
-          Object.entries(cityMap).sort((a, b) => b[1] - a[1]).slice(0, 6)
+          Object.entries(cityMap).sort((a, b) => b[1] - a[1]).slice(0, MAX_CITY_CARDS)
             .map(([city, count]) => ({ city, count, photo: CITY_PHOTOS[city] || CITY_PHOTOS.default }))
         )
 
@@ -380,24 +386,18 @@ export default function SeekerMarketplace() {
     currentPage * ITEMS_PER_PAGE
   )
 
-  // ── Carousel helpers ────────────────────────────────────────────────────────
+  // ── Carousel helpers ──
   const totalDots = Math.ceil(featuredListings.length / visibleCount)
   const activeDot = Math.floor(featIdx / visibleCount)
-  // card width % inside the track (accounting for 16px gaps)
-  const cardWidthPct = 100 / visibleCount
-  // translate: each step moves by one card width + gap
-  const translateX = featIdx > 0
-    ? `calc(-${featIdx * cardWidthPct}% - ${featIdx * 16}px)`
-    : '0px'
 
   function carouselPrev() {
-    setFeatIdx(i => Math.max(0, i - 1))
+    setFeatIdx(i => Math.max(0, i - visibleCount))
   }
   function carouselNext() {
-    setFeatIdx(i => Math.min(featuredListings.length - visibleCount, i + 1))
+    setFeatIdx(i => Math.min(featuredListings.length - visibleCount, i + visibleCount))
   }
 
-  // Save / Unsave
+  // ── FIX 3: Save / Unsave with correct column names (user_id, listing_id) ──
   async function toggleSave(listingId: string, e: React.MouseEvent) {
     e.stopPropagation()
     if (!userId) { router.push('/login'); return }
@@ -407,10 +407,10 @@ export default function SeekerMarketplace() {
       const sb = createClient()
       const already = savedIds.has(listingId)
       if (already) {
-        await sb.from('saved_listings').delete().eq('seeker_id', userId).eq('listing_id', listingId)
+        await sb.from('saved_listings').delete().eq('user_id', userId).eq('listing_id', listingId)
         setSavedIds(prev => { const s = new Set(prev); s.delete(listingId); return s })
       } else {
-        await sb.from('saved_listings').insert({ seeker_id: userId, listing_id: listingId })
+        await sb.from('saved_listings').insert({ user_id: userId, listing_id: listingId })
         setSavedIds(prev => new Set([...prev, listingId]))
       }
     } catch (e) { console.error(e) }
@@ -583,58 +583,61 @@ export default function SeekerMarketplace() {
         .feat-strip::-webkit-scrollbar{display:none}
         .feat-label{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:#94A3B8;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px}
         .feat-label.personalised{color:#7C3AED}
-        .fcard{min-width:0;width:100%;background:#fff;border:1px solid #E2E8F0;border-radius:20px;overflow:hidden;cursor:pointer;transition:box-shadow .2s,transform .2s;flex-shrink:0;box-shadow:0 1px 4px rgba(15,23,42,.04)}
-        .fcard:hover{box-shadow:0 10px 32px rgba(15,23,42,.12);transform:translateY(-3px)}
-        .fcard-img{height:195px;position:relative;overflow:hidden;background:#F1F5F9}
+
+        /* ── FIX 1: Redesigned smaller featured cards ── */
+        .fcard{min-width:0;width:100%;background:#fff;border:1px solid #E2E8F0;border-radius:16px;overflow:hidden;cursor:pointer;transition:box-shadow .2s,transform .2s;flex-shrink:0;box-shadow:0 1px 4px rgba(15,23,42,.04)}
+        .fcard:hover{box-shadow:0 8px 24px rgba(15,23,42,.11);transform:translateY(-2px)}
+        .fcard-img{height:160px;position:relative;overflow:hidden;background:#F1F5F9}
         .fcard-img img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s}
         .fcard:hover .fcard-img img{transform:scale(1.04)}
-        .fcard-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:52px;background:linear-gradient(135deg,#E2E8F0,#CBD5E1)}
-        .fcard-save{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:99px;background:rgba(255,255,255,.92);border:none;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.1);transition:transform .15s;z-index:2}
+        .fcard-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:42px;background:linear-gradient(135deg,#E2E8F0,#CBD5E1)}
+        .fcard-save{position:absolute;top:8px;right:8px;width:30px;height:30px;border-radius:99px;background:rgba(255,255,255,.92);border:none;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.1);transition:transform .15s;z-index:2}
         .fcard-save:hover{transform:scale(1.12)}
-        .fcard-badge{position:absolute;top:10px;left:10px;font-size:10.5px;font-weight:700;border-radius:99px;padding:3px 10px;background:rgba(16,185,129,.9);color:#fff}
-        .fcard-body{padding:14px 16px}
-        .fcard-type{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#94A3B8;margin-bottom:3px}
-        .fcard-title{font-size:14.5px;font-weight:700;color:#0F172A;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .fcard-loc{font-size:12px;color:#94A3B8;margin-bottom:9px;display:flex;align-items:center;gap:3px}
-        .fcard-price{font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:#0F172A}
-        .fcard-price span{font-size:11.5px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:400;color:#94A3B8}
-        .fcard-facts{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
-        .fcard-fact{font-size:11px;color:#475569;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:2px 7px}
+        .fcard-badge{position:absolute;top:8px;left:8px;font-size:10px;font-weight:700;border-radius:99px;padding:3px 8px;background:rgba(16,185,129,.9);color:#fff}
+        .fcard-body{padding:11px 13px 13px}
+        .fcard-type{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#94A3B8;margin-bottom:2px}
+        .fcard-title{font-size:13.5px;font-weight:700;color:#0F172A;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .fcard-loc{font-size:11.5px;color:#94A3B8;margin-bottom:7px;display:flex;align-items:center;gap:3px}
+        .fcard-price{font-family:'Fraunces',serif;font-size:18px;font-weight:700;color:#0F172A}
+        .fcard-price span{font-size:11px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:400;color:#94A3B8}
+        .fcard-facts{display:flex;gap:4px;flex-wrap:wrap;margin-top:7px}
+        .fcard-fact{font-size:10.5px;color:#475569;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:5px;padding:2px 6px}
 
         /* ── Carousel ── */
         .carousel-wrap{position:relative;display:flex;align-items:center;gap:0}
         .carousel-viewport{flex:1;min-width:0;overflow:hidden}
         .carousel-track{
           display:flex;
-          gap:16px;
-          transition:transform .45s cubic-bezier(.4,0,.2,1);
+          gap:14px;
+          transition:transform .42s cubic-bezier(.4,0,.2,1);
           will-change:transform;
         }
-        /* Each card takes exactly 1/visibleCount of the viewport minus gaps */
+        /* Desktop: 3 cards */
         .carousel-track .fcard{
-          flex:0 0 calc(25% - 12px);
+          flex:0 0 calc(33.333% - 10px);
           min-width:0;
         }
-        .carousel-arrow{width:40px;height:40px;border-radius:50%;border:1.5px solid #E2E8F0;background:#fff;font-size:28px;font-weight:300;color:#374151;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;box-shadow:0 2px 8px rgba(15,23,42,.08);z-index:2;line-height:1;padding-bottom:2px}
+        .carousel-arrow{width:38px;height:38px;border-radius:50%;border:1.5px solid #E2E8F0;background:#fff;font-size:26px;font-weight:300;color:#374151;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;box-shadow:0 2px 8px rgba(15,23,42,.08);z-index:2;line-height:1;padding-bottom:2px}
         .carousel-arrow:hover:not([disabled]){border-color:#0F172A;background:#0F172A;color:#fff;box-shadow:0 4px 14px rgba(15,23,42,.18)}
         .carousel-arrow:disabled{opacity:.3;cursor:not-allowed}
         .carousel-arrow-left{margin-right:10px}
         .carousel-arrow-right{margin-left:10px}
-        .carousel-dots{display:flex;justify-content:center;gap:6px;margin-top:16px}
+        .carousel-dots{display:flex;justify-content:center;gap:6px;margin-top:14px}
         .carousel-dot{width:7px;height:7px;border-radius:50%;border:none;background:#CBD5E1;cursor:pointer;padding:0;transition:all .35s cubic-bezier(.4,0,.2,1)}
         .carousel-dot.active{background:#0F172A;width:20px;border-radius:99px}
 
         .feat-view-all{display:inline-flex;align-items:center;gap:6px;margin-top:14px;font-size:13px;font-weight:700;color:#2563EB;background:none;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;text-decoration:none}
         .feat-view-all:hover{text-decoration:underline}
 
-        .city-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-        .city-card{position:relative;height:155px;border-radius:18px;overflow:hidden;cursor:pointer;transition:transform .2s,box-shadow .2s}
-        .city-card:hover{transform:translateY(-3px);box-shadow:0 14px 36px rgba(15,23,42,.18)}
+        /* ── FIX 2: Smaller city cards ── */
+        .city-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+        .city-card{position:relative;height:130px;border-radius:14px;overflow:hidden;cursor:pointer;transition:transform .2s,box-shadow .2s}
+        .city-card:hover{transform:translateY(-3px);box-shadow:0 12px 30px rgba(15,23,42,.16)}
         .city-card img{width:100%;height:100%;object-fit:cover;display:block}
         .city-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(15,23,42,.78) 0%,rgba(15,23,42,.08) 60%)}
-        .city-body{position:absolute;bottom:14px;left:14px;right:14px}
-        .city-name{font-family:'Fraunces',serif;font-size:17px;font-weight:700;color:#fff;margin-bottom:2px}
-        .city-count{font-size:11.5px;color:rgba(255,255,255,.65);font-weight:500}
+        .city-body{position:absolute;bottom:11px;left:12px;right:12px}
+        .city-name{font-family:'Fraunces',serif;font-size:15px;font-weight:700;color:#fff;margin-bottom:1px}
+        .city-count{font-size:11px;color:rgba(255,255,255,.65);font-weight:500}
 
         .trust{background:#0F172A;border-radius:24px;padding:48px 52px;margin:48px 0;display:grid;grid-template-columns:1fr 1fr;gap:52px;align-items:center;overflow:hidden;position:relative}
         .trust::before{content:'';position:absolute;top:-60px;right:-40px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(37,99,235,.16) 0%,transparent 70%);pointer-events:none}
@@ -739,16 +742,19 @@ export default function SeekerMarketplace() {
         .footer-legal a{font-size:13px;color:#94A3B8;text-decoration:none}
         .footer-legal a:hover{color:#374151}
 
+        /* ── Responsive breakpoints ── */
         @media(max-width:1200px){
           .listing-grid{grid-template-columns:repeat(3,1fr)}
           .city-grid{grid-template-columns:repeat(3,1fr)}
         }
         @media(max-width:960px){
           .listing-grid{grid-template-columns:repeat(2,1fr)}
-          .city-grid{grid-template-columns:repeat(2,1fr)}
+          .city-grid{grid-template-columns:repeat(3,1fr)}
           .trust{grid-template-columns:1fr;padding:36px}
           .trust-cards{display:none}
           .footer-top{grid-template-columns:1fr 1fr;gap:24px}
+          /* Tablet: 2 cards */
+          .carousel-track .fcard{flex:0 0 calc(50% - 7px)}
         }
         @media(max-width:768px){
           .hamburger{display:block}
@@ -771,17 +777,18 @@ export default function SeekerMarketplace() {
           .cat-inner{padding:0 14px}
           .tag-row-inner{padding:10px 14px}
           .lm-options{grid-template-columns:1fr 1fr}
-          /* Tablet: 2 cards visible */
-          .carousel-track .fcard{flex:0 0 calc(50% - 8px)}
-          .carousel-arrow{width:34px;height:34px;font-size:22px}
+          .carousel-track .fcard{flex:0 0 calc(50% - 7px)}
+          .carousel-arrow{width:32px;height:32px;font-size:20px}
+          .city-card{height:115px}
         }
         @media(max-width:520px){
           .listing-grid{grid-template-columns:1fr}
           .city-grid{grid-template-columns:repeat(2,1fr)}
-          .city-card{height:130px}
+          .city-card{height:105px}
+          .city-name{font-size:13px}
           .feat-strip{gap:12px}
-          /* Mobile: 2 cards visible, no arrows — swipe instead */
-          .carousel-track .fcard{flex:0 0 calc(50% - 8px)}
+          /* Mobile: 1 card + peek of next */
+          .carousel-track .fcard{flex:0 0 calc(80% - 7px)}
           .carousel-arrow{display:none}
           .footer-top{grid-template-columns:1fr}
           .trust{padding:24px 20px;border-radius:18px}
@@ -1119,7 +1126,11 @@ export default function SeekerMarketplace() {
               >
                 <div
                   className="carousel-track"
-                  style={{ transform: `translateX(${translateX})` }}
+                  style={{
+                    transform: featIdx > 0
+                      ? `translateX(calc(-${featIdx * (100 / visibleCount)}% - ${featIdx * 14}px))`
+                      : 'translateX(0)',
+                  }}
                 >
                   {featuredListings.map(l => (
                     <div key={l.id} className="fcard" onClick={() => goToListing(l.id)}>
@@ -1128,7 +1139,12 @@ export default function SeekerMarketplace() {
                           ? <img src={l.photos[0]} alt={l.title} loading="lazy" />
                           : <div className="fcard-ph">🏠</div>
                         }
-                        <button className="fcard-save" onClick={e => toggleSave(l.id, e)}>
+                        {/* FIX 3: red heart if saved */}
+                        <button
+                          className="fcard-save"
+                          onClick={e => toggleSave(l.id, e)}
+                          title={savedIds.has(l.id) ? 'Unsave' : 'Save'}
+                        >
                           {savedIds.has(l.id) ? '❤️' : '🤍'}
                         </button>
                         {isAvailableSoon(l.available_from) && <div className="fcard-badge">Available soon</div>}
@@ -1184,6 +1200,7 @@ export default function SeekerMarketplace() {
                 <div className="sec-sub">Find rentals in your preferred location</div>
               </div>
             </div>
+            {/* FIX 2: already limited to MAX_CITY_CARDS (6) via slice above */}
             <div className="city-grid">
               {cityCards.map(c => (
                 <div key={c.city} className="city-card" onClick={() => { setSelectedCity(c.city); scrollToBrowse() }}>
@@ -1212,13 +1229,15 @@ export default function SeekerMarketplace() {
             </div>
             <div className="feat-strip">
               {availableListings.map(l => (
-                <div key={l.id} className="fcard" onClick={() => goToListing(l.id)}>
+                <div key={l.id} className="fcard" style={{ minWidth: 240, maxWidth: 280 }} onClick={() => goToListing(l.id)}>
                   <div className="fcard-img">
                     {l.photos.length > 0
                       ? <img src={l.photos[0]} alt={l.title} loading="lazy" />
                       : <div className="fcard-ph">🏠</div>
                     }
-                    <button className="fcard-save" onClick={e => toggleSave(l.id, e)}>{savedIds.has(l.id) ? '❤️' : '🤍'}</button>
+                    <button className="fcard-save" onClick={e => toggleSave(l.id, e)}>
+                      {savedIds.has(l.id) ? '❤️' : '🤍'}
+                    </button>
                     <div className="fcard-badge">Available soon</div>
                   </div>
                   <div className="fcard-body">
@@ -1330,6 +1349,7 @@ export default function SeekerMarketplace() {
                   : <div className="lcard-ph">🏠</div>
                 }
                 {l.photos.length > 1 && <div className="lcard-photo-ct">📷 {l.photos.length}</div>}
+                {/* FIX 3: red heart if saved */}
                 <button className="lcard-save" onClick={e => toggleSave(l.id, e)}>
                   {savedIds.has(l.id) ? '❤️' : '🤍'}
                 </button>
