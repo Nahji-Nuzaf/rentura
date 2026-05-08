@@ -201,7 +201,7 @@ export default function OnboardingPage() {
     const sb = createClient()
     await sb.from('profiles').update({
       phone: phone.trim(),
-      currency: currency,          // ← save selected currency to profile
+      currency: currency,
       active_role: 'landlord',
       roles: ['landlord'],
     }).eq('id', userId).select()
@@ -284,7 +284,7 @@ export default function OnboardingPage() {
     await sb.from('units').update({ status: 'occupied' }).eq('id', tenantRow.unit_id).select()
     await sb.from('profiles').update({
       phone: tenantPhone.trim(),
-      currency: currency,          // ← save selected currency to profile
+      currency: currency,
       active_role: 'tenant',
       roles: ['tenant'],
     }).eq('id', userId).select()
@@ -298,12 +298,22 @@ export default function OnboardingPage() {
     const sb = createClient()
     await sb.from('profiles').update({
       phone: seekerPhone || null,
-      currency: currency,          // ← save selected currency to profile
+      currency: currency,
       active_role: 'seeker',
       roles: ['seeker'],
     }).eq('id', userId).select()
     setLoading(false)
     setStep(2)
+  }
+
+  // ── Shared helper: mark onboarding complete and navigate ──
+  // Called only from the final "Go to Dashboard" button of each role
+  const completeOnboarding = async (destination: string) => {
+    const sb = createClient()
+    await sb.from('profiles')
+      .update({ onboarding_completed: true })
+      .eq('id', userId)
+    router.push(destination)
   }
 
   const steps = role === 'landlord'
@@ -581,7 +591,7 @@ export default function OnboardingPage() {
                 </div>
               )}
 
-              {/* ══ LANDLORD STEP 3 ══ */}
+              {/* ══ LANDLORD STEP 3 — final step, marks onboarding complete ══ */}
               {role === 'landlord' && step === 3 && (
                 <div className="ob-card" style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: 60, marginBottom: 16 }}>🎉</div>
@@ -603,7 +613,8 @@ export default function OnboardingPage() {
                       </div>
                     ))}
                   </div>
-                  <button className="ob-btn" onClick={() => router.push('/landlord')}>
+                  {/* ── FIX: mark onboarding_completed = true before navigating ── */}
+                  <button className="ob-btn" onClick={() => completeOnboarding('/landlord')}>
                     Go to Dashboard →
                   </button>
                 </div>
@@ -686,7 +697,7 @@ export default function OnboardingPage() {
                 </div>
               )}
 
-              {/* ══ TENANT STEP 2 ══ */}
+              {/* ══ TENANT STEP 2 — final step, marks onboarding complete ══ */}
               {role === 'tenant' && step === 2 && (
                 <div className="ob-card" style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: 60, marginBottom: 16 }}>🏡</div>
@@ -704,7 +715,8 @@ export default function OnboardingPage() {
                       </div>
                     ))}
                   </div>
-                  <button className="ob-btn" onClick={() => router.push('/tenant')}>
+                  {/* ── FIX: mark onboarding_completed = true before navigating ── */}
+                  <button className="ob-btn" onClick={() => completeOnboarding('/tenant')}>
                     Go to My Dashboard →
                   </button>
                 </div>
@@ -788,7 +800,7 @@ export default function OnboardingPage() {
                 </div>
               )}
 
-              {/* ══ SEEKER STEP 2 ══ */}
+              {/* ══ SEEKER STEP 2 — final step, marks onboarding complete ══ */}
               {role === 'seeker' && step === 2 && (
                 <div className="ob-card" style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: 60, marginBottom: 16 }}>🔍</div>
@@ -806,7 +818,8 @@ export default function OnboardingPage() {
                       </div>
                     ))}
                   </div>
-                  <button className="ob-btn" onClick={() => router.push('/seeker')}>
+                  {/* ── FIX: mark onboarding_completed = true before navigating ── */}
+                  <button className="ob-btn" onClick={() => completeOnboarding('/seeker')}>
                     Browse Listings →
                   </button>
                 </div>

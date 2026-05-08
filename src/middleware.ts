@@ -2,9 +2,6 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-
-
-
   let response = NextResponse.next({
     request: { headers: request.headers },
   })
@@ -19,26 +16,22 @@ export async function middleware(request: NextRequest) {
         },
         set(name: string, value: string, options: CookieOptions) {
           request.cookies.set({ name, value, ...options })
-          response = NextResponse.next({
-            request: { headers: request.headers },
-          })
+          response = NextResponse.next({ request: { headers: request.headers } })
           response.cookies.set({ name, value, ...options })
         },
         remove(name: string, options: CookieOptions) {
           request.cookies.set({ name, value: '', ...options })
-          response = NextResponse.next({
-            request: { headers: request.headers },
-          })
+          response = NextResponse.next({ request: { headers: request.headers } })
           response.cookies.set({ name, value: '', ...options })
         },
       },
     }
   )
 
-  // Use getUser() instead of getSession() for better security
   const { data: { user } } = await supabase.auth.getUser()
   const { pathname } = request.nextUrl
 
+  // ── Admin guard (unchanged) ──
   if (pathname.startsWith('/admin')) {
     const adminCookie = request.cookies.get('admin_auth')?.value
     const adminSecret = process.env.ADMIN_SECRET || 'rentura-admin-2024'
@@ -47,40 +40,49 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // 1. Define protected and auth routes
   const protectedPrefixes = ['/landlord', '/tenant', '/onboarding']
-  const seekerProtectedPrefixes = [
-    '/seeker/messages',
-    '/seeker/profile',
-    '/seeker/saved',
-  ]
+  const seekerProtectedPrefixes = ['/seeker/messages', '/seeker/profile', '/seeker/saved']
   const isProtected =
-  protectedPrefixes.some(p => pathname.startsWith(p)) ||
-  seekerProtectedPrefixes.some(p => pathname.startsWith(p))
+    protectedPrefixes.some(p => pathname.startsWith(p)) ||
+    seekerProtectedPrefixes.some(p => pathname.startsWith(p))
   const isAuthPage = pathname === '/login' || pathname === '/signup'
+  const isDashboard =
+    pathname.startsWith('/landlord') ||
+    pathname.startsWith('/tenant') ||
+    pathname.startsWith('/seeker')
 
-  // 2. If user is NOT logged in and trying to access protected routes
+  // ── Not logged in → send to login ──
   if (!user && isProtected) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // 3. If user IS logged in and trying to access login/signup
-  if (user && isAuthPage) {
+  if (user) {
+    // Fetch profile once for all logged-in checks
     const { data: profile } = await supabase
       .from('profiles')
-      .select('active_role')
+      .select('active_role, onboarding_completed')
       .eq('id', user.id)
       .maybeSingle()
 
     const role = profile?.active_role || 'landlord'
+    const onboardingDone = profile?.onboarding_completed ?? false
 
-    // Redirect to their specific dashboard
-    const url = request.nextUrl.clone()
-    if (role === 'tenant') url.pathname = '/tenant'
-    else if (role === 'seeker') url.pathname = '/seeker'
-    else url.pathname = '/landlord'
+    // ── NEW: Block dashboard access until onboarding is done ──
+    if (isDashboard && !onboardingDone) {
+      return NextResponse.redirect(new URL('/onboarding', request.url))
+    }
 
-    return NextResponse.redirect(url)
+    // ── Already logged in → redirect away from auth pages ──
+    if (isAuthPage) {
+      if (!onboardingDone) {
+        return NextResponse.redirect(new URL('/onboarding', request.url))
+      }
+      const url = request.nextUrl.clone()
+      if (role === 'tenant') url.pathname = '/tenant'
+      else if (role === 'seeker') url.pathname = '/seeker'
+      else url.pathname = '/landlord'
+      return NextResponse.redirect(url)
+    }
   }
 
   return response
@@ -88,13 +90,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - auth/callback (important: exclude your callback route!)
-     */
     '/((?!_next/static|_next/image|favicon.ico|auth/callback|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
